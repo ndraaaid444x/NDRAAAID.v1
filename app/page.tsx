@@ -9,7 +9,6 @@ import {
   Gamepad2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { supabaseBrowser } from '@/lib/supabase-browser'
 
 export default function Home() {
   const [games, setGames] = useState<any[]>([])
@@ -25,76 +24,92 @@ export default function Home() {
       setLoadingGames(true)
       setGameError('')
 
+      const supabaseUrl =
+        process.env.NEXT_PUBLIC_SUPABASE_URL
+
+      const supabaseKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) {
+        if (mounted) {
+          setGames([])
+          setGameError(
+            'Konfigurasi Supabase tidak ditemukan.'
+          )
+          setLoadingGames(false)
+        }
+
+        return
+      }
+
+      const controller = new AbortController()
+
+      const timeout = setTimeout(() => {
+        controller.abort()
+      }, 8000)
+
       try {
-        const supabase = supabaseBrowser()
+        const url =
+          `${supabaseUrl}/rest/v1/games` +
+          `?select=*` +
+          `&is_active=eq.true` +
+          `&popular=eq.true` +
+          `&order=name.asc` +
+          `&limit=10`
 
-        /*
-         * Query game utama
-         */
-        const queryPromise = supabase
-          .from('games')
-          .select('*')
-          .eq('is_active', true)
-          .eq('popular', true)
-          .order('name')
-          .limit(10)
-
-        /*
-         * Pengaman:
-         * Jangan biarkan browser menunggu Supabase selamanya.
-         */
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(
-              new Error(
-                'Timeout memuat game. Silakan coba muat ulang halaman.'
-              )
-            )
-          }, 8000)
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            Accept: 'application/json',
+          },
+          cache: 'no-store',
+          signal: controller.signal,
         })
 
-        /*
-         * Jalankan query dan timeout bersamaan.
-         * Yang selesai lebih dahulu akan digunakan.
-         */
-        const result = (await Promise.race([
-          queryPromise,
-          timeoutPromise,
-        ])) as {
-          data: any[] | null
-          error: any
+        if (!response.ok) {
+          const message = await response.text()
+
+          throw new Error(
+            `Supabase HTTP ${response.status}: ${message}`
+          )
         }
+
+        const data = await response.json()
 
         if (!mounted) return
 
-        const { data, error } = result
-
-        if (error) {
-          console.error('Gagal mengambil data games:', error)
-
-          setGames([])
-
-          setGameError(
-            error?.message ||
-              'Gagal memuat daftar game.'
+        if (!Array.isArray(data)) {
+          throw new Error(
+            'Format data game tidak valid.'
           )
-
-          return
         }
 
-        setGames(data || [])
+        setGames(data)
       } catch (error: any) {
         if (!mounted) return
 
-        console.error('Unexpected games error:', error)
+        console.error(
+          'Gagal memuat game:',
+          error
+        )
 
         setGames([])
 
-        setGameError(
-          error?.message ||
-            'Terjadi kesalahan saat memuat game.'
-        )
+        if (error?.name === 'AbortError') {
+          setGameError(
+            'Server game tidak merespons dalam 8 detik. Silakan coba lagi.'
+          )
+        } else {
+          setGameError(
+            error?.message ||
+              'Terjadi kesalahan saat memuat game.'
+          )
+        }
       } finally {
+        clearTimeout(timeout)
+
         if (mounted) {
           setLoadingGames(false)
         }
