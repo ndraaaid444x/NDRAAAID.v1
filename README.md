@@ -1,4 +1,4 @@
-# NDRAAAID.v1 — Supabase + GitHub Pages
+# NDRAAAID v1 — Supabase + GitHub Pages
 
 Platform top-up game Indonesia dengan mode transaksi **MANUAL**.
 
@@ -38,4 +38,4 @@ Admin Owner/Admin dapat menayangkan pengumuman promo/info di bagian atas website
 GitHub Actions performs `npm install`, `npm run typecheck`, `npm run build`, and verifies `out/index.html` before deploying to GitHub Pages. See `BUILD-VERIFICATION.md`.
 
 ## Email Authentication V4
-NDRAAAID V4 menambahkan alur verifikasi email aktif, resend verification, halaman email verified, template email branded, OTP login, dan reset password berbasis link email. Lihat `EMAIL-AUTH-NDRAAAID-V4.md` dan folder `supabase/email-templates/`.
+NDRAAAID V4 menambahkan alur verifikasi email aktif, resend verification, halaman email verified, template email branded, OTP login, dan reset password berbasis OTP. Lihat `EMAIL-AUTH-NDRAAAID-V4.md` dan folder `supabase/email-templates/`.

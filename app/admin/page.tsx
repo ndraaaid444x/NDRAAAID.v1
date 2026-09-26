@@ -8,11 +8,9 @@ const transitions: Record<string, string[]> = {
   PENDING_PAYMENT: ['PAYMENT_RECEIVED', 'CANCELLED', 'EXPIRED'],
   PAYMENT_RECEIVED: ['PROCESSING', 'FAILED', 'CANCELLED'],
   PROCESSING: ['SUCCESS', 'FAILED'],
-  FAILED: ['REFUNDED'],
-  CANCELLED: ['REFUNDED'],
 }
 
-const tabs = ['orders', 'deposits', 'deposit-history', 'wallet-history', 'categories', 'games', 'products', 'payments', 'vouchers', 'promotions', 'banners', 'broadcasts', 'media', 'users', 'settings', 'chat']
+const tabs = ['orders', 'deposits', 'deposit-history', 'wallet-history', 'categories', 'games', 'products', 'payments', 'vouchers', 'promotions', 'broadcasts', 'media', 'users', 'settings', 'chat']
 const mediaCategories = [
   ['games', 'Game / Logo'],
   ['products', 'Produk'],
@@ -32,7 +30,6 @@ export default function Admin() {
   const [methods, setMethods] = useState<any[]>([])
   const [vouchers, setVouchers] = useState<any[]>([])
   const [promos, setPromos] = useState<any[]>([])
-  const [banners, setBanners] = useState<any[]>([])
   const [broadcasts, setBroadcasts] = useState<any[]>([])
   const [mediaAssets, setMediaAssets] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
@@ -46,7 +43,7 @@ export default function Admin() {
   const [mediaCategory, setMediaCategory] = useState('general')
   const [mediaSearch, setMediaSearch] = useState('')
   const [mediaUploading, setMediaUploading] = useState(false)
-  const [site, setSite] = useState<any>({ name: 'NDRAAAID.v1', tagline: 'Top Up Game Cepat, Aman & Terpercaya', manual_mode: true })
+  const [site, setSite] = useState<any>({ name: 'NDRAAAID', tagline: 'Top Up Game Cepat, Aman & Terpercaya', manual_mode: true })
 
   const [categoryForm, setCategoryForm] = useState({ name: '', slug: '', description: '' })
   const [gameForm, setGameForm] = useState({ name: '', slug: '', description: '', logo_url: '', banner_url: '', category_id: '' })
@@ -54,7 +51,6 @@ export default function Admin() {
   const [methodForm, setMethodForm] = useState({ name: '', kind: 'QRIS', account_name: '', account_number: '', instruction: '', qr_url: '' })
   const [voucherForm, setVoucherForm] = useState({ code: '', discount_type: 'PERCENT', discount_value: '10', min_order: '0', max_discount: '' })
   const [promoForm, setPromoForm] = useState({ name: '', description: '', banner_url: '', code: '' })
-  const [bannerForm, setBannerForm] = useState({ title: '', image_url: '', link_url: '', sort_order: '0' })
   const [broadcastForm, setBroadcastForm] = useState({ title: '', message: '', type: 'PROMO', durationMinutes: '60', link_url: '', link_label: '' })
 
   const router = useRouter()
@@ -64,10 +60,10 @@ export default function Admin() {
     const { data: { user } } = await s.auth.getUser()
     if (!user) { router.push('/login'); return }
     const { data: p } = await s.from('profiles').select('role').eq('id', user.id).single()
-    if (!p || !['owner', 'co_owner', 'admin', 'customer_service'].includes(p.role)) { router.push('/'); return }
+    if (!p || !['owner', 'admin', 'customer_service'].includes(p.role)) { router.push('/'); return }
     setRole(p.role)
 
-    const [{ data: o }, { data: g }, { data: cat }, { data: pr }, { data: m }, { data: v }, { data: pm }, { data: b }, { data: bn }, { data: ma }, { data: u }, { data: w }, { data: dep }, { data: wtx }, { data: cr }, { data: st }] = await Promise.all([
+    const [{ data: o }, { data: g }, { data: cat }, { data: pr }, { data: m }, { data: v }, { data: pm }, { data: b }, { data: ma }, { data: u }, { data: w }, { data: dep }, { data: wtx }, { data: cr }, { data: st }] = await Promise.all([
       s.from('orders').select('id,order_code,status,total,created_at,games(name),profiles(username)').order('created_at', { ascending: false }).limit(200),
       s.from('games').select('*,game_categories(name)').order('created_at', { ascending: false }),
       s.from('game_categories').select('*').order('sort_order').order('name'),
@@ -76,7 +72,6 @@ export default function Admin() {
       s.from('vouchers').select('*').order('created_at', { ascending: false }),
       s.from('promotions').select('*').order('created_at', { ascending: false }),
       s.from('broadcasts').select('*').order('created_at', { ascending: false }).limit(100),
-      s.from('banners').select('*').order('sort_order').order('created_at', { ascending: false }),
       s.from('media_assets').select('*').order('created_at', { ascending: false }).limit(300),
       s.from('profiles').select('id,username,email,name,role,is_suspended,created_at').order('created_at', { ascending: false }).limit(200),
       s.from('wallets').select('user_id,balance,updated_at'),
@@ -92,7 +87,7 @@ export default function Admin() {
       s.from('chat_rooms').select('*,profiles(username,email)').order('created_at', { ascending: false }),
       s.from('settings').select('*').eq('key', 'site').maybeSingle(),
     ])
-    setOrders(o || []); setBanners(bn || []); setDeposits(dep || []); setWalletTx(wtx || []); setGames(g || []); setCategories(cat || []); setProducts(pr || []); setMethods(m || []); setVouchers(v || []); setPromos(pm || []); setBroadcasts(b || []); setMediaAssets(ma || []); setUsers(u || []); setWallets(w || []); setRooms(cr || [])
+    setOrders(o || []); setDeposits(dep || []); setWalletTx(wtx || []); setGames(g || []); setCategories(cat || []); setProducts(pr || []); setMethods(m || []); setVouchers(v || []); setPromos(pm || []); setBroadcasts(b || []); setMediaAssets(ma || []); setUsers(u || []); setWallets(w || []); setRooms(cr || [])
     if (st?.value) setSite(st.value)
     if (g?.[0] && !prodForm.game_id) setProdForm(x => ({ ...x, game_id: g[0].id }))
     if (cat?.[0] && !gameForm.category_id) setGameForm(x => ({ ...x, category_id: cat[0].id }))
@@ -114,7 +109,7 @@ export default function Admin() {
   }
 
   async function reviewDeposit(d: any, action: 'APPROVE' | 'REJECT') {
-    if (!['owner','co_owner','admin'].includes(role)) { setMsg('Tidak memiliki permission untuk memproses deposit.'); return }
+    if (!['owner','admin'].includes(role)) { setMsg('Hanya Owner/Admin yang dapat memproses deposit.'); return }
     let reason: string | null = null
     if (action === 'REJECT') { reason = prompt('Alasan penolakan deposit (wajib):')?.trim() || null; if (!reason) { setMsg('Alasan penolakan wajib diisi.'); return } }
     if (!confirm(`${action === 'APPROVE' ? 'Setujui' : 'Tolak'} deposit ${d.deposit_code} sebesar Rp ${Number(d.amount).toLocaleString('id-ID')}?`)) return
@@ -131,7 +126,7 @@ export default function Admin() {
   }
 
   async function toggle(table: string, id: string) {
-    const rows = table === 'games' ? games : table === 'game_products' ? products : table === 'payment_methods' ? methods : table === 'vouchers' ? vouchers : table === 'broadcasts' ? broadcasts : table === 'banners' ? banners : table === 'game_categories' ? categories : promos
+    const rows = table === 'games' ? games : table === 'game_products' ? products : table === 'payment_methods' ? methods : table === 'vouchers' ? vouchers : table === 'broadcasts' ? broadcasts : table === 'game_categories' ? categories : promos
     const row = rows.find((x: any) => x.id === id)
     const { error } = await s.from(table).update({ is_active: !row.is_active }).eq('id', id)
     setMsg(error?.message || 'Status diperbarui.'); load()
@@ -145,7 +140,7 @@ export default function Admin() {
   }
 
   async function adjustWallet(u: any, sign: 1 | -1) {
-    if (!canAdjustWallet) { setMsg('Tidak memiliki permission finance wallet.'); return }
+    if (role !== 'owner') { setMsg('Hanya Owner yang dapat mengubah saldo.'); return }
     const amountText = prompt(`${sign > 0 ? 'Tambah' : 'Kurangi'} saldo untuk ${u.email || u.username || 'user'} (angka rupiah):`, '10000')
     if (!amountText) return
     const amount = Number(amountText.replace(/[^0-9.-]/g, ''))
@@ -153,7 +148,7 @@ export default function Admin() {
     const reason = prompt('Alasan perubahan saldo (wajib):', sign > 0 ? 'Kredit saldo manual' : 'Debit saldo manual')
     if (!reason?.trim()) { setMsg('Alasan wajib diisi.'); return }
     if (!confirm(`${sign > 0 ? 'Tambah' : 'Kurangi'} Rp ${amount.toLocaleString('id-ID')}?`)) return
-    const { error } = await s.rpc('adjust_wallet', { p_user_id: u.id, p_amount: sign * amount, p_reason: reason.trim() })
+    const { error } = await s.rpc('owner_adjust_wallet', { p_user_id: u.id, p_amount: sign * amount, p_reason: reason.trim() })
     setMsg(error?.message || 'Saldo berhasil diperbarui.'); load()
   }
 
@@ -166,14 +161,14 @@ export default function Admin() {
 
   async function changeRole(u: any) {
     if (role !== 'owner') return
-    const next = prompt('Role baru: user/admin/customer_service/co_owner/owner', u.role)
-    if (!next || !['user', 'admin', 'customer_service', 'co_owner', 'owner'].includes(next)) return
-    const { error } = await s.rpc('owner_set_role', { p_user_id: u.id, p_role: next })
+    const next = prompt('Role baru: user/admin/customer_service/owner', u.role)
+    if (!next || !['user', 'admin', 'customer_service', 'owner'].includes(next)) return
+    const { error } = await s.from('profiles').update({ role: next }).eq('id', u.id)
     setMsg(error?.message || 'Role diperbarui.'); load()
   }
 
   async function uploadAsset(file: File, category: string, callback?: (url: string) => void) {
-    if (!['owner', 'co_owner', 'admin'].includes(role)) { setMsg('Hanya Owner/Admin yang boleh mengunggah media.'); return }
+    if (!['owner', 'admin'].includes(role)) { setMsg('Hanya Owner/Admin yang boleh mengunggah media.'); return }
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (!allowed.includes(file.type)) { setMsg('Format harus JPG, PNG, WEBP, atau GIF.'); return }
     if (file.size > 6 * 1024 * 1024) { setMsg('Ukuran maksimal 6 MB per file.'); return }
@@ -213,19 +208,13 @@ export default function Admin() {
     setMsg('URL media disalin.')
   }
 
-  async function addBanner(e: FormEvent) {
-    e.preventDefault();
-    if (!['owner','admin'].includes(role)) return setMsg('Tidak memiliki permission marketing.');
-    const payload = { title: bannerForm.title.trim(), image_url: bannerForm.image_url.trim(), link_url: bannerForm.link_url.trim() || null, sort_order: Number(bannerForm.sort_order) || 0, is_active: true };
-    if (!payload.title || !payload.image_url) return setMsg('Judul dan URL gambar wajib diisi.');
-    const { error } = await s.from('banners').insert(payload);
-    setMsg(error?.message || 'Banner berhasil diterbitkan.'); if (!error) setBannerForm({title:'',image_url:'',link_url:'',sort_order:'0'}); load();
-  }
-
   async function addBroadcast(e: FormEvent) {
-    e.preventDefault(); if (!['owner', 'co_owner', 'admin'].includes(role)) return
+    e.preventDefault(); if (!['owner', 'admin'].includes(role)) return
     const minutes = Math.max(1, Number(broadcastForm.durationMinutes) || 60)
-    const { error } = await s.rpc('create_broadcast', { p_title: broadcastForm.title.trim(), p_message: broadcastForm.message.trim(), p_type: broadcastForm.type, p_duration_minutes: minutes, p_link_url: broadcastForm.link_url.trim() || null, p_link_label: broadcastForm.link_label.trim() || null })
+    const starts = new Date(); const ends = new Date(starts.getTime() + minutes * 60000)
+    const { data: { user } } = await s.auth.getUser()
+    const payload = { title: broadcastForm.title.trim(), message: broadcastForm.message.trim(), type: broadcastForm.type, starts_at: starts.toISOString(), ends_at: ends.toISOString(), link_url: broadcastForm.link_url.trim() || null, link_label: broadcastForm.link_label.trim() || null, is_active: true, created_by: user?.id }
+    const { error } = await s.from('broadcasts').insert(payload)
     setMsg(error?.message || `Broadcast aktif selama ${minutes} menit.`)
     if (!error) setBroadcastForm({ title: '', message: '', type: 'PROMO', durationMinutes: '60', link_url: '', link_label: '' })
     load()
@@ -247,7 +236,7 @@ export default function Admin() {
   async function sendChat() {
     if (!activeRoom || !chatText.trim()) return
     const { data: { user } } = await s.auth.getUser(); if (!user) return
-    await s.rpc('send_chat_message', { p_room_id: activeRoom.id, p_message: chatText.trim() }); setChatText('')
+    await s.from('chat_messages').insert({ room_id: activeRoom.id, sender_id: user.id, message: chatText.trim() }); setChatText('')
   }
 
   async function addCategory(e: FormEvent) {
@@ -268,28 +257,17 @@ export default function Admin() {
   }
 
   const filteredMedia = mediaAssets.filter(a => a.name.toLowerCase().includes(mediaSearch.toLowerCase()) && (mediaCategory === 'all' || a.category === mediaCategory))
-  const tabPermissions: Record<string, string[]> = {
-    orders: ['owner','co_owner','admin','customer_service'],
-    deposits: ['owner','co_owner','admin'], 'deposit-history': ['owner','co_owner','admin'], 'wallet-history': ['owner','co_owner','admin'],
-    categories: ['owner','co_owner','admin'], games: ['owner','co_owner','admin'], products: ['owner','co_owner','admin'], payments: ['owner','co_owner','admin'],
-    vouchers: ['owner','co_owner','admin'], promotions: ['owner','co_owner','admin'], banners: ['owner','co_owner','admin'], media: ['owner','co_owner','admin'],
-    broadcasts: ['owner','co_owner','admin'], users: ['owner','co_owner','admin','customer_service'], settings: ['owner'], chat: ['owner','co_owner','admin','customer_service']
-  }
-  const visibleTabs = tabs.filter(x => tabPermissions[x]?.includes(role))
-  const canProcessOrders = ['owner','co_owner','admin'].includes(role)
-  const canRefundOrders = ['owner','co_owner'].includes(role)
-  const canAdjustWallet = ['owner','co_owner'].includes(role)
 
   return <main className="mx-auto max-w-7xl px-4 py-10">
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div><p className="text-sm font-bold text-purple-300">ADMIN PANEL</p><h1 className="text-4xl font-black">NDRAAAID.v1 Control Center</h1><p className="mt-2 text-slate-400">Transaction Mode: <b className="text-cyan-300">MANUAL</b> · {role}</p></div>
-      <div className="flex max-w-full gap-2 overflow-x-auto pb-1">{visibleTabs.map(x => { const labels: any = {orders:'Transaksi / Riwayat Order',deposits:'Keuangan / Deposit Member', 'deposit-history':'Keuangan / Riwayat Deposit','wallet-history':'Keuangan / Riwayat Wallet',categories:'Kategori',games:'Games',products:'Produk',payments:'Pembayaran',vouchers:'Voucher',promotions:'Promo',broadcasts:'Live Broadcast',media:'Media Manager',users:'Member & Wallet',settings:'Pengaturan',chat:'Live Chat'}; return <button key={x} onClick={() => setTab(x)} className={`btn shrink-0 text-xs ${tab === x ? 'btn-primary' : 'btn-muted'}`}>{labels[x]}</button> })}</div>
+      <div><p className="text-sm font-bold text-purple-300">ADMIN PANEL</p><h1 className="text-4xl font-black">NDRAAAID Control Center</h1><p className="mt-2 text-slate-400">Transaction Mode: <b className="text-cyan-300">MANUAL</b> · {role}</p></div>
+      <div className="flex max-w-full gap-2 overflow-x-auto pb-1">{tabs.filter(x => x !== 'broadcasts' || ['owner', 'admin'].includes(role)).map(x => { const labels: any = {orders:'Transaksi / Riwayat Order',deposits:'Keuangan / Deposit Member', 'deposit-history':'Keuangan / Riwayat Deposit','wallet-history':'Keuangan / Riwayat Wallet',categories:'Kategori',games:'Games',products:'Produk',payments:'Pembayaran',vouchers:'Voucher',promotions:'Promo',broadcasts:'Live Broadcast',media:'Media Manager',users:'Member & Wallet',settings:'Pengaturan',chat:'Live Chat'}; return <button key={x} onClick={() => setTab(x)} className={`btn shrink-0 text-xs ${tab === x ? 'btn-primary' : 'btn-muted'}`}>{labels[x]}</button> })}</div>
     </div>
 
     {msg && <div className="mt-5 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-3 text-sm text-cyan-200">{msg}</div>}
     <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">{[['Total Order', orders.length], ['Pending', orders.filter(x => x.status === 'PENDING_PAYMENT').length], ['Processing', orders.filter(x => x.status === 'PROCESSING').length], ['Success', orders.filter(x => x.status === 'SUCCESS').length]].map(([k, v]) => <div key={String(k)} className="glass rounded-2xl p-4"><p className="text-xs text-slate-500">{k}</p><b className="mt-1 block text-2xl">{v}</b></div>)}</div>
 
-    {tab === 'orders' && <div className="mt-7 space-y-3">{orders.map(o => <div key={o.id} className="glass rounded-2xl p-5"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><b>{o.order_code}</b><p className="text-sm text-slate-400">{o.profiles?.username || '-'} · {o.games?.name || '-'} · Rp {Number(o.total).toLocaleString('id-ID')}</p><p className="mt-1 text-xs text-slate-500">{new Date(o.created_at).toLocaleString('id-ID')}</p></div><div className="flex flex-wrap gap-2">{canProcessOrders && (transitions[o.status] || []).filter(n => n !== 'REFUNDED' || canRefundOrders).map(n => <button key={n} onClick={() => transition(o, n)} className="btn btn-primary text-xs">{n.replaceAll('_', ' ')}</button>)}<a href={`/order/?id=${encodeURIComponent(o.id)}`} className="btn btn-muted text-xs">Detail</a></div></div></div>)}{!orders.length && <p className="text-slate-400">Belum ada order.</p>}</div>}
+    {tab === 'orders' && <div className="mt-7 space-y-3">{orders.map(o => <div key={o.id} className="glass rounded-2xl p-5"><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><b>{o.order_code}</b><p className="text-sm text-slate-400">{o.profiles?.username || '-'} · {o.games?.name || '-'} · Rp {Number(o.total).toLocaleString('id-ID')}</p><p className="mt-1 text-xs text-slate-500">{new Date(o.created_at).toLocaleString('id-ID')}</p></div><div className="flex flex-wrap gap-2">{(transitions[o.status] || []).map(n => <button key={n} onClick={() => transition(o, n)} className="btn btn-primary text-xs">{n.replaceAll('_', ' ')}</button>)}<a href={`/order/?id=${encodeURIComponent(o.id)}`} className="btn btn-muted text-xs">Detail</a></div></div></div>)}{!orders.length && <p className="text-slate-400">Belum ada order.</p>}</div>}
 
     {tab === 'deposits' && <section className="mt-7 space-y-3"><div className="glass rounded-2xl p-5"><h2 className="text-xl font-black">Deposit Member — Perlu Diproses</h2><p className="mt-1 text-sm text-slate-400">Setujui atau tolak bukti deposit. Persetujuan menambah saldo secara atomik dan hanya dapat dilakukan sekali.</p></div>{deposits.filter(d=>d.status==='PENDING').map(d=><div key={d.id} className="glass rounded-2xl p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><b>{d.deposit_code}</b><p className="text-sm text-slate-400">{d.profiles?.name || d.profiles?.username || d.profiles?.email || '-'} · {d.payment_methods?.name || '-'} · Rp {Number(d.amount).toLocaleString('id-ID')}</p><p className="mt-1 text-xs text-slate-500">{new Date(d.created_at).toLocaleString('id-ID')}</p><button type="button" onClick={()=>viewDepositProof(d)} className="mt-2 inline-block text-sm text-cyan-300">Lihat bukti pembayaran ↗</button>{d.note && <p className="mt-2 text-sm text-slate-400">Catatan: {d.note}</p>}</div><div className="flex flex-wrap gap-2"><button onClick={()=>reviewDeposit(d,'APPROVE')} className="btn btn-primary text-xs">✓ Setujui Deposit</button><button onClick={()=>reviewDeposit(d,'REJECT')} className="btn btn-muted text-xs text-red-300">✕ Tolak Deposit</button></div></div></div>)}{!deposits.some(d=>d.status==='PENDING') && <div className="glass rounded-2xl p-8 text-center text-slate-400">Tidak ada deposit yang menunggu verifikasi.</div>}</section>}
 
@@ -309,13 +287,11 @@ export default function Admin() {
 
     {tab === 'promotions' && <section className="mt-7 grid gap-7 lg:grid-cols-[.8fr_1.2fr]"><form onSubmit={e => { e.preventDefault(); add('promotions', { ...promoForm, is_active: true }, () => setPromoForm({ name: '', description: '', banner_url: '', code: '' })) }} className="glass rounded-2xl p-6 space-y-3"><h2 className="text-xl font-black">Promo & Banner</h2><input className="input" placeholder="Nama promo" value={promoForm.name} onChange={e => setPromoForm({ ...promoForm, name: e.target.value })} required/><textarea className="input min-h-24" placeholder="Deskripsi" value={promoForm.description} onChange={e => setPromoForm({ ...promoForm, description: e.target.value })}/><label className="block text-sm font-semibold">Upload banner<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="input mt-2" onChange={e => uploadFromInput(e, 'promotions', url => setPromoForm(v => ({ ...v, banner_url: url })))} /></label>{promoForm.banner_url && <img src={promoForm.banner_url} alt="Banner preview" className="h-32 w-full rounded-xl object-cover"/>}<input className="input" placeholder="Kode promo (opsional)" value={promoForm.code} onChange={e => setPromoForm({ ...promoForm, code: e.target.value })}/><button className="btn btn-primary">Tambah Promo</button></form><div className="space-y-3">{promos.map(p => <div key={p.id} className="glass overflow-hidden rounded-2xl">{p.banner_url && <img src={p.banner_url} alt="" className="h-32 w-full object-cover"/>}<div className="flex items-center justify-between gap-3 p-4"><div><b>{p.name}</b><p className="text-xs text-slate-500">{p.code || 'Tanpa kode'}</p></div><button onClick={() => toggle('promotions', p.id)} className="btn btn-muted text-xs">{p.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button></div></div>)}</div></section>}
 
-    {tab === 'banners' && ['owner', 'co_owner', 'admin'].includes(role) && <section className="mt-7 grid gap-7 lg:grid-cols-[.8fr_1.2fr]"><form onSubmit={addBanner} className="glass space-y-3 rounded-2xl p-6"><p className="text-xs font-bold uppercase tracking-widest text-cyan-300">BANNER HOMEPAGE</p><h2 className="text-xl font-black">Publish Banner</h2><input className="input" placeholder="Judul banner" value={bannerForm.title} onChange={e=>setBannerForm({...bannerForm,title:e.target.value})} required/><input className="input" placeholder="URL gambar" value={bannerForm.image_url} onChange={e=>setBannerForm({...bannerForm,image_url:e.target.value})} required/><input className="input" placeholder="Link tujuan (opsional)" value={bannerForm.link_url} onChange={e=>setBannerForm({...bannerForm,link_url:e.target.value})}/><input className="input" type="number" placeholder="Urutan" value={bannerForm.sort_order} onChange={e=>setBannerForm({...bannerForm,sort_order:e.target.value})}/><button className="btn btn-primary">Publish Banner</button></form><div className="space-y-3">{banners.map(b=><div key={b.id} className="glass overflow-hidden rounded-2xl"><img src={b.image_url} alt={b.title} className="h-40 w-full object-cover"/><div className="flex items-center justify-between gap-3 p-4"><div><b>{b.title}</b><p className="text-xs text-slate-500">Urutan {b.sort_order} · {b.is_active?'Aktif':'Nonaktif'}</p></div><button onClick={()=>toggle('banners',b.id)} className="btn btn-muted text-xs">{b.is_active?'Nonaktifkan':'Aktifkan'}</button></div></div>)}{!banners.length&&<p className="text-slate-400">Belum ada banner.</p>}</div></section>}
-
-    {tab === 'broadcasts' && ['owner', 'co_owner', 'admin'].includes(role) && <section className="mt-7 grid gap-7 lg:grid-cols-[.8fr_1.2fr]"><form onSubmit={addBroadcast} className="glass rounded-2xl p-6 space-y-3"><div><p className="text-xs font-bold uppercase tracking-widest text-cyan-300">Live Broadcast</p><h2 className="text-xl font-black">Kirim pengumuman ke semua pembeli</h2><p className="mt-1 text-sm text-slate-500">Pesan tampil di bagian atas website selama durasi yang kamu tentukan.</p></div><input className="input" placeholder="Judul, mis. 🔥 Promo 20% Hari Ini" value={broadcastForm.title} onChange={e => setBroadcastForm({ ...broadcastForm, title: e.target.value })} required/><textarea className="input min-h-28" placeholder="Isi broadcast untuk pembeli..." value={broadcastForm.message} onChange={e => setBroadcastForm({ ...broadcastForm, message: e.target.value })} required/><select className="input" value={broadcastForm.type} onChange={e => setBroadcastForm({ ...broadcastForm, type: e.target.value })}><option value="PROMO">Promo</option><option value="INFO">Info</option><option value="SUCCESS">Info sukses</option><option value="WARNING">Peringatan</option></select><div className="grid gap-3 sm:grid-cols-[1fr_1fr]"><input type="number" min="1" className="input" placeholder="Durasi (menit)" value={broadcastForm.durationMinutes} onChange={e => setBroadcastForm({ ...broadcastForm, durationMinutes: e.target.value })} required/><select className="input" value={broadcastForm.durationMinutes} onChange={e => setBroadcastForm({ ...broadcastForm, durationMinutes: e.target.value })}><option value="15">15 menit</option><option value="30">30 menit</option><option value="60">1 jam</option><option value="360">6 jam</option><option value="1440">24 jam</option><option value="4320">3 hari</option><option value="10080">7 hari</option></select></div><input className="input" placeholder="Link tujuan (opsional), mis. /games" value={broadcastForm.link_url} onChange={e => setBroadcastForm({ ...broadcastForm, link_url: e.target.value })}/><input className="input" placeholder="Teks tombol link (opsional)" value={broadcastForm.link_label} onChange={e => setBroadcastForm({ ...broadcastForm, link_label: e.target.value })}/><button className="btn btn-primary">Tayangkan Broadcast</button></form><div className="space-y-3"><div className="flex items-center justify-between"><h2 className="text-xl font-black">Riwayat Broadcast</h2><span className="text-xs text-slate-500">Terbaru di atas</span></div>{broadcasts.map(b => <div key={b.id} className="glass rounded-2xl p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex items-center gap-2"><b>{b.title}</b><span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300">{b.type}</span></div><p className="mt-1 text-sm text-slate-400">{b.message}</p><p className="mt-2 text-xs text-slate-500">{new Date(b.starts_at).toLocaleString('id-ID')} → {new Date(b.ends_at).toLocaleString('id-ID')}</p></div><button onClick={() => toggle('broadcasts', b.id)} className="btn btn-muted text-xs">{b.is_active ? 'Matikan' : 'Aktifkan'}</button></div></div>)}{!broadcasts.length && <p className="text-slate-400">Belum ada broadcast.</p>}</div></section>}
+    {tab === 'broadcasts' && ['owner', 'admin'].includes(role) && <section className="mt-7 grid gap-7 lg:grid-cols-[.8fr_1.2fr]"><form onSubmit={addBroadcast} className="glass rounded-2xl p-6 space-y-3"><div><p className="text-xs font-bold uppercase tracking-widest text-cyan-300">Live Broadcast</p><h2 className="text-xl font-black">Kirim pengumuman ke semua pembeli</h2><p className="mt-1 text-sm text-slate-500">Pesan tampil di bagian atas website selama durasi yang kamu tentukan.</p></div><input className="input" placeholder="Judul, mis. 🔥 Promo 20% Hari Ini" value={broadcastForm.title} onChange={e => setBroadcastForm({ ...broadcastForm, title: e.target.value })} required/><textarea className="input min-h-28" placeholder="Isi broadcast untuk pembeli..." value={broadcastForm.message} onChange={e => setBroadcastForm({ ...broadcastForm, message: e.target.value })} required/><select className="input" value={broadcastForm.type} onChange={e => setBroadcastForm({ ...broadcastForm, type: e.target.value })}><option value="PROMO">Promo</option><option value="INFO">Info</option><option value="SUCCESS">Info sukses</option><option value="WARNING">Peringatan</option></select><div className="grid gap-3 sm:grid-cols-[1fr_1fr]"><input type="number" min="1" className="input" placeholder="Durasi (menit)" value={broadcastForm.durationMinutes} onChange={e => setBroadcastForm({ ...broadcastForm, durationMinutes: e.target.value })} required/><select className="input" value={broadcastForm.durationMinutes} onChange={e => setBroadcastForm({ ...broadcastForm, durationMinutes: e.target.value })}><option value="15">15 menit</option><option value="30">30 menit</option><option value="60">1 jam</option><option value="360">6 jam</option><option value="1440">24 jam</option><option value="4320">3 hari</option><option value="10080">7 hari</option></select></div><input className="input" placeholder="Link tujuan (opsional), mis. /games" value={broadcastForm.link_url} onChange={e => setBroadcastForm({ ...broadcastForm, link_url: e.target.value })}/><input className="input" placeholder="Teks tombol link (opsional)" value={broadcastForm.link_label} onChange={e => setBroadcastForm({ ...broadcastForm, link_label: e.target.value })}/><button className="btn btn-primary">Tayangkan Broadcast</button></form><div className="space-y-3"><div className="flex items-center justify-between"><h2 className="text-xl font-black">Riwayat Broadcast</h2><span className="text-xs text-slate-500">Terbaru di atas</span></div>{broadcasts.map(b => <div key={b.id} className="glass rounded-2xl p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex items-center gap-2"><b>{b.title}</b><span className="rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300">{b.type}</span></div><p className="mt-1 text-sm text-slate-400">{b.message}</p><p className="mt-2 text-xs text-slate-500">{new Date(b.starts_at).toLocaleString('id-ID')} → {new Date(b.ends_at).toLocaleString('id-ID')}</p></div><button onClick={() => toggle('broadcasts', b.id)} className="btn btn-muted text-xs">{b.is_active ? 'Matikan' : 'Aktifkan'}</button></div></div>)}{!broadcasts.length && <p className="text-slate-400">Belum ada broadcast.</p>}</div></section>}
 
     {tab === 'media' && <section className="mt-7 space-y-6"><div className="glass rounded-3xl p-6"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-sm font-bold text-cyan-300">MEDIA MANAGER</p><h2 className="text-2xl font-black">Upload Foto & Banner</h2><p className="mt-1 max-w-2xl text-sm text-slate-400">Semua gambar website disimpan di Supabase Storage dan bisa dipakai ulang. JPG, PNG, WEBP, GIF · maksimal 6 MB.</p></div><label className="btn btn-primary cursor-pointer">{mediaUploading ? 'Mengunggah...' : '＋ Upload Media'}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={mediaUploading} onChange={e => uploadFromInput(e, mediaCategory)}/></label></div><div className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr]"><select className="input" value={mediaCategory} onChange={e => setMediaCategory(e.target.value)}><option value="all">Semua kategori</option>{mediaCategories.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select><input className="input" placeholder="Cari nama file..." value={mediaSearch} onChange={e => setMediaSearch(e.target.value)}/></div></div><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{filteredMedia.map(a => <div key={a.id} className="glass overflow-hidden rounded-2xl"><img src={a.url} alt={a.alt_text || a.name} className="aspect-square w-full object-cover"/><div className="p-3"><p className="truncate text-sm font-bold">{a.name}</p><p className="mt-1 text-[11px] text-slate-500">{a.category} · {(Number(a.size_bytes || 0) / 1024 / 1024).toFixed(2)} MB</p><div className="mt-3 grid grid-cols-2 gap-2"><button onClick={() => copyUrl(a.url)} className="btn btn-muted px-2 py-2 text-[11px]">Copy URL</button><button onClick={() => deleteMedia(a)} className="btn btn-muted px-2 py-2 text-[11px] text-red-300">Hapus</button></div></div></div>)}{!filteredMedia.length && <div className="col-span-full rounded-2xl border border-dashed border-white/10 p-10 text-center text-slate-500">Belum ada media pada filter ini.</div>}</div></section>}
 
-    {tab === 'users' && <section className="mt-7 space-y-3"><div className="glass rounded-2xl p-5"><h2 className="text-xl font-black">Customer & Wallet</h2><p className="mt-1 text-sm text-slate-400">Suspend/aktifkan, kelola role, dan Owner dapat menambah atau mengurangi saldo dengan alasan serta riwayat audit.</p></div>{users.map(u => { const balance = Number(wallets.find(w => w.user_id === u.id)?.balance || 0); return <div key={u.id} className="glass rounded-2xl p-4"><div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div><b>{u.name || u.username || 'User'}</b><p className="text-xs text-slate-500">{u.email} · {u.role} · {u.is_suspended ? 'Suspended' : 'Aktif'}</p><p className="mt-1 text-lg font-black text-cyan-300">Saldo Rp {balance.toLocaleString('id-ID')}</p></div><div className="flex flex-wrap gap-2">{canAdjustWallet && <><button onClick={() => adjustWallet(u, 1)} className="btn btn-primary text-xs">+ Saldo</button><button onClick={() => adjustWallet(u, -1)} className="btn btn-muted text-xs">− Saldo</button></>}{role === 'owner' && <><button onClick={() => suspend(u)} className="btn btn-muted text-xs">{u.is_suspended ? 'Aktifkan' : 'Suspend'}</button><button onClick={() => changeRole(u)} className="btn btn-muted text-xs">Ubah Role</button>{u.id !== (users.find(x => x.role === 'owner')?.id || '') && <button onClick={() => deleteUser(u)} className="btn btn-muted text-xs text-red-300">Hapus Akun</button>}</>}</div></div></div>})}</section>}
+    {tab === 'users' && <section className="mt-7 space-y-3"><div className="glass rounded-2xl p-5"><h2 className="text-xl font-black">Customer & Wallet</h2><p className="mt-1 text-sm text-slate-400">Suspend/aktifkan, kelola role, dan Owner dapat menambah atau mengurangi saldo dengan alasan serta riwayat audit.</p></div>{users.map(u => { const balance = Number(wallets.find(w => w.user_id === u.id)?.balance || 0); return <div key={u.id} className="glass rounded-2xl p-4"><div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div><b>{u.name || u.username || 'User'}</b><p className="text-xs text-slate-500">{u.email} · {u.role} · {u.is_suspended ? 'Suspended' : 'Aktif'}</p><p className="mt-1 text-lg font-black text-cyan-300">Saldo Rp {balance.toLocaleString('id-ID')}</p></div><div className="flex flex-wrap gap-2">{role === 'owner' && <><button onClick={() => adjustWallet(u, 1)} className="btn btn-primary text-xs">+ Saldo</button><button onClick={() => adjustWallet(u, -1)} className="btn btn-muted text-xs">− Saldo</button><button onClick={() => suspend(u)} className="btn btn-muted text-xs">{u.is_suspended ? 'Aktifkan' : 'Suspend'}</button><button onClick={() => changeRole(u)} className="btn btn-muted text-xs">Ubah Role</button>{u.id !== (users.find(x => x.role === 'owner')?.id || '') && <button onClick={() => deleteUser(u)} className="btn btn-muted text-xs text-red-300">Hapus Akun</button>}</>}</div></div></div>})}</section>}
 
     {tab === 'settings' && <form onSubmit={saveSettings} className="glass mt-7 max-w-2xl space-y-4 rounded-2xl p-6"><h2 className="text-xl font-black">Website Settings</h2><label className="field">Nama website<input value={site.name || ''} onChange={e => setSite({ ...site, name: e.target.value })}/></label><label className="field">Tagline<input value={site.tagline || ''} onChange={e => setSite({ ...site, tagline: e.target.value })}/></label><label className="field">WhatsApp<input value={site.whatsapp || ''} onChange={e => setSite({ ...site, whatsapp: e.target.value })} placeholder="62812..."/></label><label className="field">Instagram<input value={site.instagram || ''} onChange={e => setSite({ ...site, instagram: e.target.value })}/></label><label className="field">Maintenance mode<select value={site.maintenance ? 'true' : 'false'} onChange={e => setSite({ ...site, maintenance: e.target.value === 'true' })}><option value="false">Off</option><option value="true">On</option></select></label><button className="btn btn-primary">Simpan Settings</button></form>}
 

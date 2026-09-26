@@ -13,7 +13,6 @@ const labels: any = {
   FAILED: 'Gagal',
   CANCELLED: 'Dibatalkan',
   EXPIRED: 'Kedaluwarsa',
-  REFUNDED: 'Dana Dikembalikan',
 }
 
 export default function OrderPage() {

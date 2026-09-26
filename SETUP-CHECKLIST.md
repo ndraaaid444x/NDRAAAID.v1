@@ -26,7 +26,6 @@
 - [ ] Tes notifikasi
 - [ ] Tes live chat
 - [ ] Tes WhatsApp
-- [ ] Untuk database yang sudah ada, jalankan `supabase/hardening-v5.sql` satu kali
 
 ## Live Broadcast
 - [ ] Jalankan `supabase/broadcasts.sql` jika database dibuat dari ZIP versi sebelumnya.
@@ -64,10 +63,10 @@
 - [ ] Pastikan email verifikasi masuk Inbox/Spam
 - [ ] Pastikan user belum dapat login normal sebelum email terverifikasi
 - [ ] Tes Kirim Ulang Email Verifikasi
-- [ ] Tes Lupa Password + link email
+- [ ] Tes Lupa Password + OTP
 - [ ] Tes OTP login jika fitur OTP login digunakan
 
 
 ## OTP 6 Digit NDRAAAID
 
-NDRAAAID menggunakan OTP email **tepat 6 digit angka** untuk verifikasi/login OTP. Reset password menggunakan **link email recovery**, bukan OTP.
+NDRAAAID menggunakan OTP email **tepat 6 digit angka**. Template email OTP memakai `{{ .Token }}` dan tidak menampilkan link login/reset pada email OTP. Input OTP di website dibatasi hanya 6 angka. Supabase Auth mendukung panjang OTP email 6-10 digit dan default-nya adalah 6 digit. Untuk production, gunakan Custom SMTP agar pengiriman email tidak bergantung pada batasan provider email bawaan.

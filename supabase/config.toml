@@ -1,12 +1,6 @@
 [functions.admin-delete-user]
 verify_jwt = true
 
-[functions.guest-payment-proof]
-verify_jwt = false
-
-[functions.password-changed]
-verify_jwt = true
-
 [auth.email]
 otp_length = 6
 otp_expiry = 3600

@@ -19,9 +19,9 @@ Website NDRAAAID
    ↓
 Daftar dengan email aktif
    ↓
-Email verifikasi dikirim
+OTP 6 digit dikirim ke email
    ↓
-Klik link verifikasi
+Masukkan OTP 6 digit
    ↓
 Akun aktif
    ↓
@@ -512,13 +512,13 @@ Masukkan email.
 
 Klik:
 
-**Kirim Link Reset**
+**Kirim OTP**
 
-Email menerima link reset.
+Email menerima kode 6 digit.
 
-Klik link tersebut.
+Masukkan kode.
 
-Setelah kembali ke website, buat password baru.
+Setelah berhasil diverifikasi, buat password baru.
 
 Contoh:
 
@@ -1315,10 +1315,3 @@ GitHub
 Tanpa Vercel.
 
 Untuk pertanyaan/error, kirim screenshot error atau teks errornya. Jangan mengirim password, SMTP password, service-role key, atau token rahasia.
-
-
-## Database migration dari nol
-
-Untuk database Supabase baru, gunakan migration di `supabase/migrations/` dengan urutan nama file. Migration tersebut membuat schema dasar lalu menambahkan Co-Owner, status REFUNDED, guest tracking, permission, wallet/finance hardening, banner, broadcast, dan Live Chat RPC. Jangan menjalankan migration final sebelum migration sebelumnya.
-
-Brand production: **NDRAAAID.v1** — `https://ndraaaidv1.my.id`

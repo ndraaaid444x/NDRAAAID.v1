@@ -37,6 +37,9 @@ const { data: wallet, error: walletError } = await s
   .eq('user_id', currentUser.id)
   .maybeSingle()
 
+console.log('WALLET DATA:', wallet)
+console.log('WALLET ERROR:', walletError)
+
 setBalance(Number(wallet?.balance || 0))
 
     const { count } = await s
@@ -83,15 +86,8 @@ setBalance(Number(wallet?.balance || 0))
   }, [])
 
   async function logout() {
-    const s = supabaseBrowser()
-    await s.auth.signOut({ scope: 'local' })
-    setUser(undefined)
-    setProfile(undefined)
-    setBalance(0)
-    setUnread(0)
-    setOpen(false)
-    setMobile(false)
-    window.location.replace('/')
+    await supabaseBrowser().auth.signOut()
+    location.href = '/'
   }
 
   const formattedBalance = new Intl.NumberFormat('id-ID', {
@@ -108,7 +104,7 @@ setBalance(Number(wallet?.balance || 0))
           href="/"
           className="text-xl font-black tracking-tight"
         >
-          NDRAAAID<span className="gradient-text">.v1</span>
+          NDRA<span className="gradient-text">AAAID</span>
         </Link>
 
         <nav className="hidden gap-6 text-sm text-slate-300 md:flex">
@@ -196,16 +192,12 @@ setBalance(Number(wallet?.balance || 0))
 
                     <Link
                       className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
-                      href="/account/orders"
+                      href="/orders"
                     >
                       Transaksi
                     </Link>
 
-                    <Link className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5" href="/account/deposits">Riwayat Deposit</Link>
-                    <Link className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5" href="/account/wallet/history">Riwayat Saldo</Link>
-                    <Link className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5" href="/account/security">Keamanan</Link>
-
-                    {['owner', 'co_owner', 'admin'].includes(profile?.role) && (
+                    {['owner', 'admin'].includes(profile?.role) && (
                       <Link
                         className="block rounded-xl px-3 py-2 text-sm text-cyan-300 hover:bg-white/5"
                         href="/admin"

@@ -11,8 +11,6 @@ export default function ChatWidget() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
-  const [enabled, setEnabled] = useState(true)
-  const [authRequired, setAuthRequired] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -23,29 +21,43 @@ export default function ChatWidget() {
     ;(async () => {
       const s = supabaseBrowser()
 
-      const { data: supportSettings } = await s.from('settings').select('value').eq('key', 'support').maybeSingle()
-      const liveChatEnabled = supportSettings?.value?.live_chat !== false
-      setEnabled(liveChatEnabled)
-      if (!liveChatEnabled || !mounted) return
-
       const {
         data: { user }
       } = await s.auth.getUser()
 
-      if (!user || !mounted) {
-        if (!user && mounted) setAuthRequired(true)
+      if (!user || !mounted) return
+
+      let { data: r, error: roomError } = await s
+        .from('chat_rooms')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'OPEN')
+        .maybeSingle()
+
+      if (roomError) {
+        setError(roomError.message)
         return
       }
-      setAuthRequired(false)
 
-      const { data: r, error: roomError } = await s.rpc('get_or_create_chat_room')
+      if (!r) {
+        const result = await s
+          .from('chat_rooms')
+          .insert({
+            user_id: user.id,
+            status: 'OPEN'
+          })
+          .select()
+          .single()
 
-      if (roomError || !r) {
-        setError(roomError?.message || 'Gagal membuat ruang chat.')
-        return
+        if (result.error) {
+          setError(result.error.message)
+          return
+        }
+
+        r = result.data
       }
 
-      if (!mounted) return
+      if (!r || !mounted) return
 
       setRoom(r)
 
@@ -112,10 +124,15 @@ export default function ChatWidget() {
       return
     }
 
-    const { data, error: sendError } = await s.rpc('send_chat_message', {
-      p_room_id: room.id,
-      p_message: message
-    })
+    const { data, error: sendError } = await s
+      .from('chat_messages')
+      .insert({
+        room_id: room.id,
+        sender_id: user.id,
+        message
+      })
+      .select()
+      .single()
 
     if (sendError) {
       console.error('CHAT SEND ERROR:', sendError)
@@ -136,8 +153,6 @@ export default function ChatWidget() {
     setSending(false)
   }
 
-  if (!enabled) return null
-
   return (
     <>
       <button
@@ -151,7 +166,7 @@ export default function ChatWidget() {
         <div className="fixed bottom-24 right-5 z-50 flex h-[28rem] w-[min(92vw,380px)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#08101e] shadow-2xl">
 
           <div className="border-b border-white/10 p-4">
-            <b>NDRAAAID.v1 Support</b>
+            <b>NDRAAAID Support</b>
             <p className="text-xs text-emerald-300">
               ● Online / akan ditangani CS
             </p>
@@ -159,14 +174,7 @@ export default function ChatWidget() {
 
           <div className="flex-1 space-y-2 overflow-auto p-4">
 
-            {authRequired && (
-              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-4 text-sm text-amber-200">
-                Silakan login terlebih dahulu untuk menggunakan Live Chat.
-                <a href="/login" className="mt-3 inline-block font-bold text-cyan-300">Login →</a>
-              </div>
-            )}
-
-            {!authRequired && !messages.length && (
+            {!messages.length && (
               <div className="rounded-2xl bg-white/5 p-3 text-sm text-slate-400">
                 Halo! 👋 Ada yang bisa kami bantu?
               </div>

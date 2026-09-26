@@ -5,7 +5,7 @@ Semua OTP email NDRAAAID ditetapkan tepat **6 digit angka**.
 ## Berlaku untuk
 - Verifikasi pendaftaran
 - Login OTP
-- Login OTP (reset password menggunakan link email)
+- Lupa/reset password
 - Reauthentication
 
 ## Tampilan email

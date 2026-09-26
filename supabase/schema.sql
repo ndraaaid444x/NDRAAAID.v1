@@ -20,7 +20,6 @@ create table if not exists public.wishlist(id uuid primary key default gen_rando
 create table if not exists public.admin_audit_logs(id uuid primary key default gen_random_uuid(),admin_id uuid references public.profiles(id),action text not null,entity_type text,entity_id uuid,metadata jsonb not null default '{}',created_at timestamptz not null default now());
 create table if not exists public.chat_rooms(id uuid primary key default gen_random_uuid(),user_id uuid not null references public.profiles(id) on delete cascade,status text not null default 'OPEN',created_at timestamptz not null default now());
 create table if not exists public.chat_messages(id uuid primary key default gen_random_uuid(),room_id uuid not null references public.chat_rooms(id) on delete cascade,sender_id uuid not null references public.profiles(id),message text not null,read_at timestamptz,created_at timestamptz not null default now());
-create unique index if not exists chat_rooms_one_open_per_user_idx on public.chat_rooms(user_id) where status='OPEN';
 create table if not exists public.settings(key text primary key,value jsonb not null default '{}',updated_at timestamptz not null default now());
 create table if not exists public.broadcasts(id uuid primary key default gen_random_uuid(),title text not null,message text not null,type text not null default 'PROMO' check(type in ('INFO','PROMO','WARNING','SUCCESS')),starts_at timestamptz not null default now(),ends_at timestamptz not null,link_url text,link_label text,is_active boolean not null default true,created_by uuid references public.profiles(id),created_at timestamptz not null default now(),updated_at timestamptz not null default now(),check(ends_at > starts_at));
 create table if not exists public.media_assets(id uuid primary key default gen_random_uuid(),name text not null,path text unique not null,url text not null,category text not null default 'general',mime_type text,size_bytes bigint,alt_text text,created_by uuid references public.profiles(id),created_at timestamptz not null default now());
@@ -75,46 +74,6 @@ create policy "admins can insert broadcasts" on public.broadcasts for insert wit
 create policy "admins can update broadcasts" on public.broadcasts for update using (is_admin()) with check (is_admin());
 create policy "admins can delete broadcasts" on public.broadcasts for delete using (is_admin());
 
-create or replace function public.create_broadcast(
-  p_title text,
-  p_message text,
-  p_type text default 'PROMO',
-  p_duration_minutes integer default 60,
-  p_link_url text default null,
-  p_link_label text default null
-) returns public.broadcasts
-language plpgsql
-security definer
-set search_path=public
-as $$
-declare
-  actor uuid := auth.uid();
-  result public.broadcasts;
-  mins integer := greatest(1, least(coalesce(p_duration_minutes,60), 10080));
-  started timestamptz := now();
-begin
-  if actor is null or not public.is_admin() then
-    raise exception 'FORBIDDEN';
-  end if;
-  if nullif(btrim(p_title),'') is null then raise exception 'BROADCAST_TITLE_REQUIRED'; end if;
-  if nullif(btrim(p_message),'') is null then raise exception 'BROADCAST_MESSAGE_REQUIRED'; end if;
-  if upper(coalesce(p_type,'PROMO')) not in ('INFO','PROMO','WARNING','SUCCESS') then raise exception 'INVALID_BROADCAST_TYPE'; end if;
-
-  insert into public.broadcasts(title,message,type,starts_at,ends_at,link_url,link_label,is_active,created_by)
-  values(
-    btrim(p_title), btrim(p_message), upper(coalesce(p_type,'PROMO')),
-    started, started + make_interval(mins => mins),
-    nullif(btrim(p_link_url),''), nullif(btrim(p_link_label),''), true, actor
-  )
-  returning * into result;
-  return result;
-end;
-$$;
-
-revoke execute on function public.create_broadcast(text,text,text,integer,text,text) from public,anon,authenticated;
-grant execute on function public.create_broadcast(text,text,text,integer,text,text) to authenticated;
-
-
 alter table public.settings enable row level security;
 
 -- Policies are recreated so this script can be safely re-run during development.
@@ -153,10 +112,10 @@ create policy website_assets_admin_insert on storage.objects for insert to authe
 create policy website_assets_admin_update on storage.objects for update to authenticated using(bucket_id='website-assets' and public.is_admin()) with check(bucket_id='website-assets' and public.is_admin());
 create policy website_assets_admin_delete on storage.objects for delete to authenticated using(bucket_id='website-assets' and public.is_admin());
 
-insert into public.settings(key,value) values('site','{"name":"NDRAAAID.v1","tagline":"Top Up Game Cepat, Aman & Terpercaya","manual_mode":true}'::jsonb) on conflict(key) do nothing;
+insert into public.settings(key,value) values('site','{"name":"NDRAAAID","tagline":"Top Up Game Cepat, Aman & Terpercaya","manual_mode":true}'::jsonb) on conflict(key) do nothing;
 insert into public.settings(key,value) values('social','{"whatsapp":"","instagram":"","tiktok":"","facebook":"","discord":""}'::jsonb) on conflict(key) do nothing;
 insert into public.settings(key,value) values('support','{"live_chat":true}'::jsonb) on conflict(key) do nothing;
-insert into public.payment_methods(name,kind,account_name,account_number,instruction,is_active) values('QRIS Manual','QRIS','NDRAAAID.v1','','Silakan transfer sesuai total order. Upload bukti setelah pembayaran.',true) on conflict do nothing;
+insert into public.payment_methods(name,kind,account_name,account_number,instruction,is_active) values('QRIS Manual','QRIS','NDRAAAID','','Silakan transfer sesuai total order. Upload bukti setelah pembayaran.',true) on conflict do nothing;
 
 insert into games(slug,name,description,popular) values ('mobile-legends','Mobile Legends','Diamonds Mobile Legends',true),('free-fire','Free Fire','Diamond Free Fire',true),('pubg-mobile','PUBG Mobile','UC PUBG Mobile',true),('valorant','Valorant','VP Valorant',true),('genshin-impact','Genshin Impact','Genesis Crystal',true),('honor-of-kings','Honor of Kings','Tokens HOK',true),('roblox','Roblox','Robux Roblox',false),('call-of-duty-mobile','Call of Duty Mobile','CP CODM',false),('ea-fc-mobile','EA FC Mobile','FC Points',false) on conflict(slug) do nothing;
 insert into game_fields(game_id,key,label,placeholder,required,sort_order) select id,'user_id','User ID','Masukkan User ID',true,1 from games where slug in('mobile-legends','free-fire','pubg-mobile','genshin-impact','honor-of-kings','roblox','call-of-duty-mobile','ea-fc-mobile') on conflict(game_id,key) do nothing;
@@ -205,7 +164,7 @@ create table if not exists public.wallets (
 create table if not exists public.wallet_transactions (
   id uuid primary key default gen_random_uuid(), user_id uuid not null references public.profiles(id) on delete cascade,
   amount numeric(14,2) not null check(amount <> 0), balance_before numeric(14,2) not null, balance_after numeric(14,2) not null check(balance_after >= 0),
-  type text not null check(type in ('ADMIN_CREDIT','ADMIN_DEBIT','ORDER_PAYMENT','REFUND','ADJUSTMENT','DEPOSIT')),
+  type text not null check(type in ('ADMIN_CREDIT','ADMIN_DEBIT','ORDER_PAYMENT','REFUND','ADJUSTMENT')),
   reason text not null, order_id uuid references public.orders(id) on delete set null, actor_id uuid references public.profiles(id) on delete set null, created_at timestamptz not null default now()
 );
 create index if not exists wallet_transactions_user_created_idx on public.wallet_transactions(user_id, created_at desc);
