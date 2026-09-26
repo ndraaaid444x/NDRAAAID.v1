@@ -201,10 +201,9 @@ export default function Admin() {
         .select('*')
         .order('created_at', { ascending: false }),
 
-      s
-        .from('vouchers')
-        .select('*')
-        .order('created_at', { ascending: false }),
+s
+  .from('vouchers')
+  .select('*'),
 
       s
         .from('voucher_usages')
