@@ -3,7 +3,17 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
-import { Menu, X, Bell, Search, LogOut, Wallet } from 'lucide-react'
+import {
+  Menu,
+  X,
+  Bell,
+  Search,
+  LogOut,
+  Wallet,
+  User,
+  Receipt,
+  Shield,
+} from 'lucide-react'
 
 export default function SiteHeader() {
   const [user, setUser] = useState<any>()
@@ -31,20 +41,20 @@ export default function SiteHeader() {
 
     setProfile(p)
 
-const { data: wallet, error: walletError } = await s
-  .from('wallets')
-  .select('balance')
-  .eq('user_id', currentUser.id)
-  .maybeSingle()
+    const { data: wallet } = await s
+      .from('wallets')
+      .select('balance')
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
 
-console.log('WALLET DATA:', wallet)
-console.log('WALLET ERROR:', walletError)
-
-setBalance(Number(wallet?.balance || 0))
+    setBalance(Number(wallet?.balance || 0))
 
     const { count } = await s
       .from('notifications')
-      .select('*', { count: 'exact', head: true })
+      .select('*', {
+        count: 'exact',
+        head: true,
+      })
       .eq('user_id', currentUser.id)
       .is('read_at', null)
 
@@ -56,7 +66,7 @@ setBalance(Number(wallet?.balance || 0))
 
     ;(async () => {
       const {
-        data: { user }
+        data: { user },
       } = await s.auth.getUser()
 
       setUser(user)
@@ -67,56 +77,73 @@ setBalance(Number(wallet?.balance || 0))
     })()
 
     const {
-      data: { subscription }
-    } = s.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user
+      data: { subscription },
+    } = s.auth.onAuthStateChange(
+      async (_event, session) => {
+        const currentUser = session?.user
 
-      setUser(currentUser)
+        setUser(currentUser)
 
-      if (currentUser) {
-        await loadUserData(currentUser)
-      } else {
-        setProfile(undefined)
-        setBalance(0)
-        setUnread(0)
+        if (currentUser) {
+          await loadUserData(currentUser)
+        } else {
+          setProfile(undefined)
+          setBalance(0)
+          setUnread(0)
+        }
       }
-    })
+    )
 
     return () => subscription.unsubscribe()
   }, [])
 
   async function logout() {
+    setMobile(false)
+    setOpen(false)
+
     await supabaseBrowser().auth.signOut()
+
     location.href = '/'
   }
 
-  const formattedBalance = new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0
-  }).format(balance)
+  const formattedBalance = new Intl.NumberFormat(
+    'id-ID',
+    {
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 0,
+    }
+  ).format(balance)
+
+  const isAdmin = ['owner', 'admin'].includes(
+    profile?.role
+  )
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050816]/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
-
         <Link
           href="/"
           className="text-xl font-black tracking-tight"
+          onClick={() => setMobile(false)}
         >
-          NDRA<span className="gradient-text">AAAID</span>
+          NDRA
+          <span className="gradient-text">
+            AAAID
+          </span>
         </Link>
 
         <nav className="hidden gap-6 text-sm text-slate-300 md:flex">
           <Link href="/">Home</Link>
           <Link href="/games">Games</Link>
           <Link href="/#promo">Promo</Link>
-          <Link href="/orders/track">Cek Transaksi</Link>
+          <Link href="/orders/track">
+            Cek Transaksi
+          </Link>
           <Link href="/terms">Bantuan</Link>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-
           <Link
             href="/games"
             className="rounded-xl p-2 hover:bg-white/5"
@@ -126,7 +153,7 @@ setBalance(Number(wallet?.balance || 0))
 
           {user ? (
             <>
-              {/* SALDO */}
+              {/* SALDO DESKTOP */}
               <Link
                 href="/dashboard"
                 className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm transition hover:bg-white/[0.07] sm:flex"
@@ -159,12 +186,13 @@ setBalance(Number(wallet?.balance || 0))
                 )}
               </Link>
 
-              {/* USER */}
-              <div className="relative">
-
+              {/* USER DESKTOP */}
+              <div className="relative hidden sm:block">
                 <button
-                  onClick={() => setOpen(v => !v)}
-                  className="hidden items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm sm:flex"
+                  onClick={() =>
+                    setOpen(v => !v)
+                  }
+                  className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm"
                 >
                   <span className="h-6 w-6 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500" />
 
@@ -175,10 +203,10 @@ setBalance(Number(wallet?.balance || 0))
 
                 {open && (
                   <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-white/10 bg-[#0a1020] p-2 shadow-2xl">
-
                     <Link
                       className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/dashboard"
+                      onClick={() => setOpen(false)}
                     >
                       Dashboard
                     </Link>
@@ -186,6 +214,7 @@ setBalance(Number(wallet?.balance || 0))
                     <Link
                       className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/account"
+                      onClick={() => setOpen(false)}
                     >
                       Profile
                     </Link>
@@ -193,14 +222,16 @@ setBalance(Number(wallet?.balance || 0))
                     <Link
                       className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/orders"
+                      onClick={() => setOpen(false)}
                     >
                       Transaksi
                     </Link>
 
-                    {['owner', 'admin'].includes(profile?.role) && (
+                    {isAdmin && (
                       <Link
                         className="block rounded-xl px-3 py-2 text-sm text-cyan-300 hover:bg-white/5"
                         href="/admin"
+                        onClick={() => setOpen(false)}
                       >
                         Admin Panel
                       </Link>
@@ -213,10 +244,8 @@ setBalance(Number(wallet?.balance || 0))
                       <LogOut size={15} />
                       Logout
                     </button>
-
                   </div>
                 )}
-
               </div>
             </>
           ) : (
@@ -237,21 +266,25 @@ setBalance(Number(wallet?.balance || 0))
             </>
           )}
 
+          {/* MOBILE MENU BUTTON */}
           <button
             className="rounded-xl p-2 md:hidden"
-            onClick={() => setMobile(v => !v)}
+            onClick={() =>
+              setMobile(v => !v)
+            }
+            aria-label="Menu"
           >
             {mobile ? <X /> : <Menu />}
           </button>
-
         </div>
       </div>
 
+      {/* MOBILE MENU */}
       {mobile && (
         <div className="border-t border-white/10 px-4 py-4 md:hidden">
-          <div className="grid gap-2 text-sm">
-
+          <div className="grid gap-1 text-sm">
             <Link
+              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/"
             >
@@ -259,6 +292,7 @@ setBalance(Number(wallet?.balance || 0))
             </Link>
 
             <Link
+              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/games"
             >
@@ -266,6 +300,7 @@ setBalance(Number(wallet?.balance || 0))
             </Link>
 
             <Link
+              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/#promo"
             >
@@ -273,42 +308,113 @@ setBalance(Number(wallet?.balance || 0))
             </Link>
 
             <Link
+              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/orders/track"
             >
               Cek Transaksi
             </Link>
 
-            {user && (
+            {user ? (
               <>
+                <div className="my-2 border-t border-white/10" />
+
                 <Link
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
                   href="/dashboard"
                 >
-                  Dashboard
+                  <Wallet
+                    size={18}
+                    className="text-cyan-300"
+                  />
+                  <div>
+                    <div>Dashboard</div>
+                    <div className="text-xs text-slate-500">
+                      Saldo: {formattedBalance}
+                    </div>
+                  </div>
                 </Link>
 
                 <Link
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
-                  href="/dashboard"
-                  className="mt-2 flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2"
+                  href="/account"
                 >
-                  <Wallet
-                    size={17}
-                    className="text-cyan-300"
-                  />
+                  <User size={18} />
+                  <span>Profile / Akun</span>
+                </Link>
 
+                <Link
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
+                  onClick={() => setMobile(false)}
+                  href="/orders"
+                >
+                  <Receipt size={18} />
+                  <span>Transaksi</span>
+                </Link>
+
+                <Link
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
+                  onClick={() => setMobile(false)}
+                  href="/notifications"
+                >
+                  <Bell size={18} />
                   <span>
-                    Saldo: {formattedBalance}
+                    Notifikasi
+                    {unread > 0 && (
+                      <span className="ml-2 rounded-full bg-pink-400 px-2 py-0.5 text-[10px] text-white">
+                        {unread}
+                      </span>
+                    )}
                   </span>
+                </Link>
+
+                {isAdmin && (
+                  <Link
+                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-cyan-300 hover:bg-white/5"
+                    onClick={() => setMobile(false)}
+                    href="/admin"
+                  >
+                    <Shield size={18} />
+                    <span>Admin Panel</span>
+                  </Link>
+                )}
+
+                <div className="my-2 border-t border-white/10" />
+
+                <button
+                  onClick={logout}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-pink-300 hover:bg-white/5"
+                >
+                  <LogOut size={18} />
+                  <span>Logout</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="my-2 border-t border-white/10" />
+
+                <Link
+                  className="rounded-xl px-3 py-3 text-center hover:bg-white/5"
+                  onClick={() => setMobile(false)}
+                  href="/login"
+                >
+                  Login
+                </Link>
+
+                <Link
+                  className="btn btn-primary mt-1 text-center"
+                  onClick={() => setMobile(false)}
+                  href="/register"
+                >
+                  Daftar
                 </Link>
               </>
             )}
-
           </div>
         </div>
       )}
-
     </header>
   )
 }
