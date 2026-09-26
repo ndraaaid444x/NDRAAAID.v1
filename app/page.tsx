@@ -50,21 +50,17 @@ export default function Home() {
 
       try {
         /*
-         * Ambil SEMUA game aktif.
+         * Ambil SEMUA game yang aktif.
          *
-         * Jangan filter popular=true di server karena kalau
-         * field popular berubah / tidak terbaca, homepage
-         * akan menganggap tidak ada game sama sekali.
+         * Jangan gunakan filter popular=true di request.
+         * Game populer akan diurutkan setelah data diterima.
          */
-        const cacheBuster = Date.now()
-
         const url =
           `${supabaseUrl}/rest/v1/games` +
           `?select=*` +
           `&is_active=eq.true` +
-          `&order=popular.desc,name.asc` +
-          `&limit=50` +
-          `&_=${cacheBuster}`
+          `&order=name.asc` +
+          `&limit=50`
 
         const response = await fetch(url, {
           method: 'GET',
@@ -72,7 +68,8 @@ export default function Home() {
             apikey: supabaseKey,
             Authorization: `Bearer ${supabaseKey}`,
             Accept: 'application/json',
-            'Cache-Control': 'no-cache, no-store, max-age=0',
+            'Cache-Control':
+              'no-cache, no-store, max-age=0',
             Pragma: 'no-cache',
           },
           cache: 'no-store',
@@ -98,32 +95,41 @@ export default function Home() {
         }
 
         /*
-         * Hapus duplikat berdasarkan ID.
+         * Hilangkan game duplikat berdasarkan ID.
          */
         const uniqueGames = Array.from(
           new Map(
-            data.map((game: any) => [game.id, game])
+            data.map((game: any) => [
+              game.id,
+              game,
+            ])
           ).values()
         )
 
         /*
-         * Game populer tetap berada di bagian atas.
-         * Kalau tidak ada game populer, semua game aktif
-         * tetap ditampilkan.
+         * Game populer ditaruh di bagian atas.
+         * Game biasa tetap ditampilkan.
          */
-        uniqueGames.sort((a: any, b: any) => {
-          const popularA = a?.popular === true ? 1 : 0
-          const popularB = b?.popular === true ? 1 : 0
+        uniqueGames.sort(
+          (a: any, b: any) => {
+            const popularA =
+              a?.popular === true ? 1 : 0
 
-          if (popularA !== popularB) {
-            return popularB - popularA
+            const popularB =
+              b?.popular === true ? 1 : 0
+
+            if (popularA !== popularB) {
+              return popularB - popularA
+            }
+
+            return String(
+              a?.name || ''
+            ).localeCompare(
+              String(b?.name || ''),
+              'id'
+            )
           }
-
-          return String(a?.name || '').localeCompare(
-            String(b?.name || ''),
-            'id'
-          )
-        })
+        )
 
         setGames(uniqueGames)
       } catch (error: any) {
@@ -211,6 +217,7 @@ export default function Home() {
             <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
               <div className="glass rounded-2xl p-4">
                 <Zap size={20} />
+
                 <p className="mt-2 text-xs text-slate-400">
                   Proses cepat
                 </p>
@@ -218,6 +225,7 @@ export default function Home() {
 
               <div className="glass rounded-2xl p-4">
                 <ShieldCheck size={20} />
+
                 <p className="mt-2 text-xs text-slate-400">
                   Manual verified
                 </p>
@@ -225,6 +233,7 @@ export default function Home() {
 
               <div className="glass rounded-2xl p-4">
                 <Headphones size={20} />
+
                 <p className="mt-2 text-xs text-slate-400">
                   Support
                 </p>
