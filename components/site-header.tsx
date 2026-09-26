@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import {
   Menu,
@@ -10,9 +10,6 @@ import {
   Search,
   LogOut,
   Wallet,
-  User,
-  Receipt,
-  Shield,
 } from 'lucide-react'
 
 export default function SiteHeader() {
@@ -24,6 +21,9 @@ export default function SiteHeader() {
   const [unread, setUnread] = useState(0)
   const [loggingOut, setLoggingOut] = useState(false)
 
+  // Mencegah data user lama menimpa user baru
+  const userRequestRef = useRef(0)
+
   async function loadUserData(currentUser: any) {
     if (!currentUser) {
       setProfile(undefined)
@@ -32,71 +32,115 @@ export default function SiteHeader() {
       return
     }
 
+    const requestId = ++userRequestRef.current
     const s = supabaseBrowser()
 
-    const { data: p } = await s
-      .from('profiles')
-      .select('name,username,role')
-      .eq('id', currentUser.id)
-      .single()
+    try {
+      const [profileResult, walletResult, notificationResult] =
+        await Promise.all([
+          s
+            .from('profiles')
+            .select('name,username,role')
+            .eq('id', currentUser.id)
+            .maybeSingle(),
 
-    setProfile(p)
+          s
+            .from('wallets')
+            .select('balance')
+            .eq('user_id', currentUser.id)
+            .maybeSingle(),
 
-    const { data: wallet } = await s
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', currentUser.id)
-      .maybeSingle()
+          s
+            .from('notifications')
+            .select('*', {
+              count: 'exact',
+              head: true,
+            })
+            .eq('user_id', currentUser.id)
+            .is('read_at', null),
+        ])
 
-    setBalance(Number(wallet?.balance || 0))
+      // Abaikan hasil kalau sudah ada user/session yang lebih baru
+      if (requestId !== userRequestRef.current) {
+        return
+      }
 
-    const { count } = await s
-      .from('notifications')
-      .select('*', {
-        count: 'exact',
-        head: true,
-      })
-      .eq('user_id', currentUser.id)
-      .is('read_at', null)
+      setProfile(profileResult.data || undefined)
+      setBalance(Number(walletResult.data?.balance || 0))
+      setUnread(notificationResult.count || 0)
+    } catch (error) {
+      console.error('Load user data error:', error)
 
-    setUnread(count || 0)
+      if (requestId !== userRequestRef.current) {
+        return
+      }
+
+      setProfile(undefined)
+      setBalance(0)
+      setUnread(0)
+    }
   }
 
   useEffect(() => {
     const s = supabaseBrowser()
+    let mounted = true
 
-    ;(async () => {
+    // Ambil session/user awal
+    async function initAuth() {
       const {
-        data: { user },
+        data: { user: currentUser },
       } = await s.auth.getUser()
 
-      setUser(user)
+      if (!mounted) return
 
-      if (user) {
-        await loadUserData(user)
+      setUser(currentUser)
+
+      if (currentUser) {
+        // Jangan membuat proses auth utama menunggu data profile/wallet
+        setTimeout(() => {
+          if (mounted) {
+            void loadUserData(currentUser)
+          }
+        }, 0)
       }
-    })()
+    }
 
+    void initAuth()
+
+    // PENTING:
+    // Jangan gunakan async callback di onAuthStateChange.
+    // Auth state harus langsung diteruskan ke UI.
     const {
       data: { subscription },
-    } = s.auth.onAuthStateChange(
-      async (_event, session) => {
-        const currentUser = session?.user
+    } = s.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user
 
-        setUser(currentUser)
+      if (!mounted) return
 
-        if (currentUser) {
-          await loadUserData(currentUser)
-        } else {
-          setProfile(undefined)
-          setBalance(0)
-          setUnread(0)
-        }
+      // Update UI auth langsung
+      setUser(currentUser)
+
+      // Reset data lama langsung
+      if (!currentUser) {
+        userRequestRef.current += 1
+        setProfile(undefined)
+        setBalance(0)
+        setUnread(0)
+        return
       }
-    )
+
+      // Load profile/wallet/notifikasi di luar callback auth
+      setTimeout(() => {
+        if (mounted) {
+          void loadUserData(currentUser)
+        }
+      }, 0)
+    })
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
+      userRequestRef.current += 1
     }
   }, [])
 
@@ -104,56 +148,51 @@ export default function SiteHeader() {
     if (loggingOut) return
 
     setLoggingOut(true)
+
+    // Tutup semua menu terlebih dahulu
     setOpen(false)
     setMobile(false)
 
-    const s = supabaseBrowser()
-
-    // Langsung bersihkan tampilan akun
+    // Hilangkan tampilan user secara langsung
+    userRequestRef.current += 1
     setUser(undefined)
     setProfile(undefined)
     setBalance(0)
     setUnread(0)
 
+    const s = supabaseBrowser()
+
     try {
-      // Local logout tidak bergantung pada sesi server
+      // Hapus session lokal terlebih dahulu
       await s.auth.signOut({
         scope: 'local',
       })
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      // Tetap kembali ke halaman utama
+      // Selalu kembali ke halaman utama
       window.location.replace('/')
     }
   }
 
-  const formattedBalance = new Intl.NumberFormat(
-    'id-ID',
-    {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }
-  ).format(balance)
+  const formattedBalance = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(balance)
 
-  const isAdmin = ['owner', 'admin'].includes(
-    profile?.role
-  )
+  const isAdmin = ['owner', 'admin'].includes(profile?.role)
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050816]/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+
         {/* LOGO */}
         <Link
           href="/"
           className="text-xl font-black tracking-tight"
-          onClick={() => setMobile(false)}
         >
-          NDRA
-          <span className="gradient-text">
-            AAAID
-          </span>
+          NDRA<span className="gradient-text">AAAID</span>
         </Link>
 
         {/* DESKTOP NAV */}
@@ -161,13 +200,12 @@ export default function SiteHeader() {
           <Link href="/">Home</Link>
           <Link href="/games">Games</Link>
           <Link href="/#promo">Promo</Link>
-          <Link href="/orders/track">
-            Cek Transaksi
-          </Link>
+          <Link href="/orders/track">Cek Transaksi</Link>
           <Link href="/terms">Bantuan</Link>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+
           {/* SEARCH */}
           <Link
             href="/games"
@@ -178,7 +216,7 @@ export default function SiteHeader() {
 
           {user ? (
             <>
-              {/* SALDO DESKTOP */}
+              {/* SALDO */}
               <Link
                 href="/dashboard"
                 className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm transition hover:bg-white/[0.07] sm:flex"
@@ -212,13 +250,10 @@ export default function SiteHeader() {
               </Link>
 
               {/* USER DESKTOP */}
-              <div className="relative hidden sm:block">
+              <div className="relative">
                 <button
-                  type="button"
-                  onClick={() =>
-                    setOpen(v => !v)
-                  }
-                  className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm"
+                  onClick={() => setOpen((v) => !v)}
+                  className="hidden items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm sm:flex"
                 >
                   <span className="h-6 w-6 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500" />
 
@@ -228,7 +263,8 @@ export default function SiteHeader() {
                 </button>
 
                 {open && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-white/10 bg-[#0a1020] p-2 shadow-2xl">
+                  <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-white/10 bg-[#0a1020] p-2 shadow-2xl">
+
                     <Link
                       className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/dashboard"
@@ -238,47 +274,40 @@ export default function SiteHeader() {
                     </Link>
 
                     <Link
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/account"
                       onClick={() => setOpen(false)}
                     >
-                      <User size={15} />
-                      Profile / Akun
+                      Profile
                     </Link>
 
                     <Link
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/orders"
                       onClick={() => setOpen(false)}
                     >
-                      <Receipt size={15} />
                       Transaksi
                     </Link>
 
                     <Link
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/notifications"
                       onClick={() => setOpen(false)}
                     >
-                      <Bell size={15} />
                       Notifikasi
                     </Link>
 
                     {isAdmin && (
                       <Link
-                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-cyan-300 hover:bg-white/5"
+                        className="block rounded-xl px-3 py-2 text-sm text-cyan-300 hover:bg-white/5"
                         href="/admin"
                         onClick={() => setOpen(false)}
                       >
-                        <Shield size={15} />
                         Admin Panel
                       </Link>
                     )}
 
-                    <div className="my-2 border-t border-white/10" />
-
                     <button
-                      type="button"
                       onClick={logout}
                       disabled={loggingOut}
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-pink-300 hover:bg-white/5 disabled:opacity-50"
@@ -303,7 +332,7 @@ export default function SiteHeader() {
                 Login
               </Link>
 
-              {/* REGISTER */}
+              {/* DAFTAR */}
               <Link
                 href="/register"
                 className="btn btn-primary"
@@ -313,13 +342,10 @@ export default function SiteHeader() {
             </>
           )}
 
-          {/* MOBILE MENU BUTTON */}
+          {/* MOBILE BUTTON */}
           <button
-            type="button"
             className="rounded-xl p-2 md:hidden"
-            onClick={() =>
-              setMobile(v => !v)
-            }
+            onClick={() => setMobile((v) => !v)}
             aria-label="Menu"
           >
             {mobile ? <X /> : <Menu />}
@@ -330,9 +356,9 @@ export default function SiteHeader() {
       {/* MOBILE MENU */}
       {mobile && (
         <div className="border-t border-white/10 px-4 py-4 md:hidden">
-          <div className="grid gap-1 text-sm">
+          <div className="grid gap-3 text-sm">
+
             <Link
-              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/"
             >
@@ -340,7 +366,6 @@ export default function SiteHeader() {
             </Link>
 
             <Link
-              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/games"
             >
@@ -348,7 +373,6 @@ export default function SiteHeader() {
             </Link>
 
             <Link
-              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/#promo"
             >
@@ -356,7 +380,6 @@ export default function SiteHeader() {
             </Link>
 
             <Link
-              className="rounded-xl px-3 py-3 hover:bg-white/5"
               onClick={() => setMobile(false)}
               href="/orders/track"
             >
@@ -365,112 +388,87 @@ export default function SiteHeader() {
 
             {user ? (
               <>
-                <div className="my-2 border-t border-white/10" />
-
-                {/* DASHBOARD */}
                 <Link
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
                   href="/dashboard"
                 >
-                  <Wallet
-                    size={18}
-                    className="text-cyan-300"
-                  />
-
-                  <div>
-                    <div>Dashboard</div>
-                    <div className="text-xs text-slate-500">
-                      Saldo: {formattedBalance}
-                    </div>
-                  </div>
+                  Dashboard
                 </Link>
 
-                {/* PROFILE */}
                 <Link
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
                   href="/account"
                 >
-                  <User size={18} />
-                  <span>Profile / Akun</span>
+                  Profile
                 </Link>
 
-                {/* TRANSAKSI */}
                 <Link
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
                   href="/orders"
                 >
-                  <Receipt size={18} />
-                  <span>Transaksi</span>
+                  Transaksi
                 </Link>
 
-                {/* NOTIFIKASI */}
                 <Link
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
                   href="/notifications"
                 >
-                  <Bell size={18} />
-
-                  <span>
-                    Notifikasi
-
-                    {unread > 0 && (
-                      <span className="ml-2 rounded-full bg-pink-400 px-2 py-0.5 text-[10px] text-white">
-                        {unread}
-                      </span>
-                    )}
-                  </span>
+                  Notifikasi
                 </Link>
 
-                {/* ADMIN */}
                 {isAdmin && (
                   <Link
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-cyan-300 hover:bg-white/5"
                     onClick={() => setMobile(false)}
                     href="/admin"
+                    className="text-cyan-300"
                   >
-                    <Shield size={18} />
-                    <span>Admin Panel</span>
+                    Admin Panel
                   </Link>
                 )}
 
-                <div className="my-2 border-t border-white/10" />
+                {/* SALDO MOBILE */}
+                <Link
+                  onClick={() => setMobile(false)}
+                  href="/dashboard"
+                  className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2"
+                >
+                  <Wallet
+                    size={17}
+                    className="text-cyan-300"
+                  />
+
+                  <span>
+                    Saldo: {formattedBalance}
+                  </span>
+                </Link>
 
                 {/* LOGOUT MOBILE */}
                 <button
-                  type="button"
                   onClick={logout}
                   disabled={loggingOut}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-pink-300 hover:bg-white/5 disabled:opacity-50"
+                  className="mt-1 flex w-full items-center gap-2 rounded-xl border border-pink-400/20 px-3 py-2 text-left text-pink-300 disabled:opacity-50"
                 >
-                  <LogOut size={18} />
+                  <LogOut size={16} />
 
-                  <span>
-                    {loggingOut
-                      ? 'Keluar...'
-                      : 'Logout'}
-                  </span>
+                  {loggingOut
+                    ? 'Keluar...'
+                    : 'Logout'}
                 </button>
               </>
             ) : (
               <>
-                <div className="my-2 border-t border-white/10" />
-
                 <Link
-                  className="rounded-xl px-3 py-3 text-center hover:bg-white/5"
                   onClick={() => setMobile(false)}
                   href="/login"
+                  className="mt-2 rounded-xl border border-white/10 px-3 py-2"
                 >
                   Login
                 </Link>
 
                 <Link
-                  className="btn btn-primary mt-1 text-center"
                   onClick={() => setMobile(false)}
                   href="/register"
+                  className="rounded-xl px-3 py-2"
                 >
                   Daftar
                 </Link>
