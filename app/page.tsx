@@ -26,13 +26,25 @@ export default function Home() {
       try {
         const supabase = supabaseBrowser()
 
-        const { data, error } = await supabase
-          .from('games')
-          .select('*')
-          .eq('is_active', true)
-          .eq('popular', true)
-          .order('name')
-          .limit(10)
+        const queryPromise = supabase
+  .from('games')
+  .select('*')
+  .eq('is_active', true)
+  .eq('popular', true)
+  .order('name')
+  .limit(10)
+
+const timeoutPromise = new Promise((_, reject) =>
+  setTimeout(
+    () => reject(new Error('Timeout memuat game')),
+    8000
+  )
+)
+
+const { data, error } = await Promise.race([
+  queryPromise,
+  timeoutPromise,
+]) as any
 
         if (!mounted) return
 
