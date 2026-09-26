@@ -2767,9 +2767,64 @@ export default function Admin() {
                 </p>
               </div>
 
-              <button className="btn btn-primary w-full">
-                Tambah Voucher
-              </button>
+         <button
+  type="button"
+  className="btn btn-primary w-full"
+  onClick={async () => {
+    const limit =
+      voucherForm.usage_limit.trim() === ''
+        ? null
+        : Number(voucherForm.usage_limit)
+
+    if (
+      limit !== null &&
+      (!Number.isInteger(limit) || limit < 0)
+    ) {
+      setMsg(
+        'Limit voucher harus berupa angka bulat 0 atau lebih.'
+      )
+      return
+    }
+
+    if (!voucherForm.code.trim()) {
+      setMsg('Kode voucher wajib diisi.')
+      return
+    }
+
+    if (!voucherForm.discount_value) {
+      setMsg('Nilai diskon wajib diisi.')
+      return
+    }
+
+    await add(
+      'vouchers',
+      {
+        code: voucherForm.code.trim().toUpperCase(),
+        discount_type: voucherForm.discount_type,
+        discount_value: Number(voucherForm.discount_value),
+        min_order: Number(voucherForm.min_order || 0),
+        max_discount: voucherForm.max_discount
+          ? Number(voucherForm.max_discount)
+          : null,
+        initial_limit: limit,
+        usage_limit: limit,
+        usage_count: 0,
+        is_active: true,
+      },
+      () =>
+        setVoucherForm({
+          code: '',
+          discount_type: 'PERCENT',
+          discount_value: '10',
+          min_order: '0',
+          max_discount: '',
+          usage_limit: '10',
+        })
+    )
+  }}
+>
+  Tambah Voucher
+</button>
             </form>
 
             <div className="space-y-3">
