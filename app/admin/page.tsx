@@ -3031,9 +3031,10 @@ async function deleteVoucher(v: any) {
                           >
                             Ubah Stok Awal
                           </button>
+)}
 {['owner', 'admin'].includes(role) && (
   <button
-)}
+
     onClick={() => deleteVoucher(v)}
     className="btn btn-muted text-xs text-red-300"
   >
