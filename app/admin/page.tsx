@@ -537,7 +537,30 @@ s
 
     load()
   }
+async function deleteVoucher(v: any) {
+  if (!['owner', 'admin'].includes(role)) {
+    setMsg('Hanya Owner/Admin yang dapat menghapus voucher.')
+    return
+  }
 
+  const ok = confirm(
+    `Hapus voucher ${v.code}?\n\nRiwayat penggunaan voucher ini TETAP akan disimpan.`
+  )
+
+  if (!ok) return
+
+  const { error } = await s
+    .from('vouchers')
+    .delete()
+    .eq('id', v.id)
+
+  setMsg(
+    error?.message ||
+      `Voucher ${v.code} berhasil dihapus. Riwayat penggunaan tetap tersimpan.`
+  )
+
+  load()
+}
   async function updateVoucherInitialLimit(v: any) {
     if (role !== 'owner') {
       setMsg(
@@ -3008,7 +3031,15 @@ s
                           >
                             Ubah Stok Awal
                           </button>
-                        )}
+{['owner', 'admin'].includes(role) && (
+  <button
+    onClick={() => deleteVoucher(v)}
+    className="btn btn-muted text-xs text-red-300"
+  >
+    Hapus
+  </button>
+)}
+                        
                       </div>
                     </div>
                   </div>
