@@ -98,26 +98,32 @@ export default function OrderPage() {
           .maybeSingle()
 
         console.log('PAYMENT METHOD:', methodData)
-        console.log('PAYMENT METHOD ERROR:', methodError)
+        console.log(
+          'PAYMENT METHOD ERROR:',
+          methodError
+        )
 
         method = methodData
       }
 
       // History + bukti
-      const [{ data: hist }, { data: pr }] = await Promise.all([
-        s
-          .from('order_status_history')
-          .select('*')
-          .eq('order_id', id)
-          .order('created_at'),
+      const [{ data: hist }, { data: pr }] =
+        await Promise.all([
+          s
+            .from('order_status_history')
+            .select('*')
+            .eq('order_id', id)
+            .order('created_at'),
 
-        s
-          .from('payment_proofs')
-          .select('*')
-          .eq('order_id', id)
-          .order('created_at', { ascending: false })
-          .limit(1),
-      ])
+          s
+            .from('payment_proofs')
+            .select('*')
+            .eq('order_id', id)
+            .order('created_at', {
+              ascending: false,
+            })
+            .limit(1),
+        ])
 
       setO(o1)
       setPaymentMethod(method)
@@ -197,7 +203,9 @@ export default function OrderPage() {
                 className="mt-1 font-bold"
               >
                 {i.product_name} · Rp{' '}
-                {Number(i.unit_price).toLocaleString('id-ID')}
+                {Number(i.unit_price).toLocaleString(
+                  'id-ID'
+                )}
               </p>
             ))}
 
@@ -206,18 +214,76 @@ export default function OrderPage() {
             </p>
 
             <p className="mt-1 text-sm text-slate-300">
-              {Object.entries(o.customer_data || {}).map(
-                ([k, v]) => (
-                  <span
-                    key={k}
-                    className="mr-3"
-                  >
-                    {k}: {String(v)}
-                  </span>
-                )
-              )}
+              {Object.entries(
+                o.customer_data || {}
+              ).map(([k, v]) => (
+                <span
+                  key={k}
+                  className="mr-3"
+                >
+                  {k}: {String(v)}
+                </span>
+              ))}
             </p>
           </div>
+
+          {/* VOUCHER */}
+          {o.voucher_code && (
+            <div className="rounded-2xl bg-slate-950/60 p-5">
+              <p className="text-xs text-slate-500">
+                Voucher Digunakan
+              </p>
+
+              <p className="mt-2 text-lg font-black text-purple-300">
+                {o.voucher_code}
+              </p>
+
+              <div className="mt-4 grid gap-3 text-sm">
+
+                {/* SUBTOTAL */}
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-slate-400">
+                    Subtotal
+                  </span>
+
+                  <span className="font-semibold">
+                    Rp{' '}
+                    {Number(
+                      o.subtotal || 0
+                    ).toLocaleString('id-ID')}
+                  </span>
+                </div>
+
+                {/* DISCOUNT */}
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-slate-400">
+                    Potongan Voucher
+                  </span>
+
+                  <span className="font-semibold text-green-400">
+                    - Rp{' '}
+                    {Number(
+                      o.discount || 0
+                    ).toLocaleString('id-ID')}
+                  </span>
+                </div>
+
+                {/* TOTAL */}
+                <div className="mt-2 flex items-center justify-between gap-4 border-t border-white/10 pt-3">
+                  <span className="font-bold">
+                    Total Dibayar
+                  </span>
+
+                  <span className="font-black text-cyan-300">
+                    Rp{' '}
+                    {Number(
+                      o.total || 0
+                    ).toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* PEMBAYARAN */}
           <div className="rounded-2xl bg-slate-950/60 p-5">
@@ -226,11 +292,15 @@ export default function OrderPage() {
             </p>
 
             <p className="mt-2 text-2xl font-black">
-              Rp {Number(o.total).toLocaleString('id-ID')}
+              Rp{' '}
+              {Number(o.total).toLocaleString(
+                'id-ID'
+              )}
             </p>
 
             <p className="mt-2 text-sm font-semibold text-cyan-300">
-              {paymentMethod?.name || 'Metode pembayaran'}
+              {paymentMethod?.name ||
+                'Metode pembayaran'}
             </p>
 
             {(paymentMethod?.account_name ||
@@ -308,13 +378,14 @@ export default function OrderPage() {
                 className="border-l-2 border-purple-500/50 pl-4"
               >
                 <p className="font-bold">
-                  {labels[x.new_status] || x.new_status}
+                  {labels[x.new_status] ||
+                    x.new_status}
                 </p>
 
                 <p className="text-xs text-slate-500">
-                  {new Date(x.created_at).toLocaleString(
-                    'id-ID'
-                  )}
+                  {new Date(
+                    x.created_at
+                  ).toLocaleString('id-ID')}
                 </p>
 
                 {x.note && (
