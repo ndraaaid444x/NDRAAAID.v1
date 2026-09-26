@@ -20,40 +20,63 @@ export default function Home() {
     let mounted = true
 
     async function loadGames() {
+      if (!mounted) return
+
       setLoadingGames(true)
       setGameError('')
 
       try {
         const supabase = supabaseBrowser()
 
+        /*
+         * Query game utama
+         */
         const queryPromise = supabase
-  .from('games')
-  .select('*')
-  .eq('is_active', true)
-  .eq('popular', true)
-  .order('name')
-  .limit(10)
+          .from('games')
+          .select('*')
+          .eq('is_active', true)
+          .eq('popular', true)
+          .order('name')
+          .limit(10)
 
-const timeoutPromise = new Promise((_, reject) =>
-  setTimeout(
-    () => reject(new Error('Timeout memuat game')),
-    8000
-  )
-)
+        /*
+         * Pengaman:
+         * Jangan biarkan browser menunggu Supabase selamanya.
+         */
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(
+              new Error(
+                'Timeout memuat game. Silakan coba muat ulang halaman.'
+              )
+            )
+          }, 8000)
+        })
 
-const { data, error } = await Promise.race([
-  queryPromise,
-  timeoutPromise,
-]) as any
+        /*
+         * Jalankan query dan timeout bersamaan.
+         * Yang selesai lebih dahulu akan digunakan.
+         */
+        const result = (await Promise.race([
+          queryPromise,
+          timeoutPromise,
+        ])) as {
+          data: any[] | null
+          error: any
+        }
 
         if (!mounted) return
+
+        const { data, error } = result
 
         if (error) {
           console.error('Gagal mengambil data games:', error)
 
           setGames([])
+
           setGameError(
-            `Gagal memuat game: ${error.message}`
+            error?.message ||
+              'Gagal memuat daftar game.'
           )
 
           return
@@ -66,6 +89,7 @@ const { data, error } = await Promise.race([
         console.error('Unexpected games error:', error)
 
         setGames([])
+
         setGameError(
           error?.message ||
             'Terjadi kesalahan saat memuat game.'
@@ -86,6 +110,7 @@ const { data, error } = await Promise.race([
 
   return (
     <div>
+      {/* HERO */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(34,211,238,.14),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(139,92,246,.18),transparent_35%)]" />
 
@@ -98,6 +123,7 @@ const { data, error } = await Promise.race([
             <h1 className="text-5xl font-black leading-[.98] md:text-7xl">
               TOP UP GAME
               <br />
+
               <span className="gradient-text">
                 FAVORITMU
               </span>
@@ -115,7 +141,10 @@ const { data, error } = await Promise.race([
                 className="btn btn-primary"
               >
                 Top Up Sekarang
-                <ArrowRight className="ml-2" size={18} />
+                <ArrowRight
+                  className="ml-2"
+                  size={18}
+                />
               </Link>
 
               <Link
@@ -129,6 +158,7 @@ const { data, error } = await Promise.race([
             <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
               <div className="glass rounded-2xl p-4">
                 <Zap size={20} />
+
                 <p className="mt-2 text-xs text-slate-400">
                   Proses cepat
                 </p>
@@ -136,6 +166,7 @@ const { data, error } = await Promise.race([
 
               <div className="glass rounded-2xl p-4">
                 <ShieldCheck size={20} />
+
                 <p className="mt-2 text-xs text-slate-400">
                   Manual verified
                 </p>
@@ -143,6 +174,7 @@ const { data, error } = await Promise.race([
 
               <div className="glass rounded-2xl p-4">
                 <Headphones size={20} />
+
                 <p className="mt-2 text-xs text-slate-400">
                   Support
                 </p>
@@ -174,6 +206,7 @@ const { data, error } = await Promise.race([
         </div>
       </section>
 
+      {/* GAME POPULER */}
       <section className="mx-auto max-w-7xl px-4 py-16">
         <div className="flex items-end justify-between">
           <div>
@@ -194,12 +227,22 @@ const { data, error } = await Promise.race([
           </Link>
         </div>
 
+        {/* LOADING */}
         {loadingGames && (
-          <div className="mt-7 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-sm text-slate-400">
-            Memuat game...
+          <div className="mt-7 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center">
+            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-cyan-400" />
+
+            <p className="mt-3 text-sm text-slate-400">
+              Memuat game...
+            </p>
+
+            <p className="mt-1 text-xs text-slate-600">
+              Mohon tunggu sebentar
+            </p>
           </div>
         )}
 
+        {/* ERROR */}
         {!loadingGames && gameError && (
           <div className="mt-7 rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
             <p className="font-bold text-red-300">
@@ -212,7 +255,9 @@ const { data, error } = await Promise.race([
 
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                window.location.reload()
+              }}
               className="btn btn-muted mt-4"
             >
               Muat Ulang
@@ -220,6 +265,7 @@ const { data, error } = await Promise.race([
           </div>
         )}
 
+        {/* GAME KOSONG */}
         {!loadingGames &&
           !gameError &&
           games.length === 0 && (
@@ -228,6 +274,7 @@ const { data, error } = await Promise.race([
             </div>
           )}
 
+        {/* GAME */}
         {!loadingGames &&
           !gameError &&
           games.length > 0 && (
@@ -265,6 +312,7 @@ const { data, error } = await Promise.race([
           )}
       </section>
 
+      {/* PROMO */}
       <section
         id="promo"
         className="mx-auto max-w-7xl px-4 py-10"
