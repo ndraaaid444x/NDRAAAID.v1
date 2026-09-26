@@ -1,22 +1,56 @@
 -- =========================================================
 -- NDRAAAID.v1
--- Voucher usage limit + usage history
+-- Voucher limits + usage history
 -- =========================================================
 
--- 1. Tambahkan batas penggunaan voucher
-alter table public.vouchers
-add column if not exists usage_limit integer;
+-- =========================================================
+-- 1. Tambahkan data limit ke voucher
+-- =========================================================
 
 alter table public.vouchers
-drop constraint if exists vouchers_usage_limit_check;
+  add column if not exists initial_limit bigint;
 
 alter table public.vouchers
-add constraint vouchers_usage_limit_check
-check (usage_limit is null or usage_limit > 0);
+  add column if not exists usage_limit bigint;
+
+alter table public.vouchers
+  add column if not exists usage_count bigint not null default 0;
+
+alter table public.vouchers
+  drop constraint if exists vouchers_initial_limit_check;
+
+alter table public.vouchers
+  add constraint vouchers_initial_limit_check
+  check (initial_limit is null or initial_limit >= 0);
+
+alter table public.vouchers
+  drop constraint if exists vouchers_usage_limit_check;
+
+alter table public.vouchers
+  add constraint vouchers_usage_limit_check
+  check (usage_limit is null or usage_limit >= 0);
+
+alter table public.vouchers
+  drop constraint if exists vouchers_usage_count_check;
+
+alter table public.vouchers
+  add constraint vouchers_usage_count_check
+  check (usage_count >= 0);
 
 
 -- =========================================================
--- 2. Tabel riwayat penggunaan voucher
+-- 2. Voucher yang sudah ada
+--    NULL = tanpa batas
+-- =========================================================
+
+update public.vouchers
+set
+  initial_limit = coalesce(initial_limit, usage_limit),
+  usage_count = coalesce(usage_count, 0);
+
+
+-- =========================================================
+-- 3. Riwayat penggunaan voucher
 -- =========================================================
 
 create table if not exists public.voucher_usages (
@@ -60,7 +94,7 @@ on public.voucher_usages(order_id);
 
 
 -- =========================================================
--- 3. RLS
+-- 4. RLS
 -- =========================================================
 
 alter table public.voucher_usages enable row level security;
@@ -75,753 +109,312 @@ using (public.is_admin());
 
 
 -- =========================================================
--- 4. Ganti create_manual_order
---    dengan validasi limit voucher yang atomic
+-- 5. Trigger penggunaan voucher
+--
+-- Setiap order yang memiliki voucher akan:
+-- - mengunci voucher
+-- - mengecek limit
+-- - mencatat penggunaan
+-- - menambah usage_count
+--
+-- Jika limit habis, order otomatis ditolak.
 -- =========================================================
 
-create or replace function public.create_manual_order(
-  p_game_id uuid,
-  p_product_id uuid,
-  p_customer_data jsonb,
-  p_payment_method_id uuid,
-  p_voucher_code text default null
-)
-returns uuid
+create or replace function public.reserve_voucher_for_order()
+returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  uid uuid := auth.uid();
-
-  prod public.game_products;
-  game public.games;
-  method public.payment_methods;
-  wallet public.wallets;
   v public.vouchers;
-
-  oid uuid;
-
-  subtotal numeric;
-  discount numeric := 0;
-  fee numeric := 0;
-  total numeric;
-
-  before_balance numeric;
-  available_balance numeric;
-
-  voucher_usage_count integer := 0;
+  current_usage bigint;
 begin
 
-  -- =======================================================
-  -- Authentication
-  -- =======================================================
-
-  if uid is null then
-    raise exception 'UNAUTHORIZED';
+  if new.voucher_code is null
+     or btrim(new.voucher_code) = '' then
+    return new;
   end if;
 
 
-  -- =======================================================
-  -- Validate product
-  -- =======================================================
-
+  -- Lock voucher agar dua order bersamaan
+  -- tidak dapat memakai stok terakhir secara bersamaan.
   select *
-  into prod
-  from public.game_products
-  where id = p_product_id
-    and game_id = p_game_id
-    and is_active = true;
+  into v
+  from public.vouchers
+  where upper(code) = upper(btrim(new.voucher_code))
+  for update;
 
-  if prod.id is null then
-    raise exception 'PRODUCT_NOT_FOUND';
+
+  if v.id is null then
+    raise exception 'INVALID_VOUCHER';
   end if;
 
 
-  -- =======================================================
-  -- Validate game
-  -- =======================================================
-
-  select *
-  into game
-  from public.games
-  where id = p_game_id
-    and is_active = true;
-
-  if game.id is null then
-    raise exception 'GAME_NOT_FOUND';
+  if not v.is_active then
+    raise exception 'INVALID_VOUCHER';
   end if;
 
 
-  -- =======================================================
-  -- Validate payment method
-  -- =======================================================
-
-  select *
-  into method
-  from public.payment_methods
-  where id = p_payment_method_id
-    and is_active = true;
-
-  if method.id is null then
-    raise exception 'PAYMENT_METHOD_NOT_FOUND';
+  if v.starts_at is not null
+     and now() < v.starts_at then
+    raise exception 'INVALID_VOUCHER';
   end if;
 
 
-  -- =======================================================
-  -- Calculate subtotal
-  -- =======================================================
-
-  subtotal := prod.price;
-
-
-  -- =======================================================
-  -- Voucher
-  -- =======================================================
-
-  if p_voucher_code is not null
-     and btrim(p_voucher_code) <> '' then
-
-    /*
-      FOR UPDATE penting.
-
-      Jika dua customer memakai voucher yang sama
-      secara bersamaan, database akan mengunci voucher
-      sehingga limit tidak bisa terlewati.
-    */
-
-    select *
-    into v
-    from public.vouchers
-    where upper(code) = upper(btrim(p_voucher_code))
-      and is_active = true
-      and (starts_at is null or now() >= starts_at)
-      and (ends_at is null or now() <= ends_at)
-      and subtotal >= min_order
-    limit 1
-    for update;
+  if v.ends_at is not null
+     and now() > v.ends_at then
+    raise exception 'INVALID_VOUCHER';
+  end if;
 
 
-    if v.id is null then
-      raise exception 'INVALID_VOUCHER';
-    end if;
+  current_usage := coalesce(v.usage_count, 0);
 
 
-    -- =====================================================
-    -- Hitung penggunaan voucher
-    -- =====================================================
+  -- Limit NULL = tidak terbatas.
+  if v.usage_limit is not null
+     and current_usage >= v.usage_limit then
 
-    select count(*)::integer
-    into voucher_usage_count
-    from public.voucher_usages
-    where voucher_id = v.id;
-
-
-    -- =====================================================
-    -- Cek limit
-    -- =====================================================
-
-    if v.usage_limit is not null
-       and voucher_usage_count >= v.usage_limit then
-
-      raise exception 'VOUCHER_USAGE_LIMIT_REACHED';
-
-    end if;
-
-
-    -- =====================================================
-    -- Hitung diskon
-    -- =====================================================
-
-    if v.discount_type = 'PERCENT' then
-
-      discount := round(
-        subtotal * (v.discount_value / 100),
-        2
-      );
-
-    else
-
-      discount := v.discount_value;
-
-    end if;
-
-
-    if v.max_discount is not null then
-      discount := least(
-        discount,
-        v.max_discount
-      );
-    end if;
-
-
-    discount := least(
-      discount,
-      subtotal
-    );
+    raise exception 'VOUCHER_USAGE_LIMIT_REACHED';
 
   end if;
 
 
-  -- =======================================================
-  -- Total
-  -- =======================================================
-
-  total := subtotal - discount + fee;
-
-
-  -- =======================================================
-  -- WALLET PAYMENT
-  -- =======================================================
-
-  if upper(method.kind) = 'WALLET' then
-
-    insert into public.wallets(user_id)
-    values (uid)
-    on conflict (user_id) do nothing;
-
-
-    select *
-    into wallet
-    from public.wallets
-    where user_id = uid
-    for update;
-
-
-    before_balance := wallet.balance;
-
-    available_balance :=
-      wallet.balance
-      - coalesce(wallet.reserved_balance, 0);
-
-
-    if available_balance < total then
-      raise exception 'INSUFFICIENT_WALLET_BALANCE';
-    end if;
-
-
-    -- =====================================================
-    -- Create paid order
-    -- =====================================================
-
-    insert into public.orders(
-      order_code,
-      user_id,
-      game_id,
-      status,
-      subtotal,
-      discount,
-      admin_fee,
-      total,
-      customer_data,
-      voucher_code
-    )
-    values(
-      public.make_order_code(),
-      uid,
-      p_game_id,
-      'PAYMENT_RECEIVED',
-      subtotal,
-      discount,
-      fee,
-      total,
-      coalesce(p_customer_data, '{}'),
-      nullif(btrim(p_voucher_code), '')
-    )
-    returning id into oid;
-
-
-    -- =====================================================
-    -- Order item
-    -- =====================================================
-
-    insert into public.order_items(
-      order_id,
-      product_id,
-      product_name,
-      sku,
-      quantity,
-      unit_price
-    )
-    values(
-      oid,
-      prod.id,
-      prod.name,
-      prod.sku,
-      1,
-      prod.price
-    );
-
-
-    -- =====================================================
-    -- Payment
-    -- =====================================================
-
-    insert into public.payments(
-      order_id,
-      payment_method_id,
-      amount,
-      status
-    )
-    values(
-      oid,
-      method.id,
-      total,
-      'PAID'
-    );
-
-
-    -- =====================================================
-    -- Catat penggunaan voucher
-    -- =====================================================
-
-    if v.id is not null then
-
-      insert into public.voucher_usages(
-        voucher_id,
-        order_id,
-        user_id,
-        voucher_code,
-        discount_amount
-      )
-      values(
-        v.id,
-        oid,
-        uid,
-        v.code,
-        discount
-      );
-
-    end if;
-
-
-    -- =====================================================
-    -- Deduct wallet
-    -- =====================================================
-
-    update public.wallets
-    set
-      balance = balance - total,
-      updated_at = now()
-    where user_id = uid;
-
-
-    -- =====================================================
-    -- Wallet ledger
-    -- =====================================================
-
-    insert into public.wallet_transactions(
-      user_id,
-      amount,
-      balance_before,
-      balance_after,
-      type,
-      reason,
-      order_id,
-      actor_id
-    )
-    values(
-      uid,
-      -total,
-      before_balance,
-      before_balance - total,
-      'ORDER_PAYMENT',
-      'Pembayaran order menggunakan saldo akun',
-      oid,
-      uid
-    );
-
-
-    -- =====================================================
-    -- Order history
-    -- =====================================================
-
-    insert into public.order_status_history(
-      order_id,
-      old_status,
-      new_status,
-      changed_by,
-      note
-    )
-    values(
-      oid,
-      null,
-      'PAYMENT_RECEIVED',
-      uid,
-      case
-        when v.id is not null
-        then 'Order dibayar menggunakan saldo akun dengan voucher ' || v.code || '.'
-        else 'Order dibayar menggunakan saldo akun.'
-      end
-    );
-
-
-    -- =====================================================
-    -- Notification
-    -- =====================================================
-
-    insert into public.notifications(
-      user_id,
-      title,
-      body,
-      type
-    )
-    values(
-      uid,
-      'Pembayaran berhasil',
-      case
-        when v.id is not null
-        then 'Pembayaran order menggunakan saldo akun berhasil. Voucher ' || v.code || ' digunakan.'
-        else 'Pembayaran order menggunakan saldo akun berhasil.'
-      end,
-      'ORDER'
-    );
-
-
-    return oid;
-
-  end if;
-
-
-  -- =======================================================
-  -- NORMAL / MANUAL PAYMENT
-  -- =======================================================
-
-  insert into public.orders(
-    order_code,
+  -- Catat penggunaan voucher.
+  insert into public.voucher_usages(
+    voucher_id,
+    order_id,
     user_id,
-    game_id,
-    status,
-    subtotal,
-    discount,
-    admin_fee,
-    total,
-    customer_data,
-    voucher_code
+    voucher_code,
+    discount_amount
   )
   values(
-    public.make_order_code(),
-    uid,
-    p_game_id,
-    'PENDING_PAYMENT',
-    subtotal,
-    discount,
-    fee,
-    total,
-    coalesce(p_customer_data, '{}'),
-    nullif(btrim(p_voucher_code), '')
-  )
-  returning id into oid;
-
-
-  -- =======================================================
-  -- Order item
-  -- =======================================================
-
-  insert into public.order_items(
-    order_id,
-    product_id,
-    product_name,
-    sku,
-    quantity,
-    unit_price
-  )
-  values(
-    oid,
-    prod.id,
-    prod.name,
-    prod.sku,
-    1,
-    prod.price
+    v.id,
+    new.id,
+    new.user_id,
+    v.code,
+    coalesce(new.discount, 0)
   );
 
 
-  -- =======================================================
-  -- Payment
-  -- =======================================================
-
-  insert into public.payments(
-    order_id,
-    payment_method_id,
-    amount,
-    status
-  )
-  values(
-    oid,
-    method.id,
-    total,
-    'PENDING'
-  );
+  -- Tambah jumlah penggunaan.
+  update public.vouchers
+  set usage_count = coalesce(usage_count, 0) + 1
+  where id = v.id;
 
 
-  -- =======================================================
-  -- Catat penggunaan voucher
-  -- =======================================================
-
-  if v.id is not null then
-
-    insert into public.voucher_usages(
-      voucher_id,
-      order_id,
-      user_id,
-      voucher_code,
-      discount_amount
-    )
-    values(
-      v.id,
-      oid,
-      uid,
-      v.code,
-      discount
-    );
-
-  end if;
-
-
-  -- =======================================================
-  -- Order history
-  -- =======================================================
-
-  insert into public.order_status_history(
-    order_id,
-    old_status,
-    new_status,
-    changed_by,
-    note
-  )
-  values(
-    oid,
-    null,
-    'PENDING_PAYMENT',
-    uid,
-    case
-      when v.id is not null
-      then 'Order dibuat dengan voucher ' || v.code || '.'
-      else 'Order dibuat oleh customer.'
-    end
-  );
-
-
-  -- =======================================================
-  -- Notification
-  -- =======================================================
-
-  insert into public.notifications(
-    user_id,
-    title,
-    body,
-    type
-  )
-  values(
-    uid,
-    'Order berhasil dibuat',
-    case
-      when v.id is not null
-      then 'Order dibuat dengan voucher ' || v.code || '. Silakan lakukan pembayaran.'
-      else 'Order kamu sudah dibuat. Silakan lakukan pembayaran sesuai metode yang dipilih.'
-    end,
-    'ORDER'
-  );
-
-
-  return oid;
-
+  return new;
 end;
 $$;
 
 
+drop trigger if exists trg_reserve_voucher_for_order
+on public.orders;
+
+
+create trigger trg_reserve_voucher_for_order
+before insert on public.orders
+for each row
+execute function public.reserve_voucher_for_order();
+
+
 -- =========================================================
--- 5. Permissions
+-- 6. Jika order CANCELLED / EXPIRED
+--    stok voucher dikembalikan.
 -- =========================================================
 
-revoke all on function public.create_manual_order(
-  uuid,
-  uuid,
-  jsonb,
-  uuid,
-  text
-)
-from public, anon, authenticated;
+create or replace function public.release_voucher_for_order()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  usage_row public.voucher_usages;
+begin
+
+  if new.status in ('CANCELLED', 'EXPIRED')
+     and old.status not in ('CANCELLED', 'EXPIRED') then
+
+    select *
+    into usage_row
+    from public.voucher_usages
+    where order_id = new.id
+    for update;
 
 
-grant execute on function public.create_manual_order(
-  uuid,
-  uuid,
-  jsonb,
-  uuid,
-  text
+    if usage_row.id is not null then
+
+      delete from public.voucher_usages
+      where id = usage_row.id;
+
+
+      update public.vouchers
+      set usage_count = greatest(
+        coalesce(usage_count, 0) - 1,
+        0
+      )
+      where id = usage_row.voucher_id;
+
+    end if;
+
+  end if;
+
+
+  return new;
+end;
+$$;
+
+
+drop trigger if exists trg_release_voucher_for_order
+on public.orders;
+
+
+create trigger trg_release_voucher_for_order
+after update of status on public.orders
+for each row
+execute function public.release_voucher_for_order();
+
+
+-- =========================================================
+-- 7. Admin/Owner boleh membaca riwayat voucher
+-- =========================================================
+
+drop policy if exists voucher_usages_admin_select
+on public.voucher_usages;
+
+create policy voucher_usages_admin_select
+on public.voucher_usages
+for select
+using (public.is_admin());
+
+
+-- =========================================================
+-- 8. Admin/Owner boleh mengatur voucher
+-- =========================================================
+
+drop policy if exists vouchers_admin
+on public.vouchers;
+
+create policy vouchers_admin
+on public.vouchers
+for all
+using (public.is_admin())
+with check (public.is_admin());
+
+
+-- =========================================================
+-- 9. View untuk Admin Panel
+--
+-- Menampilkan:
+-- kode
+-- diskon
+-- stok awal
+-- terpakai
+-- sisa
+-- status
+-- =========================================================
+
+create or replace view public.voucher_inventory
+with (id, code, discount_type, discount_value,
+      initial_limit, usage_limit, usage_count,
+      remaining, is_active, starts_at, ends_at)
+as
+select
+  v.id,
+  v.code,
+  v.discount_type,
+  v.discount_value,
+  v.initial_limit,
+  v.usage_limit,
+  coalesce(v.usage_count, 0),
+
+  case
+    when v.usage_limit is null then null
+    else greatest(
+      v.usage_limit - coalesce(v.usage_count, 0),
+      0
+    )
+  end,
+
+  v.is_active,
+  v.starts_at,
+  v.ends_at
+from public.vouchers v;
+
+
+-- =========================================================
+-- 10. View riwayat penggunaan voucher
+--
+-- Admin bisa mendapatkan:
+-- BUDI10
+-- Diskon 10%
+-- User @pembeli
+-- Order NDRAAAID-...
+-- Diskon Rp2.000
+-- Waktu penggunaan
+-- =========================================================
+
+create or replace view public.voucher_usage_history
+with (
+  id,
+  voucher_id,
+  voucher_code,
+  order_id,
+  order_code,
+  user_id,
+  username,
+  name,
+  discount_amount,
+  order_subtotal,
+  order_total,
+  order_status,
+  used_at
 )
+as
+select
+  vu.id,
+  vu.voucher_id,
+  vu.voucher_code,
+  vu.order_id,
+  o.order_code,
+  vu.user_id,
+  p.username,
+  p.name,
+  vu.discount_amount,
+  o.subtotal,
+  o.total,
+  o.status,
+  vu.used_at
+from public.voucher_usages vu
+join public.orders o
+  on o.id = vu.order_id
+join public.profiles p
+  on p.id = vu.user_id;
+
+
+-- =========================================================
+-- 11. Keamanan view
+-- =========================================================
+
+revoke all
+on public.voucher_inventory
+from anon, authenticated;
+
+revoke all
+on public.voucher_usage_history
+from anon, authenticated;
+
+
+grant select
+on public.voucher_inventory
+to authenticated;
+
+grant select
+on public.voucher_usage_history
 to authenticated;
 
 
 -- =========================================================
--- 6. Kembalikan kuota ketika order CANCELLED / EXPIRED
+-- SELESAI
 -- =========================================================
-
-create or replace function public.admin_transition_order(
-  p_order_id uuid,
-  p_new_status public.order_status,
-  p_note text default null
-)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  actor uuid := auth.uid();
-  old public.order_status;
-  uid uuid;
-begin
-
-  if not public.is_admin() then
-    raise exception 'FORBIDDEN';
-  end if;
-
-
-  select
-    status,
-    user_id
-  into
-    old,
-    uid
-  from public.orders
-  where id = p_order_id
-  for update;
-
-
-  if old is null then
-    raise exception 'ORDER_NOT_FOUND';
-  end if;
-
-
-  if old = 'PENDING_PAYMENT'
-     and p_new_status not in (
-       'PAYMENT_RECEIVED',
-       'CANCELLED',
-       'EXPIRED'
-     ) then
-
-    raise exception 'INVALID_TRANSITION';
-
-  end if;
-
-
-  if old = 'PAYMENT_RECEIVED'
-     and p_new_status not in (
-       'PROCESSING',
-       'FAILED',
-       'CANCELLED'
-     ) then
-
-    raise exception 'INVALID_TRANSITION';
-
-  end if;
-
-
-  if old = 'PROCESSING'
-     and p_new_status not in (
-       'SUCCESS',
-       'FAILED'
-     ) then
-
-    raise exception 'INVALID_TRANSITION';
-
-  end if;
-
-
-  update public.orders
-  set
-    status = p_new_status,
-    updated_at = now()
-  where id = p_order_id;
-
-
-  if p_new_status = 'PAYMENT_RECEIVED' then
-
-    update public.payments
-    set
-      status = 'PAID',
-      updated_at = now()
-    where order_id = p_order_id;
-
-
-    update public.payment_proofs
-    set verified = true
-    where id = (
-      select id
-      from public.payment_proofs
-      where order_id = p_order_id
-      order by created_at desc
-      limit 1
-    );
-
-  end if;
-
-
-  -- =======================================================
-  -- Jika order dibatalkan/expired,
-  -- voucher usage dikembalikan
-  -- =======================================================
-
-  if p_new_status in ('CANCELLED', 'EXPIRED') then
-
-    delete from public.voucher_usages
-    where order_id = p_order_id;
-
-  end if;
-
-
-  insert into public.order_status_history(
-    order_id,
-    old_status,
-    new_status,
-    changed_by,
-    note
-  )
-  values(
-    p_order_id,
-    old,
-    p_new_status,
-    actor,
-    p_note
-  );
-
-
-  insert into public.admin_audit_logs(
-    admin_id,
-    action,
-    entity_type,
-    entity_id,
-    metadata
-  )
-  values(
-    actor,
-    'CHANGE_ORDER_STATUS',
-    'order',
-    p_order_id,
-    jsonb_build_object(
-      'from', old,
-      'to', p_new_status,
-      'note', p_note
-    )
-  );
-
-
-  insert into public.notifications(
-    user_id,
-    title,
-    body,
-    type
-  )
-  values(
-    uid,
-    'Status order berubah',
-    'Order kamu sekarang berstatus ' ||
-    replace(p_new_status::text, '_', ' ') ||
-    '.',
-    'ORDER'
-  );
-
-end;
-$$;
