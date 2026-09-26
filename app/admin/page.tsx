@@ -3063,11 +3063,11 @@ s
                 vu.orders
 
               return (
-                <div
-                  key={vu.id}
-                  className="glass rounded-2xl p-5"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+<div
+  key={vu.id}
+  className="glass rounded-xl p-3"
+>
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <b className="text-lg">
@@ -3107,7 +3107,7 @@ s
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
                         <p className="text-[10px] text-slate-500">
                           DISKON
