@@ -22,6 +22,7 @@ export default function SiteHeader() {
   const [open, setOpen] = useState(false)
   const [mobile, setMobile] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   async function loadUserData(currentUser: any) {
     if (!currentUser) {
@@ -94,16 +95,37 @@ export default function SiteHeader() {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function logout() {
-    setMobile(false)
+    if (loggingOut) return
+
+    setLoggingOut(true)
     setOpen(false)
+    setMobile(false)
 
-    await supabaseBrowser().auth.signOut()
+    const s = supabaseBrowser()
 
-    location.href = '/'
+    // Langsung bersihkan tampilan akun
+    setUser(undefined)
+    setProfile(undefined)
+    setBalance(0)
+    setUnread(0)
+
+    try {
+      // Local logout tidak bergantung pada sesi server
+      await s.auth.signOut({
+        scope: 'local',
+      })
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      // Tetap kembali ke halaman utama
+      window.location.replace('/')
+    }
   }
 
   const formattedBalance = new Intl.NumberFormat(
@@ -122,6 +144,7 @@ export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050816]/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+        {/* LOGO */}
         <Link
           href="/"
           className="text-xl font-black tracking-tight"
@@ -133,6 +156,7 @@ export default function SiteHeader() {
           </span>
         </Link>
 
+        {/* DESKTOP NAV */}
         <nav className="hidden gap-6 text-sm text-slate-300 md:flex">
           <Link href="/">Home</Link>
           <Link href="/games">Games</Link>
@@ -144,6 +168,7 @@ export default function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* SEARCH */}
           <Link
             href="/games"
             className="rounded-xl p-2 hover:bg-white/5"
@@ -189,6 +214,7 @@ export default function SiteHeader() {
               {/* USER DESKTOP */}
               <div className="relative hidden sm:block">
                 <button
+                  type="button"
                   onClick={() =>
                     setOpen(v => !v)
                   }
@@ -202,7 +228,7 @@ export default function SiteHeader() {
                 </button>
 
                 {open && (
-                  <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-white/10 bg-[#0a1020] p-2 shadow-2xl">
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-white/10 bg-[#0a1020] p-2 shadow-2xl">
                     <Link
                       className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/dashboard"
@@ -212,37 +238,56 @@ export default function SiteHeader() {
                     </Link>
 
                     <Link
-                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/account"
                       onClick={() => setOpen(false)}
                     >
-                      Profile
+                      <User size={15} />
+                      Profile / Akun
                     </Link>
 
                     <Link
-                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-white/5"
                       href="/orders"
                       onClick={() => setOpen(false)}
                     >
+                      <Receipt size={15} />
                       Transaksi
+                    </Link>
+
+                    <Link
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      href="/notifications"
+                      onClick={() => setOpen(false)}
+                    >
+                      <Bell size={15} />
+                      Notifikasi
                     </Link>
 
                     {isAdmin && (
                       <Link
-                        className="block rounded-xl px-3 py-2 text-sm text-cyan-300 hover:bg-white/5"
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-cyan-300 hover:bg-white/5"
                         href="/admin"
                         onClick={() => setOpen(false)}
                       >
+                        <Shield size={15} />
                         Admin Panel
                       </Link>
                     )}
 
+                    <div className="my-2 border-t border-white/10" />
+
                     <button
+                      type="button"
                       onClick={logout}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-pink-300 hover:bg-white/5"
+                      disabled={loggingOut}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-pink-300 hover:bg-white/5 disabled:opacity-50"
                     >
                       <LogOut size={15} />
-                      Logout
+
+                      {loggingOut
+                        ? 'Keluar...'
+                        : 'Logout'}
                     </button>
                   </div>
                 )}
@@ -250,6 +295,7 @@ export default function SiteHeader() {
             </>
           ) : (
             <>
+              {/* LOGIN */}
               <Link
                 href="/login"
                 className="btn btn-muted hidden sm:inline-flex"
@@ -257,6 +303,7 @@ export default function SiteHeader() {
                 Login
               </Link>
 
+              {/* REGISTER */}
               <Link
                 href="/register"
                 className="btn btn-primary"
@@ -268,6 +315,7 @@ export default function SiteHeader() {
 
           {/* MOBILE MENU BUTTON */}
           <button
+            type="button"
             className="rounded-xl p-2 md:hidden"
             onClick={() =>
               setMobile(v => !v)
@@ -319,6 +367,7 @@ export default function SiteHeader() {
               <>
                 <div className="my-2 border-t border-white/10" />
 
+                {/* DASHBOARD */}
                 <Link
                   className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
@@ -328,6 +377,7 @@ export default function SiteHeader() {
                     size={18}
                     className="text-cyan-300"
                   />
+
                   <div>
                     <div>Dashboard</div>
                     <div className="text-xs text-slate-500">
@@ -336,6 +386,7 @@ export default function SiteHeader() {
                   </div>
                 </Link>
 
+                {/* PROFILE */}
                 <Link
                   className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
@@ -345,6 +396,7 @@ export default function SiteHeader() {
                   <span>Profile / Akun</span>
                 </Link>
 
+                {/* TRANSAKSI */}
                 <Link
                   className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
@@ -354,14 +406,17 @@ export default function SiteHeader() {
                   <span>Transaksi</span>
                 </Link>
 
+                {/* NOTIFIKASI */}
                 <Link
                   className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"
                   onClick={() => setMobile(false)}
                   href="/notifications"
                 >
                   <Bell size={18} />
+
                   <span>
                     Notifikasi
+
                     {unread > 0 && (
                       <span className="ml-2 rounded-full bg-pink-400 px-2 py-0.5 text-[10px] text-white">
                         {unread}
@@ -370,6 +425,7 @@ export default function SiteHeader() {
                   </span>
                 </Link>
 
+                {/* ADMIN */}
                 {isAdmin && (
                   <Link
                     className="flex items-center gap-3 rounded-xl px-3 py-3 text-cyan-300 hover:bg-white/5"
@@ -383,12 +439,20 @@ export default function SiteHeader() {
 
                 <div className="my-2 border-t border-white/10" />
 
+                {/* LOGOUT MOBILE */}
                 <button
+                  type="button"
                   onClick={logout}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-pink-300 hover:bg-white/5"
+                  disabled={loggingOut}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-pink-300 hover:bg-white/5 disabled:opacity-50"
                 >
                   <LogOut size={18} />
-                  <span>Logout</span>
+
+                  <span>
+                    {loggingOut
+                      ? 'Keluar...'
+                      : 'Logout'}
+                  </span>
                 </button>
               </>
             ) : (
