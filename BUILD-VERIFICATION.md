@@ -8,7 +8,7 @@ npm run typecheck
 npm run build
 ```
 
-The project is configured for Next.js static export and GitHub Pages (`output: 'export'`). Server-only actions use Supabase Edge Functions; there are no Next.js `/api` routes or middleware in the final static deployment.
+The project is configured for Next.js static export and GitHub Pages (`output: 'export'`).
 The GitHub Actions workflow runs the TypeScript check and production build on every push to `main`, then verifies that `out/index.html` exists before deploying the `out` directory.
 
 ### Local environment note
