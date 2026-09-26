@@ -49,13 +49,22 @@ export default function Home() {
       }, 8000)
 
       try {
+        /*
+         * Ambil SEMUA game aktif.
+         *
+         * Jangan filter popular=true di server karena kalau
+         * field popular berubah / tidak terbaca, homepage
+         * akan menganggap tidak ada game sama sekali.
+         */
+        const cacheBuster = Date.now()
+
         const url =
           `${supabaseUrl}/rest/v1/games` +
           `?select=*` +
           `&is_active=eq.true` +
-          `&popular=eq.true` +
-          `&order=name.asc` +
-          `&limit=10`
+          `&order=popular.desc,name.asc` +
+          `&limit=50` +
+          `&_=${cacheBuster}`
 
         const response = await fetch(url, {
           method: 'GET',
@@ -63,6 +72,8 @@ export default function Home() {
             apikey: supabaseKey,
             Authorization: `Bearer ${supabaseKey}`,
             Accept: 'application/json',
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            Pragma: 'no-cache',
           },
           cache: 'no-store',
           signal: controller.signal,
@@ -86,7 +97,35 @@ export default function Home() {
           )
         }
 
-        setGames(data)
+        /*
+         * Hapus duplikat berdasarkan ID.
+         */
+        const uniqueGames = Array.from(
+          new Map(
+            data.map((game: any) => [game.id, game])
+          ).values()
+        )
+
+        /*
+         * Game populer tetap berada di bagian atas.
+         * Kalau tidak ada game populer, semua game aktif
+         * tetap ditampilkan.
+         */
+        uniqueGames.sort((a: any, b: any) => {
+          const popularA = a?.popular === true ? 1 : 0
+          const popularB = b?.popular === true ? 1 : 0
+
+          if (popularA !== popularB) {
+            return popularB - popularA
+          }
+
+          return String(a?.name || '').localeCompare(
+            String(b?.name || ''),
+            'id'
+          )
+        })
+
+        setGames(uniqueGames)
       } catch (error: any) {
         if (!mounted) return
 
@@ -138,7 +177,6 @@ export default function Home() {
             <h1 className="text-5xl font-black leading-[.98] md:text-7xl">
               TOP UP GAME
               <br />
-
               <span className="gradient-text">
                 FAVORITMU
               </span>
@@ -173,7 +211,6 @@ export default function Home() {
             <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
               <div className="glass rounded-2xl p-4">
                 <Zap size={20} />
-
                 <p className="mt-2 text-xs text-slate-400">
                   Proses cepat
                 </p>
@@ -181,7 +218,6 @@ export default function Home() {
 
               <div className="glass rounded-2xl p-4">
                 <ShieldCheck size={20} />
-
                 <p className="mt-2 text-xs text-slate-400">
                   Manual verified
                 </p>
@@ -189,7 +225,6 @@ export default function Home() {
 
               <div className="glass rounded-2xl p-4">
                 <Headphones size={20} />
-
                 <p className="mt-2 text-xs text-slate-400">
                   Support
                 </p>
@@ -294,7 +329,7 @@ export default function Home() {
           !gameError &&
           games.length > 0 && (
             <div className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              {games.map((g) => (
+              {games.slice(0, 10).map((g) => (
                 <Link
                   key={g.id}
                   href={`/game/?slug=${encodeURIComponent(
