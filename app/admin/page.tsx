@@ -253,8 +253,10 @@ s
 
       s
         .from('promotions')
-        .select('*')
-        .order('created_at', { ascending: false }),
+        .select(
+          'id,name,description,code,banner_url,content_type,is_active,starts_at,ends_at'
+        )
+        .order('is_active', { ascending: false }),
 
       s
         .from('broadcasts')
