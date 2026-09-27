@@ -1408,69 +1408,94 @@ async function deleteVoucher(v: any) {
   }
 
   async function savePromoContent() {
-    const existing = promos[0] || null
-    const imageUrl = pendingPromoImageUrl || existing?.banner_url || ''
-    const wantsText = mediaPromoType === 'text' || mediaPromoType === 'both'
-    const wantsImage = mediaPromoType === 'image' || mediaPromoType === 'both'
-
-    if (wantsText && !mediaPromoTitle.trim()) {
-      setMsg('Isi judul promo untuk konten teks.')
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat membuat atau mengubah Banner Promo.')
       return
     }
 
-    if (wantsImage && !imageUrl) {
-      setMsg('Pilih file gambar Banner Promo terlebih dahulu.')
-      return
-    }
+    try {
+      const existing = promos[0] || null
+      const imageUrl = pendingPromoImageUrl || existing?.banner_url || ''
+      const wantsText = mediaPromoType === 'text' || mediaPromoType === 'both'
+      const wantsImage = mediaPromoType === 'image' || mediaPromoType === 'both'
 
-    const payload: any = {
-      is_active: existing?.is_active ?? true,
-      content_type: mediaPromoType,
-      name: wantsText
-        ? mediaPromoTitle.trim()
-        : (existing?.name || 'Banner Promo'),
-      description: wantsText
-        ? (mediaPromoDescription.trim() || null)
-        : null,
-      code: wantsText
-        ? (mediaPromoCode.trim() || null)
-        : null,
-      banner_url: wantsImage ? imageUrl : null,
-    }
-
-    const query = existing
-      ? s.from('promotions').update(payload).eq('id', existing.id)
-      : s.from('promotions').insert(payload)
-
-    const { data: saved, error } = await query.select('id').maybeSingle()
-
-    if (error) {
-      setMsg(error.message)
-      return
-    }
-
-    const savedId = existing?.id || saved?.id
-    if (payload.is_active && savedId) {
-      const { error: deactivateError } = await s
-        .from('promotions')
-        .update({ is_active: false })
-        .eq('is_active', true)
-        .neq('id', savedId)
-
-      if (deactivateError) {
-        setMsg(deactivateError.message)
+      if (wantsText && !mediaPromoTitle.trim()) {
+        setMsg('Isi judul promo untuk konten teks.')
         return
       }
+
+      if (wantsImage && !imageUrl) {
+        setMsg('Pilih file gambar Banner Promo terlebih dahulu.')
+        return
+      }
+
+      const payload: any = {
+        is_active: existing ? Boolean(existing.is_active) : true,
+        content_type: mediaPromoType,
+        name: wantsText
+          ? mediaPromoTitle.trim()
+          : (existing?.name || 'Banner Promo'),
+        description: wantsText
+          ? (mediaPromoDescription.trim() || null)
+          : null,
+        code: wantsText
+          ? (mediaPromoCode.trim() || null)
+          : null,
+        banner_url: wantsImage ? imageUrl : null,
+      }
+
+      let savedId = existing?.id || ''
+
+      if (existing) {
+        const { error } = await s
+          .from('promotions')
+          .update(payload)
+          .eq('id', existing.id)
+
+        if (error) {
+          setMsg(`Gagal menyimpan Banner Promo: ${error.message}`)
+          return
+        }
+      } else {
+        const { data, error } = await s
+          .from('promotions')
+          .insert(payload)
+          .select('id')
+          .single()
+
+        if (error) {
+          setMsg(`Gagal membuat Banner Promo: ${error.message}`)
+          return
+        }
+
+        savedId = data?.id || ''
+      }
+
+      // Hanya satu Banner Promo yang boleh aktif.
+      if (payload.is_active && savedId) {
+        const { error: deactivateError } = await s
+          .from('promotions')
+          .update({ is_active: false })
+          .eq('is_active', true)
+          .neq('id', savedId)
+
+        if (deactivateError) {
+          setMsg(`Banner tersimpan, tetapi promo lama gagal dinonaktifkan: ${deactivateError.message}`)
+          await load()
+          return
+        }
+      }
+
+      setPendingPromoImageUrl(payload.banner_url || '')
+      setMsg(
+        existing
+          ? 'Banner Promo berhasil diperbarui dan tersimpan.'
+          : 'Banner Promo berhasil dibuat dan langsung aktif di Home.'
+      )
+      await load()
+    } catch (error: any) {
+      setMsg(`Gagal menyimpan Banner Promo: ${error?.message || 'Terjadi kesalahan yang tidak diketahui.'}`)
     }
-
-    setMsg(
-      existing
-        ? 'Banner Promo berhasil diperbarui.'
-        : 'Banner Promo berhasil dibuat dan diaktifkan.'
-    )
-
-    setPendingPromoImageUrl(payload.banner_url || '')
-    load()
   }
 
   async function preparePromoImage(url: string) {
