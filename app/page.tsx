@@ -1,7 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, ExternalLink } from 'lucide-react'
+import {
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+  Headphones,
+  Radio,
+  ExternalLink,
+  Sparkles,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 export default function Home() {
@@ -563,64 +571,47 @@ export default function Home() {
 
       {/* =====================================================
           BROADCAST WIDGETS
-          Dua widget kecil sejajar kiri-kanan.
-          TANPA label tambahan seperti LIVE / CYBER / INCOMING.
+          Dua widget compact, berjejer, responsif.
       ===================================================== */}
 
       {!loadingBroadcast &&
         (currentBroadcast || linkedBroadcast) && (
-          <section className="mx-auto max-w-5xl px-4 pt-5">
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
+          <section className="mx-auto max-w-7xl px-4 pt-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {/* BROADCAST TANPA LINK */}
               {currentBroadcast ? (
                 <div
-                  className="relative min-w-0 overflow-hidden rounded-2xl border border-cyan-400/20 bg-[#070a12] shadow-[0_0_24px_rgba(34,211,238,.06)] select-none"
+                  className="group relative min-w-0 overflow-hidden rounded-2xl border border-cyan-400/20 bg-[#071018] shadow-[0_0_28px_rgba(34,211,238,.06)] select-none"
                   onPointerDown={handleBroadcastPointerDown}
                   onPointerUp={handleBroadcastPointerUp}
                   onPointerCancel={handleBroadcastPointerUp}
                   style={{
                     touchAction: 'pan-y',
-                    cursor:
-                      cyberBroadcasts.length > 1
-                        ? 'grab'
-                        : 'default',
+                    cursor: cyberBroadcasts.length > 1 ? 'grab' : 'default',
                   }}
                 >
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.10),transparent_55%)]" />
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-400/10 blur-2xl" />
+                  <div className="pointer-events-none absolute -left-8 -bottom-8 h-20 w-20 rounded-full bg-violet-500/10 blur-2xl" />
 
-                  <div className="relative p-3 sm:p-4 md:p-5">
-                    <div className="overflow-hidden">
-                      <div
-                        className="flex transition-transform duration-500 ease-out"
-                        style={{
-                          transform: `translateX(-${activeBroadcast * 100}%)`,
-                        }}
-                      >
-                        {cyberBroadcasts.map((broadcast) => (
-                          <div
-                            key={broadcast.id}
-                            className="w-full shrink-0 pr-1"
-                          >
-                            <h3 className="line-clamp-2 text-sm font-black leading-tight text-white sm:text-base md:text-lg">
-                              {broadcast.title}
-                            </h3>
+                  <div className="relative flex min-h-[150px] flex-col justify-between p-4 sm:min-h-[160px] sm:p-5">
+                    <div>
+                      <h3 className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
+                        {currentBroadcast.title}
+                      </h3>
 
-                            <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-slate-400 sm:text-xs md:text-sm">
-                              {broadcast.message}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-400 sm:text-sm">
+                        {currentBroadcast.message}
+                      </p>
                     </div>
 
                     {cyberBroadcasts.length > 1 && (
-                      <div className="mt-3 flex items-center gap-1.5">
+                      <div className="mt-3 flex items-center gap-1">
                         {cyberBroadcasts.map((item, index) => (
                           <span
                             key={item.id}
                             className={`h-1 rounded-full transition-all duration-300 ${
                               index === activeBroadcast
-                                ? 'w-5 bg-cyan-300'
+                                ? 'w-6 bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,.7)]'
                                 : 'w-1 bg-slate-700'
                             }`}
                           />
@@ -630,48 +621,49 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <div />
+                <div className="min-h-[150px] rounded-2xl border border-cyan-400/10 bg-[#071018]/60 sm:min-h-[160px]" />
               )}
 
               {/* BROADCAST DENGAN LINK */}
               {linkedBroadcast ? (
-                <div className="relative min-w-0 overflow-hidden rounded-2xl border border-red-500/20 bg-[#0b0507] shadow-[0_0_24px_rgba(220,38,38,.06)]">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(239,68,68,.10),transparent_55%)]" />
+                <div className="group relative min-w-0 overflow-hidden rounded-2xl border border-fuchsia-400/30 bg-gradient-to-br from-[#18091c] via-[#100714] to-[#08050d] shadow-[0_0_32px_rgba(217,70,239,.10)]">
+                  <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-fuchsia-500/15 blur-2xl" />
+                  <div className="pointer-events-none absolute -left-8 -bottom-8 h-20 w-20 rounded-full bg-red-500/10 blur-2xl" />
 
-                  <div className="relative flex h-full flex-col p-3 sm:p-4 md:p-5">
-                    <h3 className="line-clamp-2 text-sm font-black leading-tight text-white sm:text-base md:text-lg">
-                      {linkedBroadcast.title}
-                    </h3>
+                  <div className="relative flex min-h-[150px] flex-col justify-between p-4 sm:min-h-[160px] sm:p-5">
+                    <div>
+                      <h3 className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
+                        {linkedBroadcast.title}
+                      </h3>
 
-                    <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-slate-400 sm:text-xs md:text-sm">
-                      {linkedBroadcast.message}
-                    </p>
-
-                    <div className="mt-auto pt-3">
-                      {String(linkedBroadcast.link_url).startsWith('/') ? (
-                        <Link
-                          href={linkedBroadcast.link_url}
-                          className="inline-flex w-full items-center justify-center rounded-xl bg-red-500/15 px-3 py-2 text-[11px] font-black text-red-200 ring-1 ring-red-500/25 transition hover:bg-red-500/25 sm:text-xs"
-                        >
-                          {linkedBroadcast.link_label || 'Lihat'}
-                          <ArrowRight size={14} className="ml-1.5" />
-                        </Link>
-                      ) : (
-                        <a
-                          href={linkedBroadcast.link_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex w-full items-center justify-center rounded-xl bg-red-500/15 px-3 py-2 text-[11px] font-black text-red-200 ring-1 ring-red-500/25 transition hover:bg-red-500/25 sm:text-xs"
-                        >
-                          {linkedBroadcast.link_label || 'Lihat'}
-                          <ExternalLink size={13} className="ml-1.5" />
-                        </a>
-                      )}
+                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-400 sm:text-sm">
+                        {linkedBroadcast.message}
+                      </p>
                     </div>
+
+                    {String(linkedBroadcast.link_url).startsWith('/') ? (
+                      <Link
+                        href={linkedBroadcast.link_url}
+                        className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-2 text-xs font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-sm"
+                      >
+                        {linkedBroadcast.link_label || 'Lihat'}
+                        <ArrowRight size={14} className="ml-1.5" />
+                      </Link>
+                    ) : (
+                      <a
+                        href={linkedBroadcast.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-2 text-xs font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-sm"
+                      >
+                        {linkedBroadcast.link_label || 'Lihat'}
+                        <ExternalLink size={14} className="ml-1.5" />
+                      </a>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div />
+                <div className="min-h-[150px] rounded-2xl border border-fuchsia-400/10 bg-[#100714]/50 sm:min-h-[160px]" />
               )}
             </div>
           </section>
