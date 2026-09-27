@@ -1132,19 +1132,31 @@ async function deleteVoucher(v: any) {
       return
     }
 
-    const { error } = await s
-      .from('profiles')
-      .update({
-        username,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', u.id)
+    const { error } = await (s as any).rpc(
+      'admin_update_username',
+      {
+        p_user_id: u.id,
+        p_username: username,
+      }
+    )
 
     if (error) {
-      if (error.code === '23505') {
+      const message = error.message || ''
+
+      if (message.includes('USERNAME_ALREADY_EXISTS')) {
         setMsg('Username tersebut sudah digunakan member lain.')
+      } else if (message.includes('USERNAME_INVALID_LENGTH')) {
+        setMsg('Username harus 3-30 karakter.')
+      } else if (message.includes('USERNAME_INVALID_FORMAT')) {
+        setMsg(
+          'Username hanya boleh berisi huruf, angka, titik, garis bawah, dan tanda hubung.'
+        )
+      } else if (message.includes('FORBIDDEN')) {
+        setMsg('Kamu tidak memiliki izin untuk mengubah username.')
+      } else if (message.includes('USER_NOT_FOUND')) {
+        setMsg('Member tidak ditemukan.')
       } else {
-        setMsg(error.message)
+        setMsg(message || 'Gagal mengubah username.')
       }
       return
     }
