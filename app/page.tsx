@@ -18,139 +18,15 @@ export default function Home() {
   const [loadingGames, setLoadingGames] = useState(true)
   const [gameError, setGameError] = useState('')
 
-  const [promo, setPromo] = useState<any | null>(null)
-  const [loadingPromo, setLoadingPromo] = useState(true)
-  const [promoError, setPromoError] = useState('')
-  const [homepageHeroUrl, setHomepageHeroUrl] = useState('')
-
   const [broadcasts, setBroadcasts] = useState<any[]>([])
   const [loadingBroadcast, setLoadingBroadcast] = useState(true)
   const [activeBroadcast, setActiveBroadcast] = useState(0)
 
+  // Banner Promo utama dari Admin → Promosi
+  const [promo, setPromo] = useState<any | null>(null)
+  const [loadingPromo, setLoadingPromo] = useState(true)
+
   const broadcastStartX = useRef<number | null>(null)
-
-  /* =========================================================
-     LOAD ACTIVE BANNER PROMO
-  ========================================================= */
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadPromo() {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-      if (!supabaseUrl || !supabaseKey) {
-        if (mounted) {
-          setPromo(null)
-          setPromoError('Konfigurasi Supabase tidak ditemukan.')
-          setLoadingPromo(false)
-        }
-        return
-      }
-
-      try {
-        const params = new URLSearchParams()
-        params.set('select', 'id,name,description,code,banner_url,content_type,is_active,created_at')
-        params.set('is_active', 'eq.true')
-        params.set('order', 'created_at.desc')
-        params.set('limit', '1')
-
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/promotions?${params.toString()}`,
-          {
-            method: 'GET',
-            headers: {
-              apikey: supabaseKey,
-              Authorization: `Bearer ${supabaseKey}`,
-              Accept: 'application/json',
-              'Cache-Control': 'no-cache, no-store, max-age=0',
-              Pragma: 'no-cache',
-            },
-            cache: 'no-store',
-          }
-        )
-
-        if (!response.ok) {
-          const message = await response.text()
-          throw new Error(`Promo HTTP ${response.status}: ${message}`)
-        }
-
-        const data = await response.json()
-        if (!mounted) return
-
-        setPromo(Array.isArray(data) && data.length ? data[0] : null)
-        setPromoError('')
-      } catch (error: any) {
-        console.error('Gagal memuat Banner Promo:', error)
-        if (mounted) {
-          setPromo(null)
-          setPromoError(error?.message || 'Banner Promo gagal dimuat.')
-        }
-      } finally {
-        if (mounted) setLoadingPromo(false)
-      }
-    }
-
-    loadPromo()
-    const interval = setInterval(loadPromo, 30000)
-
-    return () => {
-      mounted = false
-      clearInterval(interval)
-    }
-  }, [])
-
-  /* =========================================================
-     LOAD HOMEPAGE HERO BANNER FROM WEBSITE SETTINGS
-  ========================================================= */
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadHomepageHero() {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (!supabaseUrl || !supabaseKey) return
-
-      try {
-        const params = new URLSearchParams()
-        params.set('select', 'value')
-        params.set('key', 'eq.site')
-        params.set('limit', '1')
-
-        const response = await fetch(
-          `${supabaseUrl}/rest/v1/settings?${params.toString()}`,
-          {
-            method: 'GET',
-            headers: {
-              apikey: supabaseKey,
-              Authorization: `Bearer ${supabaseKey}`,
-              Accept: 'application/json',
-              'Cache-Control': 'no-cache, no-store, max-age=0',
-              Pragma: 'no-cache',
-            },
-            cache: 'no-store',
-          }
-        )
-
-        if (!response.ok) return
-        const data = await response.json()
-        const value = Array.isArray(data) ? data[0]?.value : null
-        const hero = value?.homepage_banners?.hero
-        if (mounted) setHomepageHeroUrl(typeof hero === 'string' ? hero : '')
-      } catch (error) {
-        console.error('Gagal memuat Banner Homepage:', error)
-      }
-    }
-
-    loadHomepageHero()
-    const interval = setInterval(loadHomepageHero, 30000)
-    return () => {
-      mounted = false
-      clearInterval(interval)
-    }
-  }, [])
 
   /* =========================================================
      LOAD GAMES
@@ -429,6 +305,130 @@ export default function Home() {
   }, [])
 
   /* =========================================================
+     LOAD BANNER PROMO UTAMA
+
+     Sumber data:
+     public.promotions
+
+     Hanya Banner Promo dengan is_active = true yang
+     ditampilkan ke pengunjung Home.
+
+     Tidak memakai created_at karena kolom tersebut tidak
+     tersedia pada tabel promotions di database ini.
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadPromo() {
+      const supabaseUrl =
+        process.env.NEXT_PUBLIC_SUPABASE_URL
+
+      const supabaseKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) {
+        if (mounted) {
+          setPromo(null)
+          setLoadingPromo(false)
+        }
+        return
+      }
+
+      const controller = new AbortController()
+
+      const timeout = setTimeout(() => {
+        controller.abort()
+      }, 8000)
+
+      try {
+        const params = new URLSearchParams()
+
+        params.set(
+          'select',
+          'id,name,description,code,banner_url,content_type,is_active'
+        )
+
+        params.set(
+          'is_active',
+          'eq.true'
+        )
+
+        params.set(
+          'limit',
+          '1'
+        )
+
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/promotions?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+              Accept: 'application/json',
+              'Cache-Control':
+                'no-cache, no-store, max-age=0',
+              Pragma: 'no-cache',
+            },
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        )
+
+        if (!response.ok) {
+          const message = await response.text()
+
+          throw new Error(
+            `Promo HTTP ${response.status}: ${message}`
+          )
+        }
+
+        const data = await response.json()
+
+        if (!mounted) return
+
+        const activePromo =
+          Array.isArray(data) && data.length > 0
+            ? data[0]
+            : null
+
+        setPromo(activePromo)
+      } catch (error: any) {
+        console.error(
+          'Gagal memuat Banner Promo:',
+          error
+        )
+
+        if (mounted) {
+          // Jangan menampilkan pesan error teknis kepada pembeli.
+          // Jika gagal dimuat, bagian Promo cukup disembunyikan.
+          setPromo(null)
+        }
+      } finally {
+        clearTimeout(timeout)
+
+        if (mounted) {
+          setLoadingPromo(false)
+        }
+      }
+    }
+
+    loadPromo()
+
+    const interval = setInterval(
+      loadPromo,
+      30000
+    )
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+      clearTimeout(timeout)
+    }
+  }, [])
+
+  /* =========================================================
      FILTER BROADCAST
 
      CYBER:
@@ -635,30 +635,26 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="glass neon relative min-h-[340px] overflow-hidden rounded-[2rem] p-0">
-            {homepageHeroUrl ? (
-              <img
-                src={homepageHeroUrl}
-                alt="Banner Homepage NDRAAAID.v1"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            ) : (
-              <>
-                <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-purple-500/20 blur-3xl" />
-                <Gamepad2 className="absolute bottom-8 right-8 h-48 w-48 text-purple-400/20" />
-                <div className="relative mt-20 p-8">
-                  <p className="text-sm font-bold text-cyan-300">NDRAAAID</p>
-                  <h2 className="mt-2 text-4xl font-black">
-                    BONUS DIAMOND
-                    <br />
-                    SETIAP HARI*
-                  </h2>
-                  <p className="mt-4 text-sm text-slate-400">
-                    *Promo mengikuti ketentuan yang berlaku.
-                  </p>
-                </div>
-              </>
-            )}
+          <div className="glass neon relative min-h-[340px] overflow-hidden rounded-[2rem] p-8">
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-purple-500/20 blur-3xl" />
+
+            <Gamepad2 className="absolute bottom-8 right-8 h-48 w-48 text-purple-400/20" />
+
+            <div className="relative mt-20">
+              <p className="text-sm font-bold text-cyan-300">
+                NDRAAAID
+              </p>
+
+              <h2 className="mt-2 text-4xl font-black">
+                BONUS DIAMOND
+                <br />
+                SETIAP HARI*
+              </h2>
+
+              <p className="mt-4 text-sm text-slate-400">
+                *Promo mengikuti ketentuan yang berlaku.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -1031,7 +1027,10 @@ export default function Home() {
       </section>
 
       {/* =====================================================
-          PROMO
+          BANNER PROMO UTAMA
+
+          Data berasal dari Admin → Promosi → Banner Promo.
+          Hanya promo aktif yang ditampilkan di Home.
       ===================================================== */}
 
       {!loadingPromo && promo && (
@@ -1039,47 +1038,48 @@ export default function Home() {
           id="promo"
           className="mx-auto max-w-7xl px-4 py-10"
         >
-          <div className="glass overflow-hidden rounded-3xl border border-pink-400/10">
-            {promo.content_type !== 'text' && promo.banner_url && (
-              <img
-                src={promo.banner_url}
-                alt={promo.name || 'Banner Promo'}
-                className="max-h-[520px] w-full object-cover"
-              />
-            )}
+          <div className="overflow-hidden rounded-3xl border border-pink-400/20 bg-[#070914] shadow-[0_0_45px_rgba(236,72,153,.08)]">
+            {promo.content_type !== 'text' &&
+              promo.banner_url && (
+                <div className="w-full overflow-hidden bg-black/20">
+                  <img
+                    src={promo.banner_url}
+                    alt={
+                      promo.name ||
+                      'Banner Promo NDRAAAID.v1'
+                    }
+                    className="block aspect-video w-full object-cover"
+                    loading="eager"
+                  />
+                </div>
+              )}
 
             {promo.content_type !== 'image' && (
-              <div className="p-6 md:p-8">
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">
+              <div className="p-6 sm:p-8">
+                <p className="text-sm font-black uppercase tracking-[0.25em] text-pink-300">
                   PROMO
                 </p>
 
                 {promo.name && (
-                  <h2 className="mt-2 text-3xl font-black">
+                  <h2 className="mt-2 text-3xl font-black text-white">
                     {promo.name}
                   </h2>
                 )}
 
                 {promo.description && (
-                  <p className="mt-3 max-w-3xl text-slate-400">
+                  <p className="mt-3 max-w-3xl whitespace-pre-line text-slate-400">
                     {promo.description}
                   </p>
                 )}
 
                 {promo.code && (
-                  <div className="mt-4 inline-flex rounded-xl border border-pink-400/20 bg-pink-400/10 px-4 py-2 text-sm font-black text-pink-200">
-                    Kode: {promo.code}
+                  <div className="mt-5 inline-flex rounded-xl border border-pink-400/20 bg-pink-400/10 px-4 py-2 text-sm font-black text-pink-200">
+                    KODE: {promo.code}
                   </div>
                 )}
               </div>
             )}
           </div>
-        </section>
-      )}
-
-      {!loadingPromo && !promo && promoError && (
-        <section className="mx-auto max-w-7xl px-4 py-4">
-          <p className="text-xs text-slate-500">Banner Promo belum dapat dimuat.</p>
         </section>
       )}
     </div>
