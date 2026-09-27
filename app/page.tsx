@@ -703,7 +703,6 @@ if (reviewResponse.ok) {
             <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#070b12] to-transparent" />
             <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#070b12] to-transparent" />
             <div className="flex min-h-10 items-center overflow-hidden">
-              <div className="shrink-0 px-3 text-cyan-300">⚡</div>
               <div
                 className="whitespace-nowrap text-xs font-black uppercase tracking-[0.12em] text-slate-200"
                 style={{
