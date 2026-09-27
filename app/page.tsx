@@ -541,68 +541,31 @@ export default function Home() {
           Pragma: 'no-cache',
         }
 
-const [runningResponse, reviewResponse] = await Promise.all([
-  fetch(
-    `${supabaseUrl}/rest/v1/home_running_text?${runningParams.toString()}`,
-    {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-    }
-  ),
-  fetch(
-    `${supabaseUrl}/rest/v1/customer_reviews?${reviewParams.toString()}`,
-    {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-    }
-  ),
-])
+        const [runningResponse, reviewResponse] = await Promise.all([
+          fetch(`${supabaseUrl}/rest/v1/home_running_text?${runningParams.toString()}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+          }),
+          fetch(`${supabaseUrl}/rest/v1/customer_reviews?${reviewParams.toString()}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+          }),
+        ])
 
-if (!mounted) return
+        if (!runningResponse.ok || !reviewResponse.ok) return
 
-// Running Text berdiri sendiri.
-// Kalau gagal, jangan blokir Customer Reviews.
-if (runningResponse.ok) {
-  try {
-    const runningData = await runningResponse.json()
+        const [runningData, reviewData] = await Promise.all([
+          runningResponse.json(),
+          reviewResponse.json(),
+        ])
 
-    setRunningText(
-      Array.isArray(runningData) && runningData.length
-        ? runningData[0]
-        : null
-    )
-  } catch (error) {
-    console.error('Gagal membaca Running Text:', error)
-    setRunningText(null)
-  }
-}
+        if (!mounted) return
 
-// Customer Reviews berdiri sendiri.
-if (reviewResponse.ok) {
-  try {
-    const reviewData = await reviewResponse.json()
-
-    setReviews(
-      Array.isArray(reviewData)
-        ? reviewData
-        : []
-    )
-
-    setActiveReview(0)
-  } catch (error) {
-    console.error('Gagal membaca Customer Reviews:', error)
-    setReviews([])
-  }
-} else {
-  const reviewError = await reviewResponse.text().catch(() => '')
-  console.error(
-    'Customer Reviews HTTP error:',
-    reviewResponse.status,
-    reviewError
-  )
-}
+        setRunningText(Array.isArray(runningData) && runningData.length ? runningData[0] : null)
+        setReviews(Array.isArray(reviewData) ? reviewData : [])
+        setActiveReview(0)
       } catch (error) {
         console.error('Gagal memuat running text/review:', error)
       }
@@ -703,6 +666,7 @@ if (reviewResponse.ok) {
             <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#070b12] to-transparent" />
             <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#070b12] to-transparent" />
             <div className="flex min-h-10 items-center overflow-hidden">
+              <div className="shrink-0 px-3 text-cyan-300">⚡</div>
               <div
                 className="whitespace-nowrap text-xs font-black uppercase tracking-[0.12em] text-slate-200"
                 style={{
@@ -819,31 +783,51 @@ if (reviewResponse.ok) {
 
       {reviews.length > 0 && (
         <section className="mx-auto max-w-7xl px-4 pt-5">
-          <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-            <span className="text-cyan-300">★</span> Ulasan Pelanggan
-          </div>
-          <div className="relative overflow-hidden rounded-xl border border-cyan-400/15 bg-gradient-to-r from-[#08131a] via-[#090a12] to-[#120813] shadow-[0_0_22px_rgba(34,211,238,.05)]">
-            <div className="relative min-h-[76px] px-4 py-3">
+          <div className="relative overflow-hidden rounded-xl border border-cyan-400/20 bg-[#070b12] shadow-[0_0_24px_rgba(34,211,238,.06)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent" />
+            <div className="pointer-events-none absolute right-0 top-0 h-16 w-24 bg-cyan-400/5 blur-2xl" />
+
+            <div className="relative px-4 py-3">
               {reviews.map((review, index) => (
                 <div
                   key={review.id}
                   className={`transition-opacity duration-500 ${index === activeReview ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'}`}
                 >
-                  <div className="flex min-h-[50px] items-center gap-3">
-                    <div className="shrink-0 text-[13px] tracking-tight text-amber-300">
-                      {'★'.repeat(Math.max(1, Math.min(5, Number(review.rating || 5))))}
+                  <div className="flex items-center justify-between gap-3 border-b border-cyan-400/10 pb-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-cyan-300">◈</span>
+                      <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">
+                        Customer Feedback
+                      </span>
                     </div>
-                    <p className="min-w-0 flex-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-200">
-                      “{review.review_text}”
-                    </p>
-                    <div className="hidden shrink-0 text-right sm:block">
-                      <p className="text-[11px] font-black text-slate-300">{review.reviewer_display}</p>
-                      <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-400">✓ Top Up Berhasil</p>
+                    <span className="shrink-0 rounded-md border border-emerald-400/20 bg-emerald-400/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-emerald-400">
+                      [ Online ]
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-start">
+                    <div>
+                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">USER</p>
+                      <p className="mt-1 truncate text-xs font-black text-slate-200">{review.reviewer_display}</p>
+
+                      <p className="mt-3 text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">RATING</p>
+                      <p className="mt-1 text-[13px] tracking-tight text-amber-300">
+                        {'★'.repeat(Math.max(1, Math.min(5, Number(review.rating || 5))))}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0 rounded-lg border border-cyan-400/15 bg-[#081018] px-3 py-2.5">
+                      <p className="line-clamp-2 text-xs font-semibold leading-5 text-slate-200 sm:text-[13px]">
+                        “{review.review_text}”
+                      </p>
                     </div>
                   </div>
-                  <div className="mt-0.5 flex items-center justify-between sm:hidden">
-                    <span className="text-[10px] font-black text-slate-400">{review.reviewer_display}</span>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400">✓ Berhasil</span>
+
+                  <div className="mt-3 flex min-w-0 items-center gap-2 border-t border-cyan-400/10 pt-2">
+                    <span className="shrink-0 text-[10px] text-cyan-400/70">ⓘ</span>
+                    <p className="min-w-0 truncate whitespace-nowrap text-[9px] font-medium text-slate-500">
+                      Review ini berdasarkan pengalaman terakhir.
+                    </p>
                   </div>
                 </div>
               ))}
