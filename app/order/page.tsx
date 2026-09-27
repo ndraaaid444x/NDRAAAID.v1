@@ -163,6 +163,10 @@ export default function OrderPage() {
     )
   }
 
+  const paymentMethodIsQris =
+    String(paymentMethod?.kind || '').trim().toUpperCase() === 'QRIS' ||
+    String(paymentMethod?.name || '').trim().toLowerCase().includes('qris')
+
   return (
     <section className="mx-auto max-w-4xl px-4 py-12">
       <div className="glass rounded-3xl p-6 md:p-8">
@@ -314,14 +318,14 @@ export default function OrderPage() {
             )}
 
             {/* QRIS */}
-            {paymentMethod?.qr_url && (
+            {(paymentMethodIsQris || paymentMethod?.qr_url) && (
               <div className="mt-5 rounded-2xl bg-white p-4">
                 <p className="mb-3 text-center text-sm font-bold text-slate-900">
                   Scan QRIS untuk pembayaran
                 </p>
 
                 <img
-                  src={paymentMethod.qr_url}
+                  src={paymentMethodIsQris ? '/qris.png' : paymentMethod.qr_url}
                   alt="QRIS Pembayaran"
                   className="mx-auto block w-full max-w-xs rounded-xl"
                 />
