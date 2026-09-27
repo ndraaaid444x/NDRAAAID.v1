@@ -16,7 +16,6 @@ export default function Home() {
   const [games, setGames] = useState<any[]>([])
   const [loadingGames, setLoadingGames] = useState(true)
   const [gameError, setGameError] = useState('')
-
   const [broadcasts, setBroadcasts] = useState<any[]>([])
   const [loadingBroadcast, setLoadingBroadcast] = useState(true)
 
@@ -326,7 +325,6 @@ export default function Home() {
             <h1 className="text-5xl font-black leading-[.98] md:text-7xl">
               TOP UP GAME
               <br />
-
               <span className="gradient-text">
                 FAVORITMU
               </span>
@@ -412,49 +410,50 @@ export default function Home() {
 
       {/* =====================================================
           LIVE BROADCAST
+          VISUAL COMPACT / GAMING
       ===================================================== */}
-
       {!loadingBroadcast &&
         broadcasts.length > 0 && (
-          <section className="mx-auto max-w-7xl px-4 pt-2">
-            <div className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-black/80 shadow-[0_0_30px_rgba(220,38,38,.10)]">
-              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-red-600/10 blur-3xl" />
+          <section className="mx-auto max-w-7xl px-4 pt-1">
+            <div className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-black/80 shadow-[0_0_28px_rgba(220,38,38,.10)]">
 
-              <div className="relative p-4 sm:p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  {/* INFO BROADCAST */}
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-[0_0_20px_rgba(220,38,38,.12)]">
-                      <Radio
-                        size={20}
-                        className="text-red-400"
-                      />
-                    </div>
+              {/* Gaming glow */}
+              <div className="pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-red-600/10 blur-3xl" />
 
-                    <div className="min-w-0">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-black tracking-wider text-red-300">
-                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+              <div className="relative p-3 sm:p-4">
+                <div className="flex items-center gap-3">
 
-                          LIVE BROADCAST
-                        </span>
-
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          {broadcasts[0].type}
-                        </span>
-                      </div>
-
-                      <h2 className="break-words text-base font-black text-white sm:text-lg">
-                        {broadcasts[0].title}
-                      </h2>
-
-                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">
-                        {broadcasts[0].message}
-                      </p>
-                    </div>
+                  {/* ICON */}
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-[0_0_18px_rgba(220,38,38,.12)] sm:h-11 sm:w-11">
+                    <Radio
+                      size={19}
+                      className="text-red-400"
+                    />
                   </div>
 
-                  {/* LINK BROADCAST */}
+                  {/* CONTENT */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[9px] font-black tracking-wider text-red-300 sm:text-[10px]">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                        LIVE
+                      </span>
+
+                      <span className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:text-[10px]">
+                        {broadcasts[0].type}
+                      </span>
+                    </div>
+
+                    <h2 className="mt-1 truncate text-sm font-black text-white sm:text-base">
+                      {broadcasts[0].title}
+                    </h2>
+
+                    <p className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                      {broadcasts[0].message}
+                    </p>
+                  </div>
+
+                  {/* LINK */}
                   {broadcasts[0].link_url && (
                     String(
                       broadcasts[0].link_url
@@ -463,15 +462,15 @@ export default function Home() {
                         href={
                           broadcasts[0].link_url
                         }
-                        className="btn btn-primary w-full shrink-0 justify-center text-sm sm:w-auto"
+                        className="hidden shrink-0 items-center rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 sm:flex"
                       >
                         {broadcasts[0]
                           .link_label ||
-                          'Lihat Sekarang'}
+                          'Lihat'}
 
                         <ArrowRight
-                          size={16}
-                          className="ml-2"
+                          size={14}
+                          className="ml-1.5"
                         />
                       </Link>
                     ) : (
@@ -481,20 +480,63 @@ export default function Home() {
                         }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary w-full shrink-0 justify-center text-sm sm:w-auto"
+                        className="hidden shrink-0 items-center rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 sm:flex"
+                      >
+                        {broadcasts[0]
+                          .link_label ||
+                          'Lihat'}
+
+                        <ExternalLink
+                          size={13}
+                          className="ml-1.5"
+                        />
+                      </a>
+                    )
+                  )}
+                </div>
+
+                {/* MOBILE LINK */}
+                {broadcasts[0].link_url && (
+                  <div className="mt-2.5 sm:hidden">
+                    {String(
+                      broadcasts[0].link_url
+                    ).startsWith('/') ? (
+                      <Link
+                        href={
+                          broadcasts[0].link_url
+                        }
+                        className="flex w-full items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20"
+                      >
+                        {broadcasts[0]
+                          .link_label ||
+                          'Lihat Sekarang'}
+
+                        <ArrowRight
+                          size={14}
+                          className="ml-1.5"
+                        />
+                      </Link>
+                    ) : (
+                      <a
+                        href={
+                          broadcasts[0].link_url
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex w-full items-center justify-center rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20"
                       >
                         {broadcasts[0]
                           .link_label ||
                           'Lihat Sekarang'}
 
                         <ExternalLink
-                          size={15}
-                          className="ml-2"
+                          size={13}
+                          className="ml-1.5"
                         />
                       </a>
-                    )
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -503,7 +545,6 @@ export default function Home() {
       {/* =====================================================
           GAME POPULER
       ===================================================== */}
-
       <section className="mx-auto max-w-7xl px-4 py-16">
         <div className="flex items-end justify-between">
           <div>
@@ -615,7 +656,6 @@ export default function Home() {
       {/* =====================================================
           PROMO
       ===================================================== */}
-
       <section
         id="promo"
         className="mx-auto max-w-7xl px-4 py-10"
