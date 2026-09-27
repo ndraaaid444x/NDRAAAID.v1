@@ -392,11 +392,14 @@ export default function OrderPage() {
                   ).toLocaleString('id-ID')}
                 </p>
 
-                {x.note && (
-                  <p className="mt-1 text-sm text-slate-400">
-                    {x.note}
-                  </p>
-                )}
+                {x.note &&
+                  !String(x.note)
+                    .toLowerCase()
+                    .includes('diproses manual oleh owner') && (
+                    <p className="mt-1 text-sm text-slate-400">
+                      {x.note}
+                    </p>
+                  )}
               </div>
             ))}
           </div>
