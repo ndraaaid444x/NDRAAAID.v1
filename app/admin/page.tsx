@@ -824,7 +824,8 @@ async function deleteVoucher(v: any) {
   async function uploadAsset(
     file: File,
     category: string,
-    callback?: (url: string) => void
+    callback?: (url: string) => void,
+    expectedRatio?: '1:1' | '16:9'
   ) {
     if (
       !['owner', 'admin'].includes(
@@ -859,6 +860,116 @@ async function deleteVoucher(v: any) {
         'Ukuran maksimal 6 MB per file.'
       )
       return
+    }
+
+    /*
+     * Validasi rasio:
+     * - Logo Game / Produk: 1:1
+     * - Banner Promo / Homepage: 16:9
+     * - Media Lainnya: bebas
+     *
+     * expectedRatio dipakai untuk kasus khusus
+     * seperti Banner Game yang diunggah dari form Game.
+     */
+    const ratioByCategory: Record<
+      string,
+      '1:1' | '16:9' | undefined
+    > = {
+      games: '1:1',
+      products: '1:1',
+      promotions: '16:9',
+      homepage: '16:9',
+      general: undefined,
+    }
+
+    const ratio =
+      expectedRatio ||
+      ratioByCategory[category]
+
+    if (ratio) {
+      const objectUrl =
+        URL.createObjectURL(file)
+
+      try {
+        const dimensions =
+          await new Promise<{
+            width: number
+            height: number
+          }>((resolve, reject) => {
+            const img =
+              new Image()
+
+            img.onload = () => {
+              resolve({
+                width:
+                  img.naturalWidth,
+                height:
+                  img.naturalHeight,
+              })
+            }
+
+            img.onerror = () => {
+              reject(
+                new Error(
+                  'Gambar tidak dapat dibaca.'
+                )
+              )
+            }
+
+            img.src =
+              objectUrl
+          })
+
+        const targetRatio =
+          ratio === '1:1'
+            ? 1
+            : 16 / 9
+
+        const actualRatio =
+          dimensions.width /
+          dimensions.height
+
+        /*
+         * Toleransi 3% agar ukuran seperti
+         * 1599x900 tidak ditolak karena
+         * pembulatan kecil.
+         */
+        const difference =
+          Math.abs(
+            actualRatio -
+              targetRatio
+          ) /
+          targetRatio
+
+        if (
+          difference >
+          0.03
+        ) {
+          setMsg(
+            `Rasio gambar harus ${ratio}. Ukuran file Anda ${dimensions.width} × ${dimensions.height}px.`
+          )
+
+          URL.revokeObjectURL(
+            objectUrl
+          )
+
+          return
+        }
+      } catch {
+        setMsg(
+          'Gambar tidak dapat dibaca. Silakan gunakan file gambar yang valid.'
+        )
+
+        URL.revokeObjectURL(
+          objectUrl
+        )
+
+        return
+      }
+
+      URL.revokeObjectURL(
+        objectUrl
+      )
     }
 
     setMediaUploading(true)
@@ -967,7 +1078,8 @@ async function deleteVoucher(v: any) {
   async function uploadFromInput(
     e: ChangeEvent<HTMLInputElement>,
     category: string,
-    callback?: (url: string) => void
+    callback?: (url: string) => void,
+    expectedRatio?: '1:1' | '16:9'
   ) {
     const file =
       e.target.files?.[0]
@@ -977,7 +1089,8 @@ async function deleteVoucher(v: any) {
     await uploadAsset(
       file,
       category,
-      callback
+      callback,
+      expectedRatio
     )
 
     e.target.value = ''
@@ -2191,7 +2304,8 @@ async function deleteVoucher(v: any) {
                           banner_url:
                             url,
                         })
-                      )
+                      ),
+                    '16:9'
                   )
                 }
               />
