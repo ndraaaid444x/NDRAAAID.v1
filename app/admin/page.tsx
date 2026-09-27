@@ -31,6 +31,7 @@ const tabs = [
   'broadcasts',
   'media',
   'users',
+  'reviews',
   'settings',
   'chat',
 ]
@@ -77,6 +78,12 @@ export default function Admin() {
   const [deposits, setDeposits] = useState<any[]>([])
   const [walletTx, setWalletTx] = useState<any[]>([])
   const [rooms, setRooms] = useState<any[]>([])
+  const [homeRunningText, setHomeRunningText] = useState<any>({
+    text_content: '',
+    is_active: false,
+    speed_ms: 18000,
+  })
+  const [customerReviews, setCustomerReviews] = useState<any[]>([])
   const [activeRoom, setActiveRoom] = useState<any>()
   const [chatMessages, setChatMessages] = useState<any[]>([])
   const [chatText, setChatText] = useState('')
@@ -87,6 +94,7 @@ export default function Admin() {
   const [mediaGameId, setMediaGameId] = useState('')
   const [mediaProductGameId, setMediaProductGameId] = useState('')
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
+  const [mediaPromoCustomText, setMediaPromoCustomText] = useState('')
   const [mediaPromoTitle, setMediaPromoTitle] = useState('')
   const [mediaPromoDescription, setMediaPromoDescription] = useState('')
   const [mediaPromoCode, setMediaPromoCode] = useState('')
@@ -200,6 +208,8 @@ export default function Admin() {
       { data: wtx },
       { data: cr },
       { data: st },
+      { data: rt },
+      { data: rv },
     ] = await Promise.all([
       s
         .from('orders')
@@ -245,7 +255,7 @@ s
       s
         .from('promotions')
         .select(
-          'id,name,description,code,banner_url,content_type,is_active,starts_at,ends_at'
+          'id,name,custom_text,description,code,banner_url,content_type,is_active,starts_at,ends_at'
         )
         .order('is_active', { ascending: false }),
 
@@ -299,6 +309,18 @@ s
         .select('*')
         .eq('key', 'site')
         .maybeSingle(),
+
+      s
+        .from('home_running_text')
+        .select('id,text_content,is_active,speed_ms')
+        .eq('id', true)
+        .maybeSingle(),
+
+      s
+        .from('customer_reviews')
+        .select('id,order_id,user_id,reviewer_display,rating,review_text,is_approved,created_at,updated_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
     ])
 
     setOrders(o || [])
@@ -316,6 +338,8 @@ s
     setUsers(u || [])
     setWallets(w || [])
     setRooms(cr || [])
+    setHomeRunningText(rt || { text_content: '', is_active: false, speed_ms: 18000 })
+    setCustomerReviews(rv || [])
 
     if (st?.value) {
       setSite(st.value)
@@ -388,6 +412,7 @@ s
     const promo = promos[0]
     if (!promo) return
 
+    setMediaPromoCustomText(promo.custom_text || '')
     setMediaPromoTitle(promo.name || '')
     setMediaPromoDescription(promo.description || '')
     setMediaPromoCode(promo.code || '')
@@ -401,6 +426,59 @@ s
     )
     setPendingPromoImageUrl(promo.banner_url || '')
   }, [promos])
+
+  async function saveHomeRunningText() {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat mengatur Running Text.')
+      return
+    }
+
+    const payload = {
+      id: true,
+      text_content: String(homeRunningText.text_content || '').trim(),
+      is_active: Boolean(homeRunningText.is_active),
+      speed_ms: Math.max(8000, Math.min(60000, Number(homeRunningText.speed_ms || 18000))),
+    }
+
+    const { error } = await s
+      .from('home_running_text')
+      .upsert(payload, { onConflict: 'id' })
+
+    setMsg(error?.message || 'Running Text berhasil disimpan.')
+    if (!error) load()
+  }
+
+  async function moderateCustomerReview(review: any, approved: boolean) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat memoderasi ulasan.')
+      return
+    }
+
+    const { error } = await s
+      .from('customer_reviews')
+      .update({ is_approved: approved, updated_at: new Date().toISOString() })
+      .eq('id', review.id)
+
+    setMsg(error?.message || (approved ? 'Ulasan ditampilkan di Home.' : 'Ulasan disembunyikan dari Home.'))
+    if (!error) load()
+  }
+
+  async function deleteCustomerReview(review: any) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat menghapus ulasan.')
+      return
+    }
+
+    if (!confirm(`Hapus ulasan dari ${review.reviewer_display || 'pelanggan'}?`)) return
+
+    const { error } = await s
+      .from('customer_reviews')
+      .delete()
+      .eq('id', review.id)
+
+    setMsg(error?.message || 'Ulasan berhasil dihapus.')
+    if (!error) load()
+  }
 
   async function transition(o: any, n: string) {
     if (!confirm(`Ubah ${o.order_code} menjadi ${n}?`)) return
@@ -1062,7 +1140,8 @@ async function deleteVoucher(v: any) {
     file: File,
     category: string,
     callback?: (url: string) => void | Promise<void>,
-    expectedRatio?: '1:1' | '16:9'
+    expectedRatio?: '1:1' | '16:9',
+    allowMotion = false
   ) {
     if (
       !['owner', 'admin'].includes(
@@ -1075,26 +1154,40 @@ async function deleteVoucher(v: any) {
       return
     }
 
-    const allowed = [
+    const imageTypes = [
       'image/jpeg',
       'image/png',
       'image/webp',
       'image/gif',
     ]
+    const motionTypes = [
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+      'video/x-m4v',
+    ]
+    const allowed = allowMotion
+      ? [...imageTypes, ...motionTypes]
+      : imageTypes
 
     if (!allowed.includes(file.type)) {
       setMsg(
-        'Format harus JPG, PNG, WEBP, atau GIF.'
+        allowMotion
+          ? 'Format harus JPG, PNG, WEBP, GIF, MP4, WEBM, atau MOV.'
+          : 'Format harus JPG, PNG, WEBP, atau GIF.'
       )
       return
     }
 
-    if (
-      file.size >
-      6 * 1024 * 1024
-    ) {
+    const maxSize = file.type.startsWith('video/')
+      ? 20 * 1024 * 1024
+      : 6 * 1024 * 1024
+
+    if (file.size > maxSize) {
       setMsg(
-        'Ukuran maksimal 6 MB per file.'
+        file.type.startsWith('video/')
+          ? 'Ukuran maksimal video 20 MB per file.'
+          : 'Ukuran maksimal 6 MB per file.'
       )
       return
     }
@@ -1133,28 +1226,21 @@ async function deleteVoucher(v: any) {
             width: number
             height: number
           }>((resolve, reject) => {
-            const img =
-              new Image()
-
-            img.onload = () => {
-              resolve({
-                width:
-                  img.naturalWidth,
-                height:
-                  img.naturalHeight,
-              })
+            if (file.type.startsWith('video/')) {
+              const video = document.createElement('video')
+              video.preload = 'metadata'
+              video.onloadedmetadata = () => {
+                resolve({ width: video.videoWidth, height: video.videoHeight })
+              }
+              video.onerror = () => reject(new Error('Video tidak dapat dibaca.'))
+              video.src = objectUrl
+              return
             }
 
-            img.onerror = () => {
-              reject(
-                new Error(
-                  'Gambar tidak dapat dibaca.'
-                )
-              )
-            }
-
-            img.src =
-              objectUrl
+            const img = new Image()
+            img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+            img.onerror = () => reject(new Error('Gambar tidak dapat dibaca.'))
+            img.src = objectUrl
           })
 
         const targetRatio =
@@ -1194,7 +1280,7 @@ async function deleteVoucher(v: any) {
         }
       } catch {
         setMsg(
-          'Gambar tidak dapat dibaca. Silakan gunakan file gambar yang valid.'
+          'Media tidak dapat dibaca. Silakan gunakan file yang valid.'
         )
 
         URL.revokeObjectURL(
@@ -1316,7 +1402,8 @@ async function deleteVoucher(v: any) {
     e: ChangeEvent<HTMLInputElement>,
     category: string,
     callback?: (url: string) => void,
-    expectedRatio?: '1:1' | '16:9'
+    expectedRatio?: '1:1' | '16:9',
+    allowMotion = false
   ) {
     const file =
       e.target.files?.[0]
@@ -1327,7 +1414,8 @@ async function deleteVoucher(v: any) {
       file,
       category,
       callback,
-      expectedRatio
+      expectedRatio,
+      allowMotion
     )
 
     e.target.value = ''
@@ -1425,6 +1513,7 @@ async function deleteVoucher(v: any) {
       const payload: any = {
         is_active: existing ? Boolean(existing.is_active) : true,
         content_type: mediaPromoType,
+        custom_text: mediaPromoCustomText.trim() || null,
         name: wantsText
           ? mediaPromoTitle.trim()
           : (existing?.name || 'Banner Promo'),
@@ -1534,7 +1623,8 @@ async function deleteVoucher(v: any) {
     e: ChangeEvent<HTMLInputElement>,
     category: string,
     sync: (url: string) => Promise<void>,
-    expectedRatio?: '1:1' | '16:9'
+    expectedRatio?: '1:1' | '16:9',
+    allowMotion = false
   ) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -1545,7 +1635,8 @@ async function deleteVoucher(v: any) {
       async (url) => {
         await sync(url)
       },
-      expectedRatio
+      expectedRatio,
+      allowMotion
     )
 
     e.target.value = ''
@@ -1980,6 +2071,7 @@ async function deleteVoucher(v: any) {
                   title: 'MANAGEMENT',
                   items: [
                     ['users', '👥', 'Member & Wallet'],
+                    ['reviews', '⭐', 'Ulasan & Running Text'],
                     ['chat', '💬', 'Live Chat'],
                     ['settings', '⚙️', 'Pengaturan'],
                   ],
@@ -1993,8 +2085,8 @@ async function deleteVoucher(v: any) {
                     {group.items
                       .filter(
                         (item) =>
-                          item[0] !== 'broadcasts' ||
-                          ['owner', 'admin'].includes(role)
+                          (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) &&
+                          (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))
                       )
                       .map((item) => (
                         <button
@@ -2077,13 +2169,14 @@ async function deleteVoucher(v: any) {
                   ['broadcasts', '📡 Broadcast'],
                   ['media', '🖼️ Media'],
                   ['users', '👥 Member'],
+                  ['reviews', '⭐ Ulasan'],
                   ['chat', '💬 Chat'],
                   ['settings', '⚙️ Setting'],
                 ]
                   .filter(
                     (item) =>
-                      item[0] !== 'broadcasts' ||
-                      ['owner', 'admin'].includes(role)
+                      (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) &&
+                      (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))
                   )
                   .map((item) => (
                     <button
@@ -3971,7 +4064,13 @@ async function deleteVoucher(v: any) {
                   <>
                     <input
                       className="input mt-3"
-                      placeholder="Judul promo"
+                      placeholder="Custom Text di atas judul (opsional)"
+                      value={mediaPromoCustomText}
+                      onChange={(e) => setMediaPromoCustomText(e.target.value)}
+                    />
+                    <input
+                      className="input mt-3"
+                      placeholder="Judul / teks utama promo"
                       value={mediaPromoTitle}
                       onChange={(e) => setMediaPromoTitle(e.target.value)}
                     />
@@ -3995,26 +4094,33 @@ async function deleteVoucher(v: any) {
                     Gambar Banner Promo
                     <input
                       type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,video/x-m4v"
                       className="input mt-2"
                       disabled={mediaUploading}
                       onChange={(e) =>
-                        uploadAndSync(e, 'promotions', preparePromoImage, '16:9')
+                        uploadAndSync(e, 'promotions', preparePromoImage, '16:9', true)
                       }
                     />
                     <span className="mt-1 block text-[10px] text-slate-500">
-                      JPG, PNG, WEBP, GIF · maksimal 6 MB · rasio 16:9.
+                      JPG, PNG, WEBP, GIF · atau Live Photo yang diekspor sebagai video MOV/MP4 · gambar maks. 6 MB, video maks. 20 MB · rasio 16:9.
                     </span>
                   </label>
                 )}
 
                 {((pendingPromoImageUrl || promos[0]?.banner_url) && mediaPromoType !== 'text') && (
-                  <img
-                    src={pendingPromoImageUrl || promos[0]?.banner_url}
-                    alt="Preview Banner Promo"
-                    className="mt-4 h-40 w-full rounded-xl object-cover"
-                  />
-                )}
+                  /\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(pendingPromoImageUrl || promos[0]?.banner_url || '') ? (
+                    <video
+                      src={pendingPromoImageUrl || promos[0]?.banner_url}
+                      className="mt-4 h-40 w-full rounded-xl object-cover"
+                      autoPlay muted loop playsInline controls
+                    />
+                  ) : (
+                    <img
+                      src={pendingPromoImageUrl || promos[0]?.banner_url}
+                      alt="Preview Banner Promo"
+                      className="mt-4 h-40 w-full rounded-xl object-cover"
+                    />
+                  ))}
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-3 py-1 text-xs font-bold ${promos[0]?.is_active ? 'bg-green-400/10 text-green-300' : 'bg-slate-400/10 text-slate-400'}`}>
@@ -4051,15 +4157,23 @@ async function deleteVoucher(v: any) {
 
                 <div className="mt-5 overflow-hidden rounded-2xl border border-pink-400/20 bg-slate-950/70">
                   {mediaPromoType !== 'text' && (pendingPromoImageUrl || promos[0]?.banner_url) && (
-                    <img
-                      src={pendingPromoImageUrl || promos[0]?.banner_url}
-                      alt="Preview"
-                      className="max-h-64 w-full object-cover"
-                    />
+                    /(\.mp4|\.webm|\.mov|\.m4v)(?:$|[?#])/i.test(pendingPromoImageUrl || promos[0]?.banner_url || '') ? (
+                      <video
+                        src={pendingPromoImageUrl || promos[0]?.banner_url}
+                        className="max-h-64 w-full object-cover"
+                        autoPlay muted loop playsInline controls
+                      />
+                    ) : (
+                      <img
+                        src={pendingPromoImageUrl || promos[0]?.banner_url}
+                        alt="Preview"
+                        className="max-h-64 w-full object-cover"
+                      />
+                    )
                   )}
                   {mediaPromoType !== 'image' && (
                     <div className="p-5">
-                      <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">PROMO</p>
+                      <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">{mediaPromoCustomText}</p>
                       <h4 className="mt-2 text-2xl font-black">
                         {mediaPromoTitle || promos[0]?.name || 'Judul Promo'}
                       </h4>
@@ -4780,6 +4894,99 @@ async function deleteVoucher(v: any) {
               </div>
             )
           })}
+        </section>
+      )}
+
+      {/* =====================================================
+          ULASAN & RUNNING TEXT
+      ===================================================== */}
+
+      {tab === 'reviews' && (
+        <section className="mt-7 space-y-6">
+          <div className="glass overflow-hidden rounded-3xl">
+            <div className="border-b border-white/10 bg-gradient-to-r from-cyan-400/[.06] via-transparent to-fuchsia-500/[.06] p-6">
+              <p className="text-[9px] font-black uppercase tracking-[.25em] text-cyan-300">Homepage</p>
+              <h2 className="mt-2 text-2xl font-black text-white">Running Text</h2>
+              <p className="mt-1 text-sm text-slate-500">Teks berjalan bertema gaming yang tampil di bawah Banner Promo.</p>
+            </div>
+            <div className="grid gap-5 p-6 md:grid-cols-[1fr_220px]">
+              <label className="block">
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Teks Running Text</span>
+                <textarea
+                  className="input min-h-28 w-full resize-y"
+                  value={homeRunningText.text_content || ''}
+                  onChange={(e) => setHomeRunningText({ ...homeRunningText, text_content: e.target.value })}
+                  placeholder="⚡ TOP UP CEPAT • HARGA TERBAIK • EVENT SPESIAL • NDRAAAID.v1"
+                />
+              </label>
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Status</span>
+                  <select
+                    className="input w-full"
+                    value={homeRunningText.is_active ? 'true' : 'false'}
+                    onChange={(e) => setHomeRunningText({ ...homeRunningText, is_active: e.target.value === 'true' })}
+                  >
+                    <option value="true">Aktif</option>
+                    <option value="false">Nonaktif</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Kecepatan</span>
+                  <select
+                    className="input w-full"
+                    value={String(homeRunningText.speed_ms || 18000)}
+                    onChange={(e) => setHomeRunningText({ ...homeRunningText, speed_ms: Number(e.target.value) })}
+                  >
+                    <option value="12000">Cepat</option>
+                    <option value="18000">Normal</option>
+                    <option value="26000">Pelan</option>
+                  </select>
+                </label>
+              </div>
+              <div className="md:col-span-2 border-t border-white/10 pt-5">
+                <button type="button" onClick={saveHomeRunningText} className="btn btn-primary">
+                  Simpan Running Text
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass overflow-hidden rounded-3xl">
+            <div className="border-b border-white/10 p-6">
+              <p className="text-[9px] font-black uppercase tracking-[.25em] text-fuchsia-300">Moderasi</p>
+              <h2 className="mt-2 text-2xl font-black text-white">Ulasan Pelanggan</h2>
+              <p className="mt-1 text-sm text-slate-500">Hanya ulasan dari order berstatus SUCCESS yang bisa masuk. Ulasan tampil di Home setelah disetujui.</p>
+            </div>
+            <div className="divide-y divide-white/10">
+              {customerReviews.map((review) => (
+                <div key={review.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-black text-white">{review.reviewer_display}</span>
+                      <span className="text-amber-300">{'★'.repeat(Number(review.rating || 0))}</span>
+                      <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${review.is_approved ? 'bg-emerald-400/10 text-emerald-300' : 'bg-amber-400/10 text-amber-300'}`}>
+                        {review.is_approved ? 'Ditampilkan' : 'Menunggu'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">“{review.review_text}”</p>
+                    <p className="mt-1 text-[10px] text-slate-600">Order: {review.order_id}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <button type="button" onClick={() => moderateCustomerReview(review, !review.is_approved)} className="btn btn-muted text-xs">
+                      {review.is_approved ? 'Sembunyikan' : 'Tampilkan'}
+                    </button>
+                    <button type="button" onClick={() => deleteCustomerReview(review)} className="btn btn-muted text-xs text-red-300">
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {!customerReviews.length && (
+                <div className="p-10 text-center text-sm text-slate-500">Belum ada ulasan pelanggan.</div>
+              )}
+            </div>
+          </div>
         </section>
       )}
 
