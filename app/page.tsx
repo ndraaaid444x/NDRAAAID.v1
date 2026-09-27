@@ -541,31 +541,68 @@ export default function Home() {
           Pragma: 'no-cache',
         }
 
-        const [runningResponse, reviewResponse] = await Promise.all([
-          fetch(`${supabaseUrl}/rest/v1/home_running_text?${runningParams.toString()}`, {
-            method: 'GET',
-            headers,
-            cache: 'no-store',
-          }),
-          fetch(`${supabaseUrl}/rest/v1/customer_reviews?${reviewParams.toString()}`, {
-            method: 'GET',
-            headers,
-            cache: 'no-store',
-          }),
-        ])
+const [runningResponse, reviewResponse] = await Promise.all([
+  fetch(
+    `${supabaseUrl}/rest/v1/home_running_text?${runningParams.toString()}`,
+    {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+    }
+  ),
+  fetch(
+    `${supabaseUrl}/rest/v1/customer_reviews?${reviewParams.toString()}`,
+    {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+    }
+  ),
+])
 
-        if (!runningResponse.ok || !reviewResponse.ok) return
+if (!mounted) return
 
-        const [runningData, reviewData] = await Promise.all([
-          runningResponse.json(),
-          reviewResponse.json(),
-        ])
+// Running Text berdiri sendiri.
+// Kalau gagal, jangan blokir Customer Reviews.
+if (runningResponse.ok) {
+  try {
+    const runningData = await runningResponse.json()
 
-        if (!mounted) return
+    setRunningText(
+      Array.isArray(runningData) && runningData.length
+        ? runningData[0]
+        : null
+    )
+  } catch (error) {
+    console.error('Gagal membaca Running Text:', error)
+    setRunningText(null)
+  }
+}
 
-        setRunningText(Array.isArray(runningData) && runningData.length ? runningData[0] : null)
-        setReviews(Array.isArray(reviewData) ? reviewData : [])
-        setActiveReview(0)
+// Customer Reviews berdiri sendiri.
+if (reviewResponse.ok) {
+  try {
+    const reviewData = await reviewResponse.json()
+
+    setReviews(
+      Array.isArray(reviewData)
+        ? reviewData
+        : []
+    )
+
+    setActiveReview(0)
+  } catch (error) {
+    console.error('Gagal membaca Customer Reviews:', error)
+    setReviews([])
+  }
+} else {
+  const reviewError = await reviewResponse.text().catch(() => '')
+  console.error(
+    'Customer Reviews HTTP error:',
+    reviewResponse.status,
+    reviewError
+  )
+}
       } catch (error) {
         console.error('Gagal memuat running text/review:', error)
       }
