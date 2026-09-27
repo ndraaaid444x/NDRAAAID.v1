@@ -19,46 +19,58 @@ export default function DepositPage() {
   const [loading, setLoading] = useState(false)
 
   async function load() {
-    const {
-      data: { user },
-    } = await s.auth.getUser()
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await s.auth.getUser()
 
-    if (!user) {
-      r.push('/login')
-      return
-    }
+      if (authError) throw authError
 
-    const [
-      { data: m },
-      { data: h },
-      { data: w },
-    ] = await Promise.all([
-      s
-        .from('payment_methods')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at'),
+      if (!user) {
+        r.push('/login')
+        return
+      }
 
-      s
-        .from('member_deposits')
-        .select('*,payment_methods(name,kind)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(30),
+      const [methodsResult, historyResult, walletResult] = await Promise.all([
+        s
+          .from('payment_methods')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at'),
+        s
+          .from('member_deposits')
+          .select('*,payment_methods(name,kind)')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        s
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ])
 
-      s
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', user.id)
-        .maybeSingle(),
-    ])
+      if (methodsResult.error) throw methodsResult.error
+      if (historyResult.error) throw historyResult.error
+      if (walletResult.error) throw walletResult.error
 
-    setMethods(m || [])
-    setHistory(h || [])
-    setBalance(Number(w?.balance || 0))
+      const availableMethods = (methodsResult.data || []).filter((x) => {
+        const kind = String(x.kind || '').trim().toUpperCase()
+        const name = String(x.name || '').trim().toLowerCase()
+        return kind !== 'WALLET' && name !== 'saldo akun'
+      })
 
-    if (!method && m?.[0]) {
-      setMethod(m[0].id)
+      setMethods(availableMethods)
+      setHistory(historyResult.data || [])
+      setBalance(Number(walletResult.data?.balance || 0))
+      setMethod((current) =>
+        availableMethods.some((x) => x.id === current)
+          ? current
+          : availableMethods[0]?.id || ''
+      )
+    } catch (error: any) {
+      setMsg(error?.message || 'Gagal memuat data deposit.')
     }
   }
 
@@ -100,66 +112,65 @@ export default function DepositPage() {
 
     setLoading(true)
 
-    const {
-      data: { user },
-    } = await s.auth.getUser()
+    let path = ''
 
-    if (!user) {
-      setLoading(false)
-      r.push('/login')
-      return
-    }
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await s.auth.getUser()
 
-    const ext =
-      file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      if (authError) throw authError
 
-    const path =
-      `${user.id}/deposit-${Date.now()}-` +
-      `${crypto.randomUUID().slice(0, 8)}.${ext}`
-
-    const up = await s.storage
-      .from('payment-proofs')
-      .upload(path, file, {
-        contentType: file.type,
-        upsert: false,
-      })
-
-    if (up.error) {
-      setLoading(false)
-      setMsg(up.error.message)
-      return
-    }
-
-    const { error } = await s.rpc(
-      'create_member_deposit',
-      {
-        p_payment_method_id: method,
-        p_amount: n,
-        p_proof_path: path,
-        p_proof_url: null,
-        p_note: note.trim() || null,
+      if (!user) {
+        r.push('/login')
+        return
       }
-    )
 
-    if (error) {
-      await s.storage
+      const ext =
+        file.name.split('.').pop()?.toLowerCase() || 'jpg'
+
+      path =
+        `${user.id}/deposit-${Date.now()}-` +
+        `${crypto.randomUUID().slice(0, 8)}.${ext}`
+
+      const up = await s.storage
         .from('payment-proofs')
-        .remove([path])
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+        })
 
-      setMsg(error.message)
-    } else {
+      if (up.error) throw up.error
+
+      const { error } = await s.rpc(
+        'create_member_deposit',
+        {
+          p_payment_method_id: method,
+          p_amount: n,
+          p_proof_path: path,
+          p_proof_url: null,
+          p_note: note.trim() || null,
+        }
+      )
+
+      if (error) {
+        await s.storage.from('payment-proofs').remove([path])
+        throw error
+      }
+
       setMsg(
         'Deposit berhasil dikirim. Tunggu verifikasi admin.'
       )
-
       setAmount('')
       setNote('')
       setFile(null)
-
       await load()
+    } catch (error: any) {
+      setMsg(error?.message || 'Deposit gagal diproses.')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   const selectedMethod = methods.find(
