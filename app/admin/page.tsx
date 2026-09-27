@@ -1605,87 +1605,176 @@ async function deleteVoucher(v: any) {
     )
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-sm font-bold text-purple-300">
-            ADMIN PANEL
-          </p>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,.08),transparent_32%),radial-gradient(circle_at_top_right,rgba(168,85,247,.08),transparent_28%)]">
+      <div className="mx-auto flex max-w-[1500px] gap-5 px-3 py-4 md:px-5 lg:py-6">
+        <aside className="hidden w-64 shrink-0 lg:block">
+          <div className="sticky top-5 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
+            <div className="border-b border-white/10 p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-xl shadow-[0_0_25px_rgba(34,211,238,.12)]">
+                  ⚡
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">
+                    Admin
+                  </p>
+                  <h2 className="truncate text-lg font-black text-white">
+                    NDRAAAID.v1
+                  </h2>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between rounded-2xl border border-emerald-400/10 bg-emerald-400/5 px-3 py-2">
+                <span className="text-[11px] text-slate-500">Mode</span>
+                <span className="text-[11px] font-bold text-emerald-300">● ONLINE</span>
+              </div>
+            </div>
 
-          <h1 className="text-4xl font-black">
-            NDRAAAID Control Center
-          </h1>
+            <nav className="max-h-[calc(100vh-190px)] space-y-5 overflow-y-auto p-3">
+              {[
+                {
+                  title: 'OPERASIONAL',
+                  items: [
+                    ['orders', '🧾', 'Order'],
+                    ['deposits', '💳', 'Deposit'],
+                    ['deposit-history', '📥', 'Riwayat Deposit'],
+                    ['wallet-history', '💰', 'Riwayat Wallet'],
+                  ],
+                },
+                {
+                  title: 'KATALOG',
+                  items: [
+                    ['categories', '🗂️', 'Kategori'],
+                    ['games', '🎮', 'Games'],
+                    ['products', '💎', 'Produk'],
+                    ['promotions', '📢', 'Promo'],
+                  ],
+                },
+                {
+                  title: 'SISTEM',
+                  items: [
+                    ['payments', '🏦', 'Pembayaran'],
+                    ['vouchers', '🎟️', 'Voucher'],
+                    ['broadcasts', '📡', 'Live Broadcast'],
+                    ['media', '🖼️', 'Media Manager'],
+                  ],
+                },
+                {
+                  title: 'MANAGEMENT',
+                  items: [
+                    ['users', '👥', 'Member & Wallet'],
+                    ['chat', '💬', 'Live Chat'],
+                    ['settings', '⚙️', 'Pengaturan'],
+                  ],
+                },
+              ].map((group) => (
+                <div key={group.title}>
+                  <p className="px-3 pb-2 text-[9px] font-black tracking-[.25em] text-slate-600">
+                    {group.title}
+                  </p>
+                  <div className="space-y-1">
+                    {group.items
+                      .filter(
+                        (item) =>
+                          item[0] !== 'broadcasts' ||
+                          ['owner', 'admin'].includes(role)
+                      )
+                      .map((item) => (
+                        <button
+                          key={item[0]}
+                          onClick={() => setTab(item[0])}
+                          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                            tab === item[0]
+                              ? 'border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.08)]'
+                              : 'border border-transparent text-slate-400 hover:bg-white/[.04] hover:text-white'
+                          }`}
+                        >
+                          <span className="w-5 text-center">{item[1]}</span>
+                          <span className="font-semibold">{item[2]}</span>
+                          {tab === item[0] && (
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.9)]" />
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </nav>
+          </div>
+        </aside>
 
-          <p className="mt-2 text-slate-400">
-            Transaction Mode:{' '}
-            <b className="text-cyan-300">
-              MANUAL
-            </b>{' '}
-            · {role}
-          </p>
-        </div>
+        <div className="min-w-0 flex-1">
+          <header className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 shadow-2xl shadow-purple-950/10 backdrop-blur-xl">
+            <div className="relative p-5 md:p-6">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
+              <div className="absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl" />
+              <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[9px] font-black tracking-[.22em] text-cyan-300">
+                      CONTROL CENTER
+                    </span>
+                    <span className="text-[10px] text-slate-600">v1</span>
+                  </div>
+                  <h1 className="mt-2 text-2xl font-black tracking-tight text-white md:text-3xl">
+                    NDRAAAID<span className="text-cyan-300">.v1</span>
+                  </h1>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Kelola toko, transaksi, katalog, media, dan member dalam satu panel.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-2xl border border-white/10 bg-white/[.03] px-4 py-2.5">
+                    <p className="text-[9px] uppercase tracking-widest text-slate-600">Role</p>
+                    <p className="text-sm font-bold text-white">{role || 'ADMIN'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 px-4 py-2.5">
+                    <p className="text-[9px] uppercase tracking-widest text-slate-600">Status</p>
+                    <p className="text-sm font-bold text-emerald-300">ONLINE</p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
-          {tabs
-            .filter(
-              (x) =>
-                x !==
-                  'broadcasts' ||
-                ['owner', 'admin'].includes(
-                  role
-                )
-            )
-            .map((x) => {
-              const labels: any = {
-                orders:
-                  'Transaksi / Riwayat Order',
-                deposits:
-                  'Keuangan / Deposit Member',
-                'deposit-history':
-                  'Keuangan / Riwayat Deposit',
-                'wallet-history':
-                  'Keuangan / Riwayat Wallet',
-                categories:
-                  'Kategori',
-                games: 'Games',
-                products:
-                  'Produk',
-                payments:
-                  'Pembayaran',
-                vouchers:
-                  'Voucher',
-                promotions:
-                  'Promo',
-                broadcasts:
-                  'Live Broadcast',
-                media:
-                  'Media Manager',
-                users:
-                  'Member & Wallet',
-                settings:
-                  'Pengaturan',
-                chat:
-                  'Live Chat',
-              }
-
-              return (
-                <button
-                  key={x}
-                  onClick={() =>
-                    setTab(x)
-                  }
-                  className={`btn shrink-0 text-xs ${
-                    tab === x
-                      ? 'btn-primary'
-                      : 'btn-muted'
-                  }`}
-                >
-                  {labels[x]}
-                </button>
-              )
-            })}
-        </div>
-      </div>
+            <div className="border-t border-white/10 p-3 lg:hidden">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {[
+                  ['orders', '🧾 Order'],
+                  ['deposits', '💳 Deposit'],
+                  ['deposit-history', '📥 Riwayat'],
+                  ['wallet-history', '💰 Wallet'],
+                  ['categories', '🗂️ Kategori'],
+                  ['games', '🎮 Games'],
+                  ['products', '💎 Produk'],
+                  ['payments', '🏦 Bayar'],
+                  ['vouchers', '🎟️ Voucher'],
+                  ['promotions', '📢 Promo'],
+                  ['broadcasts', '📡 Broadcast'],
+                  ['media', '🖼️ Media'],
+                  ['users', '👥 Member'],
+                  ['chat', '💬 Chat'],
+                  ['settings', '⚙️ Setting'],
+                ]
+                  .filter(
+                    (item) =>
+                      item[0] !== 'broadcasts' ||
+                      ['owner', 'admin'].includes(role)
+                  )
+                  .map((item) => (
+                    <button
+                      key={item[0]}
+                      onClick={() => setTab(item[0])}
+                      className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                        tab === item[0]
+                          ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
+                          : 'border-white/10 bg-white/[.03] text-slate-400'
+                      }`}
+                    >
+                      {item[1]}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </header>
 
       {msg && (
         <div className="mt-5 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-3 text-sm text-cyan-200">
@@ -4598,6 +4687,8 @@ async function deleteVoucher(v: any) {
           </div>
         </section>
       )}
+        </div>
+      </div>
     </main>
   )
 }
