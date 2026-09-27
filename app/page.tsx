@@ -49,9 +49,8 @@ export default function Home() {
 
       try {
         const params = new URLSearchParams()
-        params.set('select', 'id,name,description,code,banner_url,content_type,is_active,created_at')
+        params.set('select', 'id,name,description,code,banner_url,content_type,is_active')
         params.set('is_active', 'eq.true')
-        params.set('order', 'created_at.desc')
         params.set('limit', '1')
 
         const response = await fetch(
