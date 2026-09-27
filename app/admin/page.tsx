@@ -88,7 +88,6 @@ export default function Admin() {
   const [mediaGameId, setMediaGameId] = useState('')
   const [mediaProductGameId, setMediaProductGameId] = useState('')
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
-  const [mediaPromoId, setMediaPromoId] = useState('')
   const [mediaPromoTitle, setMediaPromoTitle] = useState('')
   const [mediaPromoDescription, setMediaPromoDescription] = useState('')
   const [mediaPromoCode, setMediaPromoCode] = useState('')
@@ -390,6 +389,23 @@ s
   useEffect(() => {
     load()
   }, [])
+
+  useEffect(() => {
+    const promo = promos[0]
+    if (!promo) return
+
+    setMediaPromoTitle(promo.name || '')
+    setMediaPromoDescription(promo.description || '')
+    setMediaPromoCode(promo.code || '')
+    setMediaPromoType(
+      promo.content_type ||
+        (promo.banner_url
+          ? promo.description || promo.code
+            ? 'both'
+            : 'image'
+          : 'text')
+    )
+  }, [promos])
 
   async function transition(o: any, n: string) {
     if (!confirm(`Ubah ${o.order_code} menjadi ${n}?`)) return
@@ -1389,32 +1405,13 @@ async function deleteVoucher(v: any) {
     }
   }
 
-  function selectMediaPromo(id: string) {
-    setMediaPromoId(id)
-
-    const promo = promos.find((x) => x.id === id)
-    if (!promo) {
-      setMediaPromoTitle('')
-      setMediaPromoDescription('')
-      setMediaPromoCode('')
-      return
-    }
-
-    setMediaPromoTitle(promo.name || '')
-    setMediaPromoDescription(promo.description || '')
-    setMediaPromoCode(promo.code || '')
-  }
-
   async function savePromoContent(url?: string) {
-    const existing = mediaPromoId
-      ? promos.find((x) => x.id === mediaPromoId)
-      : null
-
+    const existing = promos[0] || null
     const hasImage = Boolean(url)
     const wantsText = mediaPromoType === 'text' || mediaPromoType === 'both'
     const wantsImage = mediaPromoType === 'image' || mediaPromoType === 'both'
 
-    if (wantsText && !mediaPromoTitle.trim() && !existing) {
+    if (wantsText && !mediaPromoTitle.trim()) {
       setMsg('Isi judul promo untuk konten teks.')
       return
     }
@@ -1426,20 +1423,18 @@ async function deleteVoucher(v: any) {
 
     const payload: any = {
       is_active: existing?.is_active ?? true,
-    }
-
-    if (mediaPromoTitle.trim()) payload.name = mediaPromoTitle.trim()
-    else if (!existing) payload.name = 'Promo Baru'
-
-    if (mediaPromoType !== 'image') {
-      payload.description = mediaPromoDescription.trim() || null
-      payload.code = mediaPromoCode.trim() || null
+      content_type: mediaPromoType,
+      name: wantsText ? mediaPromoTitle.trim() : (existing?.name || 'Banner Promo'),
+      description: wantsText ? (mediaPromoDescription.trim() || null) : null,
+      code: wantsText ? (mediaPromoCode.trim() || null) : null,
     }
 
     if (mediaPromoType === 'text') {
       payload.banner_url = null
     } else if (hasImage) {
       payload.banner_url = url
+    } else {
+      payload.banner_url = existing?.banner_url || null
     }
 
     const query = existing
@@ -1451,22 +1446,33 @@ async function deleteVoucher(v: any) {
     setMsg(
       error?.message ||
         (existing
-          ? `Promo ${existing.name} berhasil diperbarui.`
-          : 'Promo baru berhasil dibuat.')
+          ? `Banner Promo berhasil diperbarui.`
+          : 'Banner Promo berhasil dibuat.')
     )
 
     if (!error) {
-      setMediaPromoId('')
-      setMediaPromoTitle('')
-      setMediaPromoDescription('')
-      setMediaPromoCode('')
-      setMediaPromoType('both')
       load()
     }
   }
 
   async function savePromoTextOnly() {
     await savePromoContent()
+  }
+
+  async function toggleMainPromo() {
+    const promo = promos[0]
+    if (!promo) {
+      setMsg('Belum ada Banner Promo untuk diaktifkan/nonaktifkan.')
+      return
+    }
+
+    const { error } = await s
+      .from('promotions')
+      .update({ is_active: !promo.is_active })
+      .eq('id', promo.id)
+
+    setMsg(error?.message || (promo.is_active ? 'Banner Promo dinonaktifkan.' : 'Banner Promo diaktifkan.'))
+    if (!error) load()
   }
 
   async function setHomepageBannerFromMedia(url: string) {
@@ -4508,10 +4514,10 @@ async function deleteVoucher(v: any) {
                 📢 Banner Promo
               </p>
               <h3 className="mt-1 text-lg font-black">
-                Kelola konten promo
+                Kelola 1 Banner Promo
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                Bisa teks saja, gambar saja, atau teks + gambar. Promo yang sudah ada bisa dipilih, atau buat promo baru tanpa memilih promo terlebih dahulu.
+                Satu promo utama saja. Bisa diedit, diganti, atau dinonaktifkan tanpa membuat riwayat tambahan.
               </p>
 
               <label className="mt-4 block text-xs font-bold text-slate-300">
@@ -4526,22 +4532,6 @@ async function deleteVoucher(v: any) {
                   <option value="text">Teks saja</option>
                   <option value="image">Gambar saja</option>
                   <option value="both">Teks + gambar</option>
-                </select>
-              </label>
-
-              <label className="mt-3 block text-xs font-bold text-slate-300">
-                Pilih promo yang sudah ada (opsional)
-                <select
-                  className="input mt-2"
-                  value={mediaPromoId}
-                  onChange={(e) => selectMediaPromo(e.target.value)}
-                >
-                  <option value="">+ Buat promo baru</option>
-                  {promos.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
                 </select>
               </label>
 
@@ -4572,7 +4562,7 @@ async function deleteVoucher(v: any) {
 
               {mediaPromoType !== 'text' && (
                 <label className="mt-3 block text-xs font-bold text-slate-300">
-                  File gambar banner (opsional untuk tipe teks)
+                  Gambar banner
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
@@ -4593,22 +4583,37 @@ async function deleteVoucher(v: any) {
                 </label>
               )}
 
-              {mediaPromoId && (
-                <div className="mt-3 rounded-xl border border-cyan-400/10 bg-cyan-400/[.04] p-3 text-xs text-slate-400">
-                  Promo terpilih akan diperbarui. Jika tidak memilih promo, sistem membuat promo baru.
-                </div>
+              {promos[0]?.banner_url && (
+                <img
+                  src={promos[0].banner_url}
+                  alt="Preview Banner Promo"
+                  className="mt-4 h-32 w-full rounded-xl object-cover"
+                />
               )}
 
-              {mediaPromoType === 'text' && (
-                <button
-                  type="button"
-                  className="btn btn-primary mt-3 w-full"
-                  disabled={mediaUploading}
-                  onClick={savePromoTextOnly}
-                >
-                  Simpan Promo Teks
-                </button>
-              )}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${promos[0]?.is_active ? 'bg-green-400/10 text-green-300' : 'bg-slate-400/10 text-slate-400'}`}>
+                  {promos[0] ? (promos[0].is_active ? '🟢 Aktif' : '🔴 Nonaktif') : 'Belum dibuat'}
+                </span>
+                {promos[0] && (
+                  <button
+                    type="button"
+                    className="btn btn-muted text-xs"
+                    onClick={toggleMainPromo}
+                  >
+                    {promos[0].is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary mt-3 w-full"
+                disabled={mediaUploading}
+                onClick={savePromoTextOnly}
+              >
+                {promos[0] ? 'Simpan Perubahan Banner Promo' : 'Buat Banner Promo'}
+              </button>
             </div>
 
             <div className="glass rounded-3xl p-5">
