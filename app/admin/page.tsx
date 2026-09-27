@@ -1942,15 +1942,7 @@ async function deleteVoucher(v: any) {
             </div>
 
             <div className="border-t border-white/10 p-3 lg:hidden">
-<div
-  ref={mobileMenuRef}
-  onPointerDown={startMenuDrag}
-  onPointerMove={moveMenuDrag}
-  onPointerUp={endMenuDrag}
-  onPointerCancel={endMenuDrag}
-  className="flex cursor-grab select-none gap-2 overflow-x-auto pb-1 touch-pan-x active:cursor-grabbing"
-  style={{ scrollbarWidth: 'none' }}
->
+         <div className="grid grid-cols-3 gap-3">
                 {[
                   ['orders', '🧾 Order'],
                   ['deposits', '💳 Deposit'],
@@ -1976,16 +1968,8 @@ async function deleteVoucher(v: any) {
                   .map((item) => (
                     <button
                       key={item[0]}
-                      onClick={(e) => {
-  if (dragMoved.current) {
-    e.preventDefault()
-    dragMoved.current = false
-    return
-  }
-
-  setTab(item[0])
-}}
-                      className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+onClick={() => setTab(item[0])}
+    className={`w-full rounded-xl border px-3 py-3 text-sm font-bold transition ${
                         tab === item[0]
                           ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
                           : 'border-white/10 bg-white/[.03] text-slate-400'
