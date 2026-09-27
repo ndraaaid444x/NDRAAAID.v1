@@ -9,6 +9,7 @@ import {
   Gamepad2,
   Radio,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -23,11 +24,10 @@ export default function Home() {
 
   const broadcastStartX = useRef<number | null>(null)
 
-  /*
-   * ============================================================
-   * LOAD GAME
-   * ============================================================
-   */
+  /* =========================================================
+     LOAD GAMES
+  ========================================================= */
+
   useEffect(() => {
     let mounted = true
 
@@ -101,9 +101,6 @@ export default function Home() {
           )
         }
 
-        /*
-         * Hilangkan game duplikat berdasarkan ID.
-         */
         const uniqueGames = Array.from(
           new Map(
             data.map((game: any) => [
@@ -113,9 +110,6 @@ export default function Home() {
           ).values()
         )
 
-        /*
-         * Game populer berada di atas.
-         */
         uniqueGames.sort(
           (a: any, b: any) => {
             const popularA =
@@ -174,20 +168,10 @@ export default function Home() {
     }
   }, [])
 
-  /*
-   * ============================================================
-   * LOAD LIVE BROADCAST
-   * ============================================================
-   *
-   * Tetap menggunakan tabel broadcasts yang sudah ada.
-   *
-   * Hanya mengambil:
-   * - is_active = true
-   * - starts_at <= sekarang
-   * - ends_at > sekarang
-   *
-   * Tidak membuat database baru.
-   */
+  /* =========================================================
+     LOAD BROADCAST
+  ========================================================= */
+
   useEffect(() => {
     let mounted = true
 
@@ -280,10 +264,6 @@ export default function Home() {
 
         setBroadcasts(nextBroadcasts)
 
-        /*
-         * Pastikan index slider tetap valid
-         * ketika jumlah broadcast berubah.
-         */
         setActiveBroadcast(
           (current) => {
             if (
@@ -317,10 +297,6 @@ export default function Home() {
 
     loadBroadcasts()
 
-    /*
-     * Sinkronisasi dengan Broadcast Admin
-     * setiap 30 detik.
-     */
     const interval =
       setInterval(
         loadBroadcasts,
@@ -333,17 +309,11 @@ export default function Home() {
     }
   }, [])
 
-  /*
-   * ============================================================
-   * AUTO SLIDER
-   * ============================================================
-   *
-   * Broadcast otomatis berganti setiap 5 detik.
-   *
-   * Ketika pengguna melakukan swipe manual,
-   * activeBroadcast berubah dan timer otomatis
-   * dimulai ulang dari 5 detik.
-   */
+  /* =========================================================
+     AUTO SLIDER
+     Tetap 5 detik tanpa menampilkan tulisan AUTO
+  ========================================================= */
+
   useEffect(() => {
     if (broadcasts.length <= 1) {
       return
@@ -365,16 +335,10 @@ export default function Home() {
     broadcasts.length,
   ])
 
-  /*
-   * ============================================================
-   * SWIPE / DRAG BROADCAST
-   * ============================================================
-   *
-   * Berlaku untuk:
-   * - HP
-   * - Tablet
-   * - Desktop
-   */
+  /* =========================================================
+     SWIPE / DRAG
+  ========================================================= */
+
   function handleBroadcastPointerDown(
     event: React.PointerEvent<HTMLDivElement>
   ) {
@@ -407,25 +371,14 @@ export default function Home() {
       event.clientX -
       broadcastStartX.current
 
-    const minimumSwipe = 50
-
-    if (
-      Math.abs(distance) >=
-      minimumSwipe
-    ) {
+    if (Math.abs(distance) >= 50) {
       if (distance < 0) {
-        /*
-         * Swipe kiri
-         */
         setActiveBroadcast(
           (current) =>
             (current + 1) %
             broadcasts.length
         )
       } else {
-        /*
-         * Swipe kanan
-         */
         setActiveBroadcast(
           (current) =>
             (current - 1 +
@@ -444,9 +397,6 @@ export default function Home() {
     } catch {}
   }
 
-  /*
-   * Broadcast yang sedang aktif.
-   */
   const currentBroadcast =
     broadcasts.length > 0
       ? broadcasts[
@@ -454,14 +404,6 @@ export default function Home() {
         ]
       : null
 
-  /*
-   * ============================================================
-   * BROADCAST YANG MEMILIKI LINK
-   * ============================================================
-   *
-   * Card besar hanya mengambil broadcast
-   * yang mempunyai link_url.
-   */
   const linkedBroadcast =
     broadcasts.find(
       (broadcast) =>
@@ -475,6 +417,7 @@ export default function Home() {
       {/* =====================================================
           HERO
       ===================================================== */}
+
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(34,211,238,.14),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(139,92,246,.18),transparent_35%)]" />
 
@@ -571,15 +514,15 @@ export default function Home() {
       </section>
 
       {/* =====================================================
-          LIVE BROADCAST SLIDER
-          ===================================================== */}
+          CYBER / HOLOGRAM LIVE SLIDER
+      ===================================================== */}
 
       {!loadingBroadcast &&
         broadcasts.length > 0 &&
         currentBroadcast && (
-          <section className="mx-auto max-w-7xl px-4 pt-4">
+          <section className="mx-auto max-w-7xl px-4 pt-5">
             <div
-              className="relative overflow-hidden rounded-[1.75rem] border border-red-500/25 bg-gradient-to-br from-[#120406] via-black to-[#08090d] shadow-[0_0_35px_rgba(220,38,38,.10)] select-none"
+              className="group relative overflow-hidden rounded-[2rem] border border-cyan-400/25 bg-[#050713] shadow-[0_0_50px_rgba(34,211,238,.08)] select-none"
               onPointerDown={
                 handleBroadcastPointerDown
               }
@@ -590,38 +533,67 @@ export default function Home() {
                 handleBroadcastPointerUp
               }
               style={{
-                touchAction:
-                  'pan-y',
+                touchAction: 'pan-y',
                 cursor:
                   broadcasts.length > 1
                     ? 'grab'
                     : 'default',
               }}
             >
-              {/* Decorative gaming glow */}
-              <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-red-600/10 blur-3xl" />
+              {/* CYBER GLOW */}
 
-              <div className="pointer-events-none absolute -bottom-24 -right-24 h-56 w-56 rounded-full bg-red-500/5 blur-3xl" />
+              <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
-              {/* Top line */}
-              <div className="relative flex items-center justify-between border-b border-white/5 px-4 py-2.5 sm:px-6">
+              <div className="pointer-events-none absolute -right-24 -bottom-24 h-80 w-80 rounded-full bg-violet-600/15 blur-3xl" />
+
+              {/* GRID */}
+
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.12]"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(rgba(34,211,238,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,.35) 1px, transparent 1px)',
+                  backgroundSize:
+                    '32px 32px',
+                }}
+              />
+
+              {/* TOP HUD */}
+
+              <div className="relative flex items-center justify-between border-b border-cyan-400/10 px-5 py-3 sm:px-7">
                 <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,.8)]" />
+                  <Sparkles
+                    size={13}
+                    className="text-cyan-300"
+                  />
 
-                  <span className="text-[9px] font-black uppercase tracking-[0.25em] text-red-300 sm:text-[10px]">
-                    LIVE TRANSMISSION
+                  <span className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-300 sm:text-[10px]">
+                    CYBER TRANSMISSION
                   </span>
                 </div>
 
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
-                  AUTO 05s
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="hidden text-[9px] font-bold uppercase tracking-[0.2em] text-violet-400 sm:block">
+                    LIVE DATA
+                  </span>
+
+                  <span className="text-[9px] font-black tracking-[0.2em] text-slate-500">
+                    {String(
+                      activeBroadcast + 1
+                    ).padStart(2, '0')}
+                    /
+                    {String(
+                      broadcasts.length
+                    ).padStart(2, '0')}
+                  </span>
+                </div>
               </div>
 
-              {/* Slider */}
+              {/* SLIDER TRACK */}
+
               <div className="relative overflow-hidden">
                 <div
-                  className="flex transition-transform duration-500 ease-out"
+                  className="flex transition-transform duration-700 ease-[cubic-bezier(.22,1,.36,1)]"
                   style={{
                     transform: `translateX(-${
                       activeBroadcast * 100
@@ -636,10 +608,28 @@ export default function Home() {
                         }
                         className="w-full shrink-0"
                       >
-                        <div className="relative flex min-h-[150px] flex-col justify-between gap-5 p-5 sm:min-h-[165px] sm:p-6 md:min-h-[175px] md:p-7">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-red-300">
+                        <div className="relative min-h-[235px] overflow-hidden p-6 sm:min-h-[245px] sm:p-8 md:min-h-[260px] md:p-10">
+                          {/* SCAN LINE */}
+
+                          <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent" />
+
+                          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
+
+                          {/* CORNER MARKS */}
+
+                          <div className="pointer-events-none absolute left-4 top-4 h-5 w-5 border-l border-t border-cyan-400/50" />
+
+                          <div className="pointer-events-none absolute right-4 top-4 h-5 w-5 border-r border-t border-violet-400/50" />
+
+                          <div className="pointer-events-none absolute bottom-4 left-4 h-5 w-5 border-b border-l border-cyan-400/50" />
+
+                          <div className="pointer-events-none absolute bottom-4 right-4 h-5 w-5 border-b border-r border-violet-400/50" />
+
+                          {/* CONTENT */}
+
+                          <div className="relative">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-cyan-200">
                                 <Radio
                                   size={11}
                                 />
@@ -647,22 +637,27 @@ export default function Home() {
                                 LIVE
                               </span>
 
-                              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">
+                              <span className="rounded-full border border-violet-400/20 bg-violet-400/5 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-violet-300">
                                 {broadcast.type}
                               </span>
                             </div>
 
-                            <h2 className="mt-3 text-xl font-black uppercase tracking-tight text-white sm:text-2xl md:text-3xl">
+                            <p className="mt-6 text-[9px] font-black uppercase tracking-[0.35em] text-slate-600">
+                              INCOMING BROADCAST
+                            </p>
+
+                            <h2 className="mt-2 max-w-4xl text-3xl font-black uppercase leading-tight tracking-tight text-white sm:text-4xl md:text-5xl">
                               {broadcast.title}
                             </h2>
 
-                            <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-400 sm:text-base">
+                            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400 sm:text-base md:text-lg">
                               {broadcast.message}
                             </p>
                           </div>
 
-                          {/* Bottom accent */}
-                          <div className="flex items-center justify-between">
+                          {/* BOTTOM HUD */}
+
+                          <div className="relative mt-7 flex items-end justify-between">
                             <div className="flex items-center gap-1.5">
                               {broadcasts.map(
                                 (
@@ -673,10 +668,10 @@ export default function Home() {
                                     key={
                                       item.id
                                     }
-                                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                                    className={`h-1.5 rounded-full transition-all duration-500 ${
                                       index ===
                                       activeBroadcast
-                                        ? 'w-8 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,.5)]'
+                                        ? 'w-10 bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,.8)]'
                                         : 'w-1.5 bg-slate-700'
                                     }`}
                                   />
@@ -684,22 +679,11 @@ export default function Home() {
                               )}
                             </div>
 
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-700">
-                              {String(
-                                activeBroadcast +
-                                  1
-                              ).padStart(
-                                2,
-                                '0'
-                              )}
-                              /
-                              {String(
-                                broadcasts.length
-                              ).padStart(
-                                2,
-                                '0'
-                              )}
-                            </span>
+                            <div className="hidden items-center gap-2 text-[8px] font-black uppercase tracking-[0.25em] text-slate-600 sm:flex">
+                              <span className="h-1 w-1 rounded-full bg-violet-400" />
+
+                              SIGNAL ACTIVE
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -712,19 +696,16 @@ export default function Home() {
         )}
 
       {/* =====================================================
-          LINK BROADCAST CARD
-          HANYA UNTUK BROADCAST DENGAN LINK
+          LINK BROADCAST
       ===================================================== */}
 
       {!loadingBroadcast &&
         linkedBroadcast && (
           <section className="mx-auto max-w-7xl px-4 pt-6">
             <div className="relative overflow-hidden rounded-[2rem] border border-red-500/30 bg-gradient-to-br from-[#170407] via-[#080304] to-black shadow-[0_0_45px_rgba(220,38,38,.12)]">
-              {/* Glow */}
               <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-red-600/10 blur-3xl" />
 
               <div className="relative p-5 sm:p-7 md:p-8">
-                {/* Header */}
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
@@ -737,7 +718,6 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Content */}
                 <div className="mt-5">
                   <h2 className="text-2xl font-black uppercase tracking-tight text-white sm:text-3xl md:text-4xl">
                     {linkedBroadcast.title}
@@ -748,7 +728,6 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Link button */}
                 <div className="mt-6">
                   {String(
                     linkedBroadcast.link_url
@@ -815,7 +794,6 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* LOADING */}
         {loadingGames && (
           <div className="mt-7 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center">
             <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-cyan-400" />
@@ -830,7 +808,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* ERROR */}
         {!loadingGames &&
           gameError && (
             <div className="mt-7 rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
@@ -854,7 +831,6 @@ export default function Home() {
             </div>
           )}
 
-        {/* GAME KOSONG */}
         {!loadingGames &&
           !gameError &&
           games.length === 0 && (
@@ -863,7 +839,6 @@ export default function Home() {
             </div>
           )}
 
-        {/* GAME */}
         {!loadingGames &&
           !gameError &&
           games.length > 0 && (
