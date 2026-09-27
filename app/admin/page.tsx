@@ -936,6 +936,57 @@ async function deleteVoucher(v: any) {
     load()
   }
 
+  async function updateUsername(u: any) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat mengubah username.')
+      return
+    }
+
+    const current = String(u.username || '')
+    const next = prompt('Username baru:', current)
+
+    if (next === null) return
+
+    const username = next.trim()
+
+    if (username === current) {
+      setMsg('Username tidak berubah.')
+      return
+    }
+
+    if (username.length < 3 || username.length > 30) {
+      setMsg('Username harus 3–30 karakter.')
+      return
+    }
+
+    if (!/^[A-Za-z0-9._-]+$/.test(username)) {
+      setMsg('Username hanya boleh berisi huruf, angka, titik, underscore, dan tanda hubung.')
+      return
+    }
+
+    const { error } = await s.rpc('admin_update_username', {
+      p_user_id: u.id,
+      p_username: username,
+    })
+
+    if (error) {
+      const message = error.message || ''
+      if (message.includes('USERNAME_ALREADY_EXISTS')) {
+        setMsg('Username tersebut sudah digunakan member lain.')
+      } else if (message.includes('USERNAME_INVALID')) {
+        setMsg('Username tidak valid. Gunakan 3–30 karakter: huruf, angka, titik, underscore, atau tanda hubung.')
+      } else if (message.includes('USER_NOT_FOUND')) {
+        setMsg('Member tidak ditemukan.')
+      } else {
+        setMsg(`Gagal mengubah username: ${message}`)
+      }
+      return
+    }
+
+    setMsg(`Username ${current || u.email || 'member'} berhasil diubah menjadi ${username}.`)
+    load()
+  }
+
   async function suspend(u: any) {
     if (role !== 'owner') {
       setMsg(
@@ -4820,6 +4871,15 @@ async function deleteVoucher(v: any) {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
+                    {['owner', 'admin'].includes(role) && (
+                      <button
+                        onClick={() => updateUsername(u)}
+                        className="btn btn-muted text-xs"
+                      >
+                        Ubah Username
+                      </button>
+                    )}
+
                     {role ===
                       'owner' && (
                       <>
