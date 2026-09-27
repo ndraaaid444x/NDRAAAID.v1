@@ -22,6 +22,9 @@ export default function Home() {
   const [loadingBroadcast, setLoadingBroadcast] = useState(true)
   const [activeBroadcast, setActiveBroadcast] = useState(0)
 
+  const [promo, setPromo] = useState<any | null>(null)
+  const [loadingPromo, setLoadingPromo] = useState(true)
+
   const broadcastStartX = useRef<number | null>(null)
 
   /* =========================================================
@@ -293,6 +296,101 @@ export default function Home() {
         loadBroadcasts,
         30000
       )
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  /* =========================================================
+     LOAD MAIN PROMO
+     Hanya 1 Banner Promo aktif yang ditampilkan.
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadPromo() {
+      const supabaseUrl =
+        process.env.NEXT_PUBLIC_SUPABASE_URL
+
+      const supabaseKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) {
+        if (mounted) {
+          setPromo(null)
+          setLoadingPromo(false)
+        }
+        return
+      }
+
+      try {
+        const params = new URLSearchParams()
+
+        params.set(
+          'select',
+          'id,name,description,code,banner_url,content_type,is_active,created_at'
+        )
+        params.set('is_active', 'eq.true')
+        params.set('order', 'created_at.desc')
+        params.set('limit', '1')
+
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/promotions?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+              Accept: 'application/json',
+              'Cache-Control':
+                'no-cache, no-store, max-age=0',
+              Pragma: 'no-cache',
+            },
+            cache: 'no-store',
+          }
+        )
+
+        if (!response.ok) {
+          const message = await response.text()
+          throw new Error(
+            `Promo HTTP ${response.status}: ${message}`
+          )
+        }
+
+        const data = await response.json()
+
+        if (!mounted) return
+
+        setPromo(
+          Array.isArray(data) && data.length > 0
+            ? data[0]
+            : null
+        )
+      } catch (error) {
+        console.error(
+          'Gagal memuat Banner Promo:',
+          error
+        )
+
+        if (mounted) {
+          setPromo(null)
+        }
+      } finally {
+        if (mounted) {
+          setLoadingPromo(false)
+        }
+      }
+    }
+
+    loadPromo()
+
+    const interval = setInterval(
+      loadPromo,
+      30000
+    )
 
     return () => {
       mounted = false
@@ -900,28 +998,63 @@ export default function Home() {
 
       {/* =====================================================
           PROMO
+          Konten diambil langsung dari Admin → Banner Promo.
+          Promo nonaktif tidak ditampilkan.
       ===================================================== */}
 
-      <section
-        id="promo"
-        className="mx-auto max-w-7xl px-4 py-10"
-      >
-        <div className="glass rounded-3xl p-8">
-          <p className="text-sm font-bold text-pink-300">
-            PROMO
-          </p>
+      {!loadingPromo && promo && (
+        <section
+          id="promo"
+          className="mx-auto max-w-7xl px-4 py-10"
+        >
+          <div className="relative overflow-hidden rounded-3xl border border-pink-400/20 bg-slate-950/70 shadow-[0_0_45px_rgba(236,72,153,.08)]">
+            {promo.content_type !== 'text' &&
+              promo.banner_url && (
+                <div
+                  className={
+                    promo.content_type === 'image'
+                      ? 'relative'
+                      : 'relative'
+                  }
+                >
+                  <img
+                    src={promo.banner_url}
+                    alt={promo.name || 'Banner Promo'}
+                    className="block max-h-[520px] w-full object-cover"
+                  />
+                </div>
+              )}
 
-          <h2 className="mt-2 text-3xl font-black">
-            Promo member & flash sale
-          </h2>
+            {promo.content_type !== 'image' && (
+              <div className="relative p-6 sm:p-8 md:p-10">
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">
+                  PROMO
+                </p>
 
-          <p className="mt-3 max-w-2xl text-slate-400">
-            Kode voucher dan promo dapat dikelola Owner
-            melalui Admin Panel. Jangan percaya screenshot
-            pembayaran sebagai bukti pembayaran otomatis.
-          </p>
-        </div>
-      </section>
+                {promo.name && (
+                  <h2 className="mt-2 text-2xl font-black sm:text-3xl md:text-4xl">
+                    {promo.name}
+                  </h2>
+                )}
+
+                {promo.description && (
+                  <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-7 text-slate-400 sm:text-base">
+                    {promo.description}
+                  </p>
+                )}
+
+                {promo.code && (
+                  <div className="mt-5 inline-flex rounded-xl border border-pink-400/20 bg-pink-400/10 px-4 py-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-pink-300">
+                      Kode: {promo.code}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
