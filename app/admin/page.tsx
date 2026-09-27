@@ -29,11 +29,11 @@ const tabs = [
 ]
 
 const mediaCategories = [
-  ['games', 'Game / Logo'],
-  ['products', 'Produk'],
-  ['promotions', 'Promo / Banner'],
-  ['homepage', 'Homepage'],
-  ['general', 'Lainnya'],
+  ['games', '🎮 Logo Game'],
+  ['products', '💎 Gambar Produk'],
+  ['promotions', '📢 Banner Promo'],
+  ['homepage', '🏠 Banner Homepage'],
+  ['general', '📁 Media Lainnya'],
 ]
 
 export default function Admin() {
