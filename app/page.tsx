@@ -25,6 +25,10 @@ export default function Home() {
   const [loadingBroadcast, setLoadingBroadcast] = useState(true)
   const [activeBroadcast, setActiveBroadcast] = useState(0)
 
+  const [runningText, setRunningText] = useState<any | null>(null)
+  const [reviews, setReviews] = useState<any[]>([])
+  const [activeReview, setActiveReview] = useState(0)
+
   const broadcastStartX = useRef<number | null>(null)
 
   /* =========================================================
@@ -503,6 +507,89 @@ export default function Home() {
     } catch {}
   }
 
+  /* =========================================================
+     RUNNING TEXT + CUSTOMER REVIEWS
+     Review publik hanya yang sudah disetujui Admin.
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadHomeExtras() {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) return
+
+      try {
+        const runningParams = new URLSearchParams()
+        runningParams.set('select', 'id,text_content,is_active,speed_ms')
+        runningParams.set('is_active', 'eq.true')
+        runningParams.set('limit', '1')
+
+        const reviewParams = new URLSearchParams()
+        reviewParams.set('select', 'id,reviewer_display,rating,review_text,created_at')
+        reviewParams.set('is_approved', 'eq.true')
+        reviewParams.set('order', 'created_at.desc')
+        reviewParams.set('limit', '50')
+
+        const headers = {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          Pragma: 'no-cache',
+        }
+
+        const [runningResponse, reviewResponse] = await Promise.all([
+          fetch(`${supabaseUrl}/rest/v1/home_running_text?${runningParams.toString()}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+          }),
+          fetch(`${supabaseUrl}/rest/v1/customer_reviews?${reviewParams.toString()}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+          }),
+        ])
+
+        if (!runningResponse.ok || !reviewResponse.ok) return
+
+        const [runningData, reviewData] = await Promise.all([
+          runningResponse.json(),
+          reviewResponse.json(),
+        ])
+
+        if (!mounted) return
+
+        setRunningText(Array.isArray(runningData) && runningData.length ? runningData[0] : null)
+        setReviews(Array.isArray(reviewData) ? reviewData : [])
+        setActiveReview(0)
+      } catch (error) {
+        console.error('Gagal memuat running text/review:', error)
+      }
+    }
+
+    loadHomeExtras()
+    const interval = setInterval(loadHomeExtras, 30000)
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (reviews.length <= 1) return
+
+    const timer = setTimeout(() => {
+      setActiveReview((current) => (current + 1) % reviews.length)
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [activeReview, reviews.length])
+
   return (
     <div>
       {/* =====================================================
@@ -570,104 +657,164 @@ export default function Home() {
       )}
 
       {/* =====================================================
-          BROADCAST WIDGETS
-          Dua widget compact, berjejer, responsif.
+          RUNNING TEXT
       ===================================================== */}
 
-      {!loadingBroadcast &&
-        (currentBroadcast || linkedBroadcast) && (
-          <section className="mx-auto max-w-7xl px-4 pt-4">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {/* BROADCAST TANPA LINK */}
-              {currentBroadcast ? (
-                <div
-                  className="group relative min-w-0 overflow-hidden rounded-2xl border border-cyan-400/20 bg-[#071018] shadow-[0_0_28px_rgba(34,211,238,.06)] select-none"
-                  onPointerDown={handleBroadcastPointerDown}
-                  onPointerUp={handleBroadcastPointerUp}
-                  onPointerCancel={handleBroadcastPointerUp}
-                  style={{
-                    touchAction: 'pan-y',
-                    cursor: cyberBroadcasts.length > 1 ? 'grab' : 'default',
-                  }}
-                >
-                  <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-400/10 blur-2xl" />
-                  <div className="pointer-events-none absolute -left-8 -bottom-8 h-20 w-20 rounded-full bg-violet-500/10 blur-2xl" />
+      {runningText?.text_content && (
+        <section className="mx-auto max-w-7xl px-4 pt-4">
+          <div className="relative overflow-hidden rounded-xl border border-cyan-400/20 bg-[#070b12] shadow-[0_0_24px_rgba(34,211,238,.05)]">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#070b12] to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#070b12] to-transparent" />
+            <div className="flex min-h-10 items-center overflow-hidden">
+              <div className="shrink-0 px-3 text-cyan-300">⚡</div>
+              <div
+                className="whitespace-nowrap text-xs font-black uppercase tracking-[0.12em] text-slate-200"
+                style={{
+                  animation: `ndraaaid-marquee ${Math.max(8, Math.min(60, Number(runningText.speed_ms || 18000) / 1000))}s linear infinite`,
+                }}
+              >
+                <span className="mr-16">{runningText.text_content}</span>
+                <span>{runningText.text_content}</span>
+              </div>
+            </div>
+          </div>
+          <style jsx>{`
+            @keyframes ndraaaid-marquee {
+              from { transform: translateX(0); }
+              to { transform: translateX(-50%); }
+            }
+          `}</style>
+        </section>
+      )}
 
-                  <div className="relative flex min-h-[150px] flex-col justify-between p-4 sm:min-h-[160px] sm:p-5">
-                    <div>
-                      <h3 className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
-                        {currentBroadcast.title}
-                      </h3>
 
-                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-400 sm:text-sm">
-                        {currentBroadcast.message}
-                      </p>
+      {/* =====================================================
+          BROADCAST WIDGETS — COMPACT / SIDE BY SIDE
+      ===================================================== */}
+
+      {!loadingBroadcast && (currentBroadcast || linkedBroadcast) && (
+        <section className="mx-auto max-w-7xl px-4 pt-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {currentBroadcast && (
+              <div
+                className="relative min-w-0 overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-[#07131c] via-[#050a11] to-[#07050f] shadow-[0_0_28px_rgba(34,211,238,.06)] select-none"
+                onPointerDown={handleBroadcastPointerDown}
+                onPointerUp={handleBroadcastPointerUp}
+                onPointerCancel={handleBroadcastPointerUp}
+                style={{ touchAction: 'pan-y' }}
+              >
+                <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-cyan-400/10 blur-2xl" />
+                <div className="relative flex min-h-[118px] flex-col justify-between p-3 sm:min-h-[126px] sm:p-4">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <Radio size={13} className="text-cyan-300" />
+                      <span className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-cyan-300">
+                        {currentBroadcast.type}
+                      </span>
                     </div>
-
-                    {cyberBroadcasts.length > 1 && (
-                      <div className="mt-3 flex items-center gap-1">
-                        {cyberBroadcasts.map((item, index) => (
-                          <span
-                            key={item.id}
-                            className={`h-1 rounded-full transition-all duration-300 ${
-                              index === activeBroadcast
-                                ? 'w-6 bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,.7)]'
-                                : 'w-1 bg-slate-700'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    <h2 className="mt-2 line-clamp-1 text-sm font-black text-white sm:text-base">
+                      {currentBroadcast.title}
+                    </h2>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400 sm:text-xs">
+                      {currentBroadcast.message}
+                    </p>
+                  </div>
+                  <div className="mt-2 flex gap-1">
+                    {cyberBroadcasts.map((item, index) => (
+                      <span
+                        key={item.id}
+                        className={`h-1 rounded-full transition-all ${index === activeBroadcast ? 'w-6 bg-cyan-300' : 'w-1 bg-slate-700'}`}
+                      />
+                    ))}
                   </div>
                 </div>
-              ) : (
-                <div className="min-h-[150px] rounded-2xl border border-cyan-400/10 bg-[#071018]/60 sm:min-h-[160px]" />
-              )}
+              </div>
+            )}
 
-              {/* BROADCAST DENGAN LINK */}
-              {linkedBroadcast ? (
-                <div className="group relative min-w-0 overflow-hidden rounded-2xl border border-fuchsia-400/30 bg-gradient-to-br from-[#18091c] via-[#100714] to-[#08050d] shadow-[0_0_32px_rgba(217,70,239,.10)]">
-                  <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-fuchsia-500/15 blur-2xl" />
-                  <div className="pointer-events-none absolute -left-8 -bottom-8 h-20 w-20 rounded-full bg-red-500/10 blur-2xl" />
-
-                  <div className="relative flex min-h-[150px] flex-col justify-between p-4 sm:min-h-[160px] sm:p-5">
-                    <div>
-                      <h3 className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
-                        {linkedBroadcast.title}
-                      </h3>
-
-                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-400 sm:text-sm">
-                        {linkedBroadcast.message}
-                      </p>
+            {linkedBroadcast && (
+              <div className="relative min-w-0 overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-gradient-to-br from-[#190719] via-[#100512] to-[#09030b] shadow-[0_0_32px_rgba(217,70,239,.10)]">
+                <div className="pointer-events-none absolute -left-8 -bottom-8 h-24 w-24 rounded-full bg-fuchsia-500/10 blur-2xl" />
+                <div className="relative flex min-h-[118px] flex-col justify-between p-3 sm:min-h-[126px] sm:p-4">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <ExternalLink size={13} className="text-fuchsia-300" />
+                      <span className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-fuchsia-300">
+                        {linkedBroadcast.type}
+                      </span>
                     </div>
-
+                    <h2 className="mt-2 line-clamp-1 text-sm font-black text-white sm:text-base">
+                      {linkedBroadcast.title}
+                    </h2>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400 sm:text-xs">
+                      {linkedBroadcast.message}
+                    </p>
+                  </div>
+                  <div className="mt-2">
                     {String(linkedBroadcast.link_url).startsWith('/') ? (
                       <Link
                         href={linkedBroadcast.link_url}
-                        className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-2 text-xs font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-sm"
+                        className="inline-flex max-w-full items-center rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-1.5 text-[10px] font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-xs"
                       >
-                        {linkedBroadcast.link_label || 'Lihat'}
-                        <ArrowRight size={14} className="ml-1.5" />
+                        <span className="truncate">{linkedBroadcast.link_label || 'Lihat'}</span>
+                        <ArrowRight size={12} className="ml-1 shrink-0" />
                       </Link>
                     ) : (
                       <a
                         href={linkedBroadcast.link_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-2 text-xs font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-sm"
+                        className="inline-flex max-w-full items-center rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-1.5 text-[10px] font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-xs"
                       >
-                        {linkedBroadcast.link_label || 'Lihat'}
-                        <ExternalLink size={14} className="ml-1.5" />
+                        <span className="truncate">{linkedBroadcast.link_label || 'Lihat'}</span>
+                        <ExternalLink size={12} className="ml-1 shrink-0" />
                       </a>
                     )}
                   </div>
                 </div>
-              ) : (
-                <div className="min-h-[150px] rounded-2xl border border-fuchsia-400/10 bg-[#100714]/50 sm:min-h-[160px]" />
-              )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* =====================================================
+          ULASAN PELANGGAN — COMPACT, AUTO 5 DETIK
+      ===================================================== */}
+
+      {reviews.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 pt-5">
+          <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+            <span className="text-cyan-300">★</span> Ulasan Pelanggan
+          </div>
+          <div className="relative overflow-hidden rounded-xl border border-cyan-400/15 bg-gradient-to-r from-[#08131a] via-[#090a12] to-[#120813] shadow-[0_0_22px_rgba(34,211,238,.05)]">
+            <div className="relative min-h-[76px] px-4 py-3">
+              {reviews.map((review, index) => (
+                <div
+                  key={review.id}
+                  className={`transition-opacity duration-500 ${index === activeReview ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'}`}
+                >
+                  <div className="flex min-h-[50px] items-center gap-3">
+                    <div className="shrink-0 text-[13px] tracking-tight text-amber-300">
+                      {'★'.repeat(Math.max(1, Math.min(5, Number(review.rating || 5))))}
+                    </div>
+                    <p className="min-w-0 flex-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-200">
+                      “{review.review_text}”
+                    </p>
+                    <div className="hidden shrink-0 text-right sm:block">
+                      <p className="text-[11px] font-black text-slate-300">{review.reviewer_display}</p>
+                      <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-400">✓ Top Up Berhasil</p>
+                    </div>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between sm:hidden">
+                    <span className="text-[10px] font-black text-slate-400">{review.reviewer_display}</span>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400">✓ Berhasil</span>
+                  </div>
+                </div>
+              ))}
             </div>
-          </section>
-        )}
+          </div>
+        </section>
+      )}
 
       {/* =====================================================
           GAME POPULER
