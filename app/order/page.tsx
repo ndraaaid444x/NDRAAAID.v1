@@ -396,6 +396,19 @@ export default function OrderPage() {
               </div>
             ))}
           </div>
+
+          {/* REVIEW */}
+          {o.status === 'SUCCESS' && (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => r.push('/review')}
+                className="w-full rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-5 py-3 text-sm font-black text-cyan-300 transition hover:bg-cyan-400/15"
+              >
+                ⭐ Beri Penilaian
+              </button>
+            </div>
+          )}
         </div>
 
       </div>
