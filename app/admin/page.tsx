@@ -39,7 +39,6 @@ const mediaCategories = [
   ['games', '🎮 Logo Game'],
   ['products', '💎 Gambar Produk'],
   ['promotions', '📢 Banner Promo'],
-  ['homepage', '🏠 Banner Homepage'],
   ['general', '📁 Media Lainnya'],
 ]
 
@@ -93,14 +92,6 @@ export default function Admin() {
   const [mediaPromoCode, setMediaPromoCode] = useState('')
   const [mediaPromoType, setMediaPromoType] = useState<'text' | 'image' | 'both'>('both')
   const [pendingPromoImageUrl, setPendingPromoImageUrl] = useState('')
-  const [homepageSlot, setHomepageSlot] = useState('hero')
-
-  const homepageSlots = [
-    ['hero', 'Hero utama'],
-    ['promo', 'Banner promo'],
-    ['event', 'Banner event'],
-    ['secondary', 'Banner lainnya'],
-  ]
 
   const [site, setSite] = useState<any>({
     name: 'NDRAAAID',
@@ -1111,7 +1102,7 @@ async function deleteVoucher(v: any) {
     /*
      * Validasi rasio:
      * - Logo Game / Produk: 1:1
-     * - Banner Promo / Homepage: 16:9
+     * - Banner Promo: 16:9
      * - Media Lainnya: bebas
      *
      * expectedRatio dipakai untuk kasus khusus
@@ -1539,39 +1530,6 @@ async function deleteVoucher(v: any) {
     if (!error) load()
   }
 
-  async function setHomepageBannerFromMedia(url: string) {
-    const nextHomepage = {
-      ...(site.homepage_banners || {}),
-      [homepageSlot]: url,
-    }
-
-    const nextSite = {
-      ...site,
-      homepage_banners: nextHomepage,
-    }
-
-    const { error } = await s
-      .from('settings')
-      .upsert({
-        key: 'site',
-        value: nextSite,
-        updated_at: new Date().toISOString(),
-      })
-
-    setMsg(
-      error?.message ||
-        `Banner Homepage untuk ${
-          homepageSlots.find((x) => x[0] === homepageSlot)?.[1] ||
-          homepageSlot
-        } berhasil disimpan.`
-    )
-
-    if (!error) {
-      setSite(nextSite)
-      load()
-    }
-  }
-
   async function uploadAndSync(
     e: ChangeEvent<HTMLInputElement>,
     category: string,
@@ -1987,6 +1945,12 @@ async function deleteVoucher(v: any) {
             <nav className="max-h-[calc(100vh-190px)] space-y-5 overflow-y-auto p-3">
               {[
                 {
+                  title: 'PROMOSI',
+                  items: [
+                    ['promotions', '📢', 'Banner Promo'],
+                  ],
+                },
+                {
                   title: 'OPERASIONAL',
                   items: [
                     ['orders', '🧾', 'Order'],
@@ -2001,7 +1965,6 @@ async function deleteVoucher(v: any) {
                     ['categories', '🗂️', 'Kategori'],
                     ['games', '🎮', 'Games'],
                     ['products', '💎', 'Produk'],
-                    ['promotions', '📢', 'Promo'],
                   ],
                 },
                 {
@@ -4616,47 +4579,6 @@ async function deleteVoucher(v: any) {
               </button>
             </div>
 
-            <div className="glass rounded-3xl p-5">
-              <p className="text-xs font-black uppercase tracking-widest text-amber-300">
-                🏠 Banner Homepage
-              </p>
-              <h3 className="mt-1 text-lg font-black">
-                Kelola slot banner Homepage
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                Rasio 16:9 · tersimpan di Website Settings pada slot yang dipilih.
-              </p>
-
-              <select
-                className="input mt-4"
-                value={homepageSlot}
-                onChange={(e) => setHomepageSlot(e.target.value)}
-              >
-                {homepageSlots.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-
-              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
-                Upload & Pasang Banner Homepage
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                  disabled={mediaUploading}
-                  onChange={(e) =>
-                    uploadAndSync(
-                      e,
-                      'homepage',
-                      setHomepageBannerFromMedia,
-                      '16:9'
-                    )
-                  }
-                />
-              </label>
-            </div>
           </div>
 
           <div className="glass rounded-3xl p-5">
