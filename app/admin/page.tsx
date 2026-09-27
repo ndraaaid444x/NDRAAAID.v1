@@ -1892,7 +1892,14 @@ async function deleteVoucher(v: any) {
                         <button
                           type="button"
                           key={item[0]}
-                          onClick={() => changeTab(item[0])}
+                          onPointerDown={() => setTab(item[0])}
+                          onClick={() => setTab(item[0])}
+                          style={{
+                            position: 'relative',
+                            zIndex: 20,
+                            pointerEvents: 'auto',
+                            touchAction: 'manipulation',
+                          }}
                           className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
                             tab === item[0]
                               ? 'border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.08)]'
@@ -1916,8 +1923,8 @@ async function deleteVoucher(v: any) {
         <div className="min-w-0 flex-1">
           <header className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 shadow-2xl shadow-purple-950/10 backdrop-blur-xl">
             <div className="relative p-5 md:p-6">
-              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
-              <div className="absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl" />
+              <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl" />
               <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1974,8 +1981,15 @@ async function deleteVoucher(v: any) {
                     <button
                       type="button"
                       key={item[0]}
-                      onClick={() => changeTab(item[0])}
-    className={`w-full rounded-xl border px-3 py-3 text-sm font-bold transition ${
+                      onPointerDown={() => setTab(item[0])}
+                      onClick={() => setTab(item[0])}
+                      style={{
+                        position: 'relative',
+                        zIndex: 20,
+                        pointerEvents: 'auto',
+                        touchAction: 'manipulation',
+                      }}
+                      className={`w-full rounded-xl border px-3 py-3 text-sm font-bold transition ${
                         tab === item[0]
                           ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
                           : 'border-white/10 bg-white/[.03] text-slate-400'
