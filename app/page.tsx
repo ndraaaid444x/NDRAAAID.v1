@@ -9,7 +9,6 @@ import {
   Gamepad2,
   Radio,
   ExternalLink,
-  Megaphone,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -26,6 +25,7 @@ export default function Home() {
 
     async function loadGames() {
       if (!mounted) return
+
       setLoadingGames(true)
       setGameError('')
 
@@ -54,6 +54,12 @@ export default function Home() {
       }, 8000)
 
       try {
+        /*
+         * Ambil SEMUA game yang aktif.
+         *
+         * Jangan gunakan filter popular=true di request.
+         * Game populer akan diurutkan setelah data diterima.
+         */
         const url =
           `${supabaseUrl}/rest/v1/games` +
           `?select=*` +
@@ -93,6 +99,9 @@ export default function Home() {
           )
         }
 
+        /*
+         * Hilangkan game duplikat berdasarkan ID.
+         */
         const uniqueGames = Array.from(
           new Map(
             data.map((game: any) => [
@@ -102,6 +111,10 @@ export default function Home() {
           ).values()
         )
 
+        /*
+         * Game populer ditaruh di bagian atas.
+         * Game biasa tetap ditampilkan.
+         */
         uniqueGames.sort(
           (a: any, b: any) => {
             const popularA =
@@ -163,20 +176,17 @@ export default function Home() {
   /*
    * LIVE BROADCAST
    *
-   * Hanya mengambil broadcast yang:
-   * - is_active = true
-   * - starts_at <= sekarang
-   * - ends_at > sekarang
+   * Mengambil broadcast aktif dari tabel broadcasts.
    *
-   * Sistem ini menggunakan tabel broadcasts
-   * yang sudah tersedia di Supabase.
+   * Broadcast dibuat melalui:
+   * Admin → Live Broadcast
+   *
+   * Tidak membuat database baru.
    */
   useEffect(() => {
     let mounted = true
 
     async function loadBroadcasts() {
-      if (!mounted) return
-
       const supabaseUrl =
         process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -193,37 +203,68 @@ export default function Home() {
       }
 
       try {
-        const now = new Date().toISOString()
+        const now =
+          new Date().toISOString()
 
-        const url =
-          `${supabaseUrl}/rest/v1/broadcasts` +
-          `?select=id,title,message,type,starts_at,ends_at,link_url,link_label,is_active,created_at` +
-          `&is_active=eq.true` +
-          `&starts_at=lte.${encodeURIComponent(now)}` +
-          `&ends_at=gt.${encodeURIComponent(now)}` +
-          `&order=created_at.desc` +
-          `&limit=3`
+        const params = new URLSearchParams()
 
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            apikey: supabaseKey,
-            Authorization: `Bearer ${supabaseKey}`,
-            Accept: 'application/json',
-            'Cache-Control':
-              'no-cache, no-store, max-age=0',
-            Pragma: 'no-cache',
-          },
-          cache: 'no-store',
-        })
+        params.set(
+          'select',
+          'id,title,message,type,starts_at,ends_at,link_url,link_label,is_active,created_at'
+        )
+
+        params.set(
+          'is_active',
+          'eq.true'
+        )
+
+        params.set(
+          'starts_at',
+          `lte.${now}`
+        )
+
+        params.set(
+          'ends_at',
+          `gt.${now}`
+        )
+
+        params.set(
+          'order',
+          'created_at.desc'
+        )
+
+        params.set(
+          'limit',
+          '3'
+        )
+
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/broadcasts?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+              Accept: 'application/json',
+              'Cache-Control':
+                'no-cache, no-store, max-age=0',
+              Pragma: 'no-cache',
+            },
+            cache: 'no-store',
+          }
+        )
 
         if (!response.ok) {
+          const message =
+            await response.text()
+
           throw new Error(
-            `Broadcast HTTP ${response.status}`
+            `Broadcast HTTP ${response.status}: ${message}`
           )
         }
 
-        const data = await response.json()
+        const data =
+          await response.json()
 
         if (!mounted) return
 
@@ -251,13 +292,16 @@ export default function Home() {
     loadBroadcasts()
 
     /*
-     * Cek ulang setiap 30 detik supaya broadcast
-     * baru dari Admin dapat muncul tanpa reload.
+     * Cek kembali setiap 30 detik.
+     *
+     * Jadi broadcast baru dari Admin dapat
+     * muncul tanpa pengunjung harus reload.
      */
-    const interval = setInterval(
-      loadBroadcasts,
-      30000
-    )
+    const interval =
+      setInterval(
+        loadBroadcasts,
+        30000
+      )
 
     return () => {
       mounted = false
@@ -265,51 +309,17 @@ export default function Home() {
     }
   }, [])
 
-  const broadcast = broadcasts[0]
-
-  function getBroadcastLabel(type: string) {
-    switch (type) {
-      case 'WARNING':
-        return 'PERINGATAN'
-
-      case 'SUCCESS':
-        return 'UPDATE'
-
-      case 'INFO':
-        return 'INFO'
-
-      case 'PROMO':
-      default:
-        return 'PROMO'
-    }
-  }
-
-  function getBroadcastIcon(type: string) {
-    switch (type) {
-      case 'WARNING':
-        return '⚠️'
-
-      case 'SUCCESS':
-        return '✅'
-
-      case 'INFO':
-        return 'ℹ️'
-
-      case 'PROMO':
-      default:
-        return '🔥'
-    }
-  }
-
   return (
     <div>
-      {/* HERO */}
+      {/* =====================================================
+          HERO
+      ===================================================== */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(220,38,38,.14),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(127,29,29,.18),transparent_35%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(34,211,238,.14),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(139,92,246,.18),transparent_35%)]" />
 
         <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-20 md:grid-cols-2 md:py-28">
           <div>
-            <div className="mb-5 inline-flex rounded-full border border-red-500/20 bg-red-500/5 px-3 py-1 text-xs font-bold text-red-300">
+            <div className="mb-5 inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-xs font-bold text-cyan-300">
               ⚡ MANUAL VERIFIED TOP-UP
             </div>
 
@@ -377,13 +387,13 @@ export default function Home() {
           </div>
 
           <div className="glass neon relative min-h-[340px] overflow-hidden rounded-[2rem] p-8">
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-red-500/20 blur-3xl" />
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-purple-500/20 blur-3xl" />
 
-            <Gamepad2 className="absolute bottom-8 right-8 h-48 w-48 text-red-400/20" />
+            <Gamepad2 className="absolute bottom-8 right-8 h-48 w-48 text-purple-400/20" />
 
             <div className="relative mt-20">
-              <p className="text-sm font-bold text-red-300">
-                NDRAAAID.v1
+              <p className="text-sm font-bold text-cyan-300">
+                NDRAAAID
               </p>
 
               <h2 className="mt-2 text-4xl font-black">
@@ -400,53 +410,63 @@ export default function Home() {
         </div>
       </section>
 
-      {/* LIVE BROADCAST */}
-      {!loadingBroadcast && broadcast && (
-        <section className="mx-auto max-w-7xl px-4 pt-6">
-          <div className="group relative overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-950/60 via-black/80 to-black/70 p-[1px] shadow-[0_0_35px_rgba(220,38,38,.12)]">
-            <div className="relative overflow-hidden rounded-2xl bg-black/80 p-4 sm:p-5">
-              <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-red-600/10 blur-3xl" />
+      {/* =====================================================
+          LIVE BROADCAST
+      ===================================================== */}
 
-              <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 text-xl shadow-[0_0_20px_rgba(220,38,38,.15)]">
-                    <Radio
-                      size={20}
-                      className="text-red-400"
-                    />
-                  </div>
+      {!loadingBroadcast &&
+        broadcasts.length > 0 && (
+          <section className="mx-auto max-w-7xl px-4 pt-2">
+            <div className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-black/80 shadow-[0_0_30px_rgba(220,38,38,.10)]">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-red-600/10 blur-3xl" />
 
-                  <div className="min-w-0">
-                    <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-black tracking-wider text-red-300">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-                        LIVE BROADCAST
-                      </span>
-
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        {getBroadcastIcon(broadcast.type)}{' '}
-                        {getBroadcastLabel(broadcast.type)}
-                      </span>
+              <div className="relative p-4 sm:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  {/* INFO BROADCAST */}
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-[0_0_20px_rgba(220,38,38,.12)]">
+                      <Radio
+                        size={20}
+                        className="text-red-400"
+                      />
                     </div>
 
-                    <h2 className="truncate text-base font-black text-white sm:text-lg">
-                      {broadcast.title}
-                    </h2>
+                    <div className="min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-black tracking-wider text-red-300">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
 
-                    <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">
-                      {broadcast.message}
-                    </p>
+                          LIVE BROADCAST
+                        </span>
+
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          {broadcasts[0].type}
+                        </span>
+                      </div>
+
+                      <h2 className="break-words text-base font-black text-white sm:text-lg">
+                        {broadcasts[0].title}
+                      </h2>
+
+                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-slate-400">
+                        {broadcasts[0].message}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                {broadcast.link_url && (
-                  <>
-                    {String(broadcast.link_url).startsWith('/') ? (
+                  {/* LINK BROADCAST */}
+                  {broadcasts[0].link_url && (
+                    String(
+                      broadcasts[0].link_url
+                    ).startsWith('/') ? (
                       <Link
-                        href={broadcast.link_url}
-                        className="btn btn-primary shrink-0 text-sm"
+                        href={
+                          broadcasts[0].link_url
+                        }
+                        className="btn btn-primary w-full shrink-0 justify-center text-sm sm:w-auto"
                       >
-                        {broadcast.link_label ||
+                        {broadcasts[0]
+                          .link_label ||
                           'Lihat Sekarang'}
 
                         <ArrowRight
@@ -456,12 +476,15 @@ export default function Home() {
                       </Link>
                     ) : (
                       <a
-                        href={broadcast.link_url}
+                        href={
+                          broadcasts[0].link_url
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary shrink-0 text-sm"
+                        className="btn btn-primary w-full shrink-0 justify-center text-sm sm:w-auto"
                       >
-                        {broadcast.link_label ||
+                        {broadcasts[0]
+                          .link_label ||
                           'Lihat Sekarang'}
 
                         <ExternalLink
@@ -469,20 +492,22 @@ export default function Home() {
                           className="ml-2"
                         />
                       </a>
-                    )}
-                  </>
-                )}
+                    )
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
 
-      {/* GAME POPULER */}
+      {/* =====================================================
+          GAME POPULER
+      ===================================================== */}
+
       <section className="mx-auto max-w-7xl px-4 py-16">
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-sm font-bold text-red-300">
+            <p className="text-sm font-bold text-cyan-300">
               DISCOVER
             </p>
 
@@ -493,7 +518,7 @@ export default function Home() {
 
           <Link
             href="/games/"
-            className="text-sm font-bold text-slate-300 transition hover:text-red-300"
+            className="text-sm font-bold text-slate-300"
           >
             Lihat semua →
           </Link>
@@ -502,7 +527,7 @@ export default function Home() {
         {/* LOADING */}
         {loadingGames && (
           <div className="mt-7 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center">
-            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-red-400" />
+            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-cyan-400" />
 
             <p className="mt-3 text-sm text-slate-400">
               Memuat game...
@@ -515,27 +540,28 @@ export default function Home() {
         )}
 
         {/* ERROR */}
-        {!loadingGames && gameError && (
-          <div className="mt-7 rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
-            <p className="font-bold text-red-300">
-              Game gagal dimuat
-            </p>
+        {!loadingGames &&
+          gameError && (
+            <div className="mt-7 rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
+              <p className="font-bold text-red-300">
+                Game gagal dimuat
+              </p>
 
-            <p className="mt-2 break-words text-sm text-red-200/80">
-              {gameError}
-            </p>
+              <p className="mt-2 break-words text-sm text-red-200/80">
+                {gameError}
+              </p>
 
-            <button
-              type="button"
-              onClick={() => {
-                window.location.reload()
-              }}
-              className="btn btn-muted mt-4"
-            >
-              Muat Ulang
-            </button>
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.reload()
+                }}
+                className="btn btn-muted mt-4"
+              >
+                Muat Ulang
+              </button>
+            </div>
+          )}
 
         {/* GAME KOSONG */}
         {!loadingGames &&
@@ -551,55 +577,53 @@ export default function Home() {
           !gameError &&
           games.length > 0 && (
             <div className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              {games.slice(0, 10).map((g) => (
-                <Link
-                  key={g.id}
-                  href={`/game/?slug=${encodeURIComponent(
-                    g.slug
-                  )}`}
-                  className="glass group overflow-hidden rounded-2xl p-4 transition hover:-translate-y-1 hover:border-red-400/40"
-                >
-                  <div className="flex aspect-square items-center justify-center rounded-xl bg-slate-900 text-4xl">
-                    {g.logo_url ? (
-                      <img
-                        src={g.logo_url}
-                        alt={g.name}
-                        className="h-full w-full rounded-xl object-cover"
-                      />
-                    ) : (
-                      '🎮'
-                    )}
-                  </div>
+              {games
+                .slice(0, 10)
+                .map((g) => (
+                  <Link
+                    key={g.id}
+                    href={`/game/?slug=${encodeURIComponent(
+                      g.slug
+                    )}`}
+                    className="glass group overflow-hidden rounded-2xl p-4 transition hover:-translate-y-1 hover:border-purple-400/40"
+                  >
+                    <div className="flex aspect-square items-center justify-center rounded-xl bg-slate-900 text-4xl">
+                      {g.logo_url ? (
+                        <img
+                          src={g.logo_url}
+                          alt={g.name}
+                          className="h-full w-full rounded-xl object-cover"
+                        />
+                      ) : (
+                        '🎮'
+                      )}
+                    </div>
 
-                  <h3 className="mt-3 font-bold">
-                    {g.name}
-                  </h3>
+                    <h3 className="mt-3 font-bold">
+                      {g.name}
+                    </h3>
 
-                  <p className="mt-1 text-xs text-slate-500">
-                    Top Up →
-                  </p>
-                </Link>
-              ))}
+                    <p className="mt-1 text-xs text-slate-500">
+                      Top Up →
+                    </p>
+                  </Link>
+                ))}
             </div>
           )}
       </section>
 
-      {/* PROMO */}
+      {/* =====================================================
+          PROMO
+      ===================================================== */}
+
       <section
         id="promo"
         className="mx-auto max-w-7xl px-4 py-10"
       >
         <div className="glass rounded-3xl p-8">
-          <div className="flex items-center gap-2">
-            <Megaphone
-              size={18}
-              className="text-red-400"
-            />
-
-            <p className="text-sm font-bold text-red-300">
-              PROMO
-            </p>
-          </div>
+          <p className="text-sm font-bold text-pink-300">
+            PROMO
+          </p>
 
           <h2 className="mt-2 text-3xl font-black">
             Promo member & flash sale
