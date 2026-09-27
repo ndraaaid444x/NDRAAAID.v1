@@ -222,9 +222,13 @@ export default function Home() {
           'created_at.desc'
         )
 
+        /*
+          Ambil lebih banyak data supaya broadcast
+          dengan link dan tanpa link tidak terpotong.
+        */
         params.set(
           'limit',
-          '3'
+          '50'
         )
 
         const response = await fetch(
@@ -264,20 +268,7 @@ export default function Home() {
 
         setBroadcasts(nextBroadcasts)
 
-        setActiveBroadcast(
-          (current) => {
-            if (
-              nextBroadcasts.length === 0
-            ) {
-              return 0
-            }
-
-            return Math.min(
-              current,
-              nextBroadcasts.length - 1
-            )
-          }
-        )
+        setActiveBroadcast(0)
       } catch (error) {
         console.error(
           'Gagal memuat broadcast:',
@@ -310,12 +301,53 @@ export default function Home() {
   }, [])
 
   /* =========================================================
+     FILTER BROADCAST
+
+     CYBER:
+     Hanya broadcast TANPA link.
+
+     LINK:
+     Hanya broadcast DENGAN link.
+  ========================================================= */
+
+  const cyberBroadcasts =
+    broadcasts.filter(
+      (broadcast) =>
+        !String(
+          broadcast?.link_url || ''
+        ).trim()
+    )
+
+  const linkedBroadcasts =
+    broadcasts.filter(
+      (broadcast) =>
+        Boolean(
+          String(
+            broadcast?.link_url || ''
+          ).trim()
+        )
+    )
+
+  const currentBroadcast =
+    cyberBroadcasts.length > 0
+      ? cyberBroadcasts[
+          activeBroadcast %
+            cyberBroadcasts.length
+        ]
+      : null
+
+  const linkedBroadcast =
+    linkedBroadcasts.length > 0
+      ? linkedBroadcasts[0]
+      : null
+
+  /* =========================================================
      AUTO SLIDER
-     Tetap 5 detik tanpa menampilkan tulisan AUTO
+     Tetap 5 detik tanpa tulisan AUTO
   ========================================================= */
 
   useEffect(() => {
-    if (broadcasts.length <= 1) {
+    if (cyberBroadcasts.length <= 1) {
       return
     }
 
@@ -323,7 +355,7 @@ export default function Home() {
       setActiveBroadcast(
         (current) =>
           (current + 1) %
-          broadcasts.length
+          cyberBroadcasts.length
       )
     }, 5000)
 
@@ -332,17 +364,17 @@ export default function Home() {
     }
   }, [
     activeBroadcast,
-    broadcasts.length,
+    cyberBroadcasts.length,
   ])
 
   /* =========================================================
-     SWIPE / DRAG
+     SWIPE / DRAG CYBER BROADCAST
   ========================================================= */
 
   function handleBroadcastPointerDown(
     event: React.PointerEvent<HTMLDivElement>
   ) {
-    if (broadcasts.length <= 1) {
+    if (cyberBroadcasts.length <= 1) {
       return
     }
 
@@ -361,7 +393,7 @@ export default function Home() {
   ) {
     if (
       broadcastStartX.current === null ||
-      broadcasts.length <= 1
+      cyberBroadcasts.length <= 1
     ) {
       broadcastStartX.current = null
       return
@@ -376,14 +408,14 @@ export default function Home() {
         setActiveBroadcast(
           (current) =>
             (current + 1) %
-            broadcasts.length
+            cyberBroadcasts.length
         )
       } else {
         setActiveBroadcast(
           (current) =>
             (current - 1 +
-              broadcasts.length) %
-            broadcasts.length
+              cyberBroadcasts.length) %
+            cyberBroadcasts.length
         )
       }
     }
@@ -396,21 +428,6 @@ export default function Home() {
       )
     } catch {}
   }
-
-  const currentBroadcast =
-    broadcasts.length > 0
-      ? broadcasts[
-          activeBroadcast
-        ]
-      : null
-
-  const linkedBroadcast =
-    broadcasts.find(
-      (broadcast) =>
-        Boolean(
-          broadcast?.link_url
-        )
-    ) || null
 
   return (
     <div>
@@ -430,6 +447,7 @@ export default function Home() {
             <h1 className="text-5xl font-black leading-[.98] md:text-7xl">
               TOP UP GAME
               <br />
+
               <span className="gradient-text">
                 FAVORITMU
               </span>
@@ -514,11 +532,12 @@ export default function Home() {
       </section>
 
       {/* =====================================================
-          CYBER / HOLOGRAM LIVE SLIDER
+          CYBER / HOLOGRAM
+          KHUSUS BROADCAST TANPA LINK
       ===================================================== */}
 
       {!loadingBroadcast &&
-        broadcasts.length > 0 &&
+        cyberBroadcasts.length > 0 &&
         currentBroadcast && (
           <section className="mx-auto max-w-7xl px-4 pt-5">
             <div
@@ -535,7 +554,7 @@ export default function Home() {
               style={{
                 touchAction: 'pan-y',
                 cursor:
-                  broadcasts.length > 1
+                  cyberBroadcasts.length > 1
                     ? 'grab'
                     : 'default',
               }}
@@ -583,7 +602,7 @@ export default function Home() {
                     ).padStart(2, '0')}
                     /
                     {String(
-                      broadcasts.length
+                      cyberBroadcasts.length
                     ).padStart(2, '0')}
                   </span>
                 </div>
@@ -600,7 +619,7 @@ export default function Home() {
                     }%)`,
                   }}
                 >
-                  {broadcasts.map(
+                  {cyberBroadcasts.map(
                     (broadcast) => (
                       <div
                         key={
@@ -659,7 +678,7 @@ export default function Home() {
 
                           <div className="relative mt-7 flex items-end justify-between">
                             <div className="flex items-center gap-1.5">
-                              {broadcasts.map(
+                              {cyberBroadcasts.map(
                                 (
                                   item,
                                   index
@@ -697,6 +716,7 @@ export default function Home() {
 
       {/* =====================================================
           LINK BROADCAST
+          KHUSUS BROADCAST DENGAN LINK
       ===================================================== */}
 
       {!loadingBroadcast &&
