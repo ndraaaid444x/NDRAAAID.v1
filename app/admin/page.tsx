@@ -46,6 +46,10 @@ const mediaCategories = [
 export default function Admin() {
   const [tab, setTab] = useState('orders')
 
+  function changeTab(nextTab: string) {
+    setTab(nextTab)
+  }
+
   const mobileMenuRef = useRef<HTMLDivElement | null>(null)
   const isDraggingMenu = useRef(false)
   const dragStartX = useRef(0)
@@ -1886,8 +1890,9 @@ async function deleteVoucher(v: any) {
                       )
                       .map((item) => (
                         <button
+                          type="button"
                           key={item[0]}
-                          onClick={() => setTab(item[0])}
+                          onClick={() => changeTab(item[0])}
                           className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
                             tab === item[0]
                               ? 'border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.08)]'
@@ -1967,8 +1972,9 @@ async function deleteVoucher(v: any) {
                   )
                   .map((item) => (
                     <button
+                      type="button"
                       key={item[0]}
-onClick={() => setTab(item[0])}
+                      onClick={() => changeTab(item[0])}
     className={`w-full rounded-xl border px-3 py-3 text-sm font-bold transition ${
                         tab === item[0]
                           ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
