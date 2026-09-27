@@ -10,6 +10,13 @@ import {
   Search,
   LogOut,
   Wallet,
+  Gamepad2,
+  ChevronDown,
+  ShieldCheck,
+  UserRound,
+  ReceiptText,
+  LayoutDashboard,
+  CircleHelp,
 } from 'lucide-react'
 
 export default function SiteHeader() {
@@ -21,7 +28,6 @@ export default function SiteHeader() {
   const [unread, setUnread] = useState(0)
   const [loggingOut, setLoggingOut] = useState(false)
 
-  // Mencegah data user lama menimpa user baru
   const userRequestRef = useRef(0)
 
   async function loadUserData(currentUser: any) {
@@ -60,7 +66,6 @@ export default function SiteHeader() {
             .is('read_at', null),
         ])
 
-      // Abaikan hasil kalau sudah ada user/session yang lebih baru
       if (requestId !== userRequestRef.current) {
         return
       }
@@ -85,7 +90,6 @@ export default function SiteHeader() {
     const s = supabaseBrowser()
     let mounted = true
 
-    // Ambil session/user awal
     async function initAuth() {
       const {
         data: { user: currentUser },
@@ -96,7 +100,6 @@ export default function SiteHeader() {
       setUser(currentUser)
 
       if (currentUser) {
-        // Jangan membuat proses auth utama menunggu data profile/wallet
         setTimeout(() => {
           if (mounted) {
             void loadUserData(currentUser)
@@ -107,9 +110,6 @@ export default function SiteHeader() {
 
     void initAuth()
 
-    // PENTING:
-    // Jangan gunakan async callback di onAuthStateChange.
-    // Auth state harus langsung diteruskan ke UI.
     const {
       data: { subscription },
     } = s.auth.onAuthStateChange((_event, session) => {
@@ -117,10 +117,8 @@ export default function SiteHeader() {
 
       if (!mounted) return
 
-      // Update UI auth langsung
       setUser(currentUser)
 
-      // Reset data lama langsung
       if (!currentUser) {
         userRequestRef.current += 1
         setProfile(undefined)
@@ -129,7 +127,6 @@ export default function SiteHeader() {
         return
       }
 
-      // Load profile/wallet/notifikasi di luar callback auth
       setTimeout(() => {
         if (mounted) {
           void loadUserData(currentUser)
@@ -149,11 +146,9 @@ export default function SiteHeader() {
 
     setLoggingOut(true)
 
-    // Tutup semua menu terlebih dahulu
     setOpen(false)
     setMobile(false)
 
-    // Hilangkan tampilan user secara langsung
     userRequestRef.current += 1
     setUser(undefined)
     setProfile(undefined)
@@ -163,14 +158,12 @@ export default function SiteHeader() {
     const s = supabaseBrowser()
 
     try {
-      // Hapus session lokal terlebih dahulu
       await s.auth.signOut({
         scope: 'local',
       })
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      // Selalu kembali ke halaman utama
       window.location.replace('/')
     }
   }
@@ -183,134 +176,266 @@ export default function SiteHeader() {
 
   const isAdmin = ['owner', 'admin'].includes(profile?.role)
 
-  return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050816]/85 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+  const displayName =
+    profile?.name ||
+    profile?.username ||
+    'User'
 
+  return (
+    <header className="sticky top-0 z-50 border-b border-red-500/10 bg-[#030305]/90 backdrop-blur-2xl">
+      {/* TOP NEON LINE */}
+      <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-80" />
+
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-3 sm:px-5 lg:gap-5">
         {/* LOGO */}
         <Link
           href="/"
-          className="text-xl font-black tracking-tight"
+          className="group relative shrink-0"
         >
-          NDRA<span className="gradient-text">AAAID</span>
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-black tracking-[-0.06em] text-white sm:text-2xl">
+              NDRA
+            </span>
+
+            <span className="text-xl font-black tracking-[-0.06em] text-red-500 drop-shadow-[0_0_14px_rgba(239,68,68,.65)] sm:text-2xl">
+              AAAID
+            </span>
+
+            <span className="rounded-md border border-red-500/30 bg-red-500/10 px-1 py-0.5 text-[8px] font-black tracking-widest text-red-400">
+              V1
+            </span>
+          </div>
+
+          <div className="absolute -bottom-1 left-0 h-[1px] w-0 bg-red-500 transition-all duration-300 group-hover:w-full" />
         </Link>
 
-        {/* DESKTOP NAV */}
-        <nav className="hidden gap-6 text-sm text-slate-300 md:flex">
-          <Link href="/">Home</Link>
-          <Link href="/games">Games</Link>
-          <Link href="/#promo">Promo</Link>
-          <Link href="/orders/track">Cek Transaksi</Link>
-          <Link href="/terms">Bantuan</Link>
+        {/* DESKTOP NAVIGATION */}
+        <nav className="hidden items-center gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-1 lg:flex">
+          <Link
+            href="/"
+            className="group flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
+          >
+            <Gamepad2
+              size={15}
+              className="text-red-500 transition group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,.8)]"
+            />
+            Home
+          </Link>
+
+          <Link
+            href="/games"
+            className="group flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
+          >
+            <Gamepad2 size={15} />
+            Games
+          </Link>
+
+          <Link
+            href="/#promo"
+            className="rounded-xl px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
+          >
+            Promo
+          </Link>
+
+          <Link
+            href="/orders/track"
+            className="rounded-xl px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
+          >
+            Cek Transaksi
+          </Link>
+
+          <Link
+            href="/terms"
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
+          >
+            <CircleHelp size={14} />
+            Bantuan
+          </Link>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-
-          {/* SEARCH */}
+          {/* SEARCH HUD */}
           <Link
             href="/games"
-            className="rounded-xl p-2 hover:bg-white/5"
+            aria-label="Cari game"
+            className="group flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.025] text-slate-400 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
           >
-            <Search size={19} />
+            <Search
+              size={18}
+              className="transition group-hover:scale-110"
+            />
           </Link>
 
           {user ? (
             <>
-              {/* SALDO */}
+              {/* WALLET HUD */}
               <Link
                 href="/dashboard"
-                className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm transition hover:bg-white/[0.07] sm:flex"
+                className="hidden h-10 items-center gap-2 rounded-xl border border-red-500/20 bg-gradient-to-r from-red-500/[0.10] to-transparent px-3 transition hover:border-red-500/40 hover:bg-red-500/[0.15] sm:flex"
               >
-                <Wallet
-                  size={17}
-                  className="text-cyan-300"
-                />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500/15">
+                  <Wallet
+                    size={15}
+                    className="text-red-400"
+                  />
+                </div>
 
-                <div className="leading-tight">
-                  <div className="text-[10px] text-slate-400">
-                    Saldo
+                <div className="leading-none">
+                  <div className="mb-1 text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                    Wallet
                   </div>
 
-                  <div className="font-semibold text-white">
+                  <div className="text-xs font-black text-white">
                     {formattedBalance}
                   </div>
                 </div>
               </Link>
 
-              {/* NOTIFICATION */}
+              {/* NOTIFICATION HUD */}
               <Link
                 href="/notifications"
-                className="relative rounded-xl p-2 hover:bg-white/5"
+                aria-label="Notifikasi"
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.025] text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
               >
-                <Bell size={19} />
+                <Bell size={17} />
 
                 {unread > 0 && (
-                  <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-pink-400" />
+                  <>
+                    <span className="absolute right-2 top-2 h-2 w-2 animate-pulse rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,.9)]" />
+                    <span className="absolute right-[5px] top-[5px] h-3 w-3 animate-ping rounded-full bg-red-500/30" />
+                  </>
                 )}
               </Link>
 
-              {/* USER DESKTOP */}
+              {/* PLAYER CARD */}
               <div className="relative">
                 <button
                   onClick={() => setOpen((v) => !v)}
-                  className="hidden items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm sm:flex"
+                  className="hidden h-10 items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] px-2.5 transition hover:border-red-500/30 hover:bg-red-500/10 sm:flex"
                 >
-                  <span className="h-6 w-6 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500" />
+                  <div className="relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg border border-red-500/30 bg-gradient-to-br from-red-600/30 to-black">
+                    <UserRound
+                      size={14}
+                      className="text-red-400"
+                    />
 
-                  {profile?.name ||
-                    profile?.username ||
-                    'User'}
+                    <span className="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_7px_rgba(52,211,153,.8)]" />
+                  </div>
+
+                  <div className="max-w-[100px] text-left leading-none">
+                    <div className="mb-1 text-[8px] font-black uppercase tracking-[0.15em] text-slate-500">
+                      Player
+                    </div>
+
+                    <div className="truncate text-xs font-bold text-white">
+                      {displayName}
+                    </div>
+                  </div>
+
+                  <ChevronDown
+                    size={14}
+                    className={`text-slate-500 transition ${
+                      open ? 'rotate-180' : ''
+                    }`}
+                  />
                 </button>
 
+                {/* PLAYER DROPDOWN */}
                 {open && (
-                  <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-white/10 bg-[#0a1020] p-2 shadow-2xl">
+                  <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-2xl border border-red-500/20 bg-[#09090d]/98 p-2 shadow-[0_20px_60px_rgba(0,0,0,.65)] backdrop-blur-xl">
+                    <div className="mb-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10">
+                          <UserRound
+                            size={18}
+                            className="text-red-400"
+                          />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-black text-white">
+                            {displayName}
+                          </div>
+
+                          <div className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-emerald-400">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            Online
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
                     <Link
-                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
                       href="/dashboard"
                       onClick={() => setOpen(false)}
                     >
+                      <LayoutDashboard
+                        size={15}
+                        className="text-slate-500 group-hover:text-red-400"
+                      />
                       Dashboard
                     </Link>
 
                     <Link
-                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
                       href="/account"
                       onClick={() => setOpen(false)}
                     >
+                      <UserRound
+                        size={15}
+                        className="text-slate-500 group-hover:text-red-400"
+                      />
                       Profile
                     </Link>
 
                     <Link
-                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
                       href="/orders"
                       onClick={() => setOpen(false)}
                     >
+                      <ReceiptText
+                        size={15}
+                        className="text-slate-500 group-hover:text-red-400"
+                      />
                       Transaksi
                     </Link>
 
                     <Link
-                      className="block rounded-xl px-3 py-2 text-sm hover:bg-white/5"
+                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-white"
                       href="/notifications"
                       onClick={() => setOpen(false)}
                     >
+                      <Bell
+                        size={15}
+                        className="text-slate-500 group-hover:text-red-400"
+                      />
                       Notifikasi
+
+                      {unread > 0 && (
+                        <span className="ml-auto rounded-full bg-red-500/15 px-2 py-0.5 text-[9px] font-black text-red-400">
+                          {unread}
+                        </span>
+                      )}
                     </Link>
 
                     {isAdmin && (
                       <Link
-                        className="block rounded-xl px-3 py-2 text-sm text-cyan-300 hover:bg-white/5"
+                        className="group flex items-center gap-3 rounded-xl border border-red-500/10 bg-red-500/[0.04] px-3 py-2.5 text-xs font-bold text-red-400 transition hover:bg-red-500/10"
                         href="/admin"
                         onClick={() => setOpen(false)}
                       >
+                        <ShieldCheck size={15} />
                         Admin Panel
                       </Link>
                     )}
 
+                    <div className="my-2 h-px bg-white/[0.06]" />
+
                     <button
                       onClick={logout}
                       disabled={loggingOut}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-pink-300 hover:bg-white/5 disabled:opacity-50"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
                     >
                       <LogOut size={15} />
 
@@ -327,126 +452,222 @@ export default function SiteHeader() {
               {/* LOGIN */}
               <Link
                 href="/login"
-                className="btn btn-muted hidden sm:inline-flex"
+                className="hidden h-10 items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 text-xs font-black text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white sm:inline-flex"
               >
                 Login
               </Link>
 
-              {/* DAFTAR */}
+              {/* DAFTAR GAMING CTA */}
               <Link
                 href="/register"
-                className="btn btn-primary"
+                className="group relative flex h-10 items-center overflow-hidden rounded-xl border border-red-500/40 bg-red-600 px-4 text-xs font-black text-white shadow-[0_0_20px_rgba(239,68,68,.20)] transition hover:bg-red-500 hover:shadow-[0_0_28px_rgba(239,68,68,.35)]"
               >
-                Daftar
+                <span className="relative z-10">
+                  Daftar
+                </span>
+
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               </Link>
             </>
           )}
 
-          {/* MOBILE BUTTON */}
+          {/* MOBILE MENU BUTTON */}
           <button
-            className="rounded-xl p-2 md:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.025] text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 md:flex lg:hidden"
             onClick={() => setMobile((v) => !v)}
             aria-label="Menu"
           >
-            {mobile ? <X /> : <Menu />}
+            {mobile ? (
+              <X size={19} />
+            ) : (
+              <Menu size={19} />
+            )}
           </button>
         </div>
       </div>
 
-      {/* MOBILE MENU */}
+      {/* MOBILE GAMING COMMAND PANEL */}
       {mobile && (
-        <div className="border-t border-white/10 px-4 py-4 md:hidden">
-          <div className="grid gap-3 text-sm">
+        <div className="border-t border-red-500/10 bg-[#050507]/98 px-3 pb-4 pt-3 backdrop-blur-2xl md:px-5 lg:hidden">
+          <div className="mx-auto max-w-7xl">
+            {/* MOBILE PLAYER / GUEST STATUS */}
+            {user ? (
+              <Link
+                href="/dashboard"
+                onClick={() => setMobile(false)}
+                className="mb-3 flex items-center justify-between rounded-2xl border border-red-500/20 bg-gradient-to-r from-red-500/[0.10] to-transparent p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10">
+                    <UserRound
+                      size={17}
+                      className="text-red-400"
+                    />
+                  </div>
 
-            <Link
-              onClick={() => setMobile(false)}
-              href="/"
-            >
-              Home
-            </Link>
+                  <div>
+                    <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
+                      Player
+                    </div>
 
-            <Link
-              onClick={() => setMobile(false)}
-              href="/games"
-            >
-              Games
-            </Link>
+                    <div className="mt-1 text-sm font-black text-white">
+                      {displayName}
+                    </div>
+                  </div>
+                </div>
 
-            <Link
-              onClick={() => setMobile(false)}
-              href="/#promo"
-            >
-              Promo
-            </Link>
+                <div className="text-right">
+                  <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
+                    Balance
+                  </div>
 
-            <Link
-              onClick={() => setMobile(false)}
-              href="/orders/track"
-            >
-              Cek Transaksi
-            </Link>
+                  <div className="mt-1 text-xs font-black text-red-400">
+                    {formattedBalance}
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <div className="mb-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.18em] text-red-400">
+                  NDRAAAID V1
+                </div>
+
+                <div className="mt-1 text-sm font-black text-white">
+                  Gaming Top Up Center
+                </div>
+              </div>
+            )}
+
+            {/* MOBILE NAV */}
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                onClick={() => setMobile(false)}
+                href="/"
+                className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
+              >
+                <Gamepad2
+                  size={16}
+                  className="text-red-400"
+                />
+                Home
+              </Link>
+
+              <Link
+                onClick={() => setMobile(false)}
+                href="/games"
+                className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
+              >
+                <Gamepad2
+                  size={16}
+                  className="text-red-400"
+                />
+                Games
+              </Link>
+
+              <Link
+                onClick={() => setMobile(false)}
+                href="/#promo"
+                className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
+              >
+                🔥 Promo
+              </Link>
+
+              <Link
+                onClick={() => setMobile(false)}
+                href="/orders/track"
+                className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
+              >
+                🧾 Cek Transaksi
+              </Link>
+
+              <Link
+                onClick={() => setMobile(false)}
+                href="/terms"
+                className="col-span-2 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
+              >
+                <CircleHelp
+                  size={16}
+                  className="text-red-400"
+                />
+                Bantuan
+              </Link>
+            </div>
 
             {user ? (
               <>
-                <Link
-                  onClick={() => setMobile(false)}
-                  href="/dashboard"
-                >
-                  Dashboard
-                </Link>
+                {/* ACCOUNT MENU */}
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Link
+                    onClick={() => setMobile(false)}
+                    href="/dashboard"
+                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
+                  >
+                    <LayoutDashboard
+                      size={15}
+                      className="text-red-400"
+                    />
+                    Dashboard
+                  </Link>
 
-                <Link
-                  onClick={() => setMobile(false)}
-                  href="/account"
-                >
-                  Profile
-                </Link>
+                  <Link
+                    onClick={() => setMobile(false)}
+                    href="/account"
+                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
+                  >
+                    <UserRound
+                      size={15}
+                      className="text-red-400"
+                    />
+                    Profile
+                  </Link>
 
-                <Link
-                  onClick={() => setMobile(false)}
-                  href="/orders"
-                >
-                  Transaksi
-                </Link>
+                  <Link
+                    onClick={() => setMobile(false)}
+                    href="/orders"
+                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
+                  >
+                    <ReceiptText
+                      size={15}
+                      className="text-red-400"
+                    />
+                    Transaksi
+                  </Link>
 
-                <Link
-                  onClick={() => setMobile(false)}
-                  href="/notifications"
-                >
-                  Notifikasi
-                </Link>
+                  <Link
+                    onClick={() => setMobile(false)}
+                    href="/notifications"
+                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
+                  >
+                    <Bell
+                      size={15}
+                      className="text-red-400"
+                    />
+                    Notifikasi
+
+                    {unread > 0 && (
+                      <span className="ml-auto rounded-full bg-red-500/15 px-1.5 py-0.5 text-[8px] font-black text-red-400">
+                        {unread}
+                      </span>
+                    )}
+                  </Link>
+                </div>
 
                 {isAdmin && (
                   <Link
                     onClick={() => setMobile(false)}
                     href="/admin"
-                    className="text-cyan-300"
+                    className="mt-2 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/[0.05] p-3 text-xs font-black text-red-400"
                   >
+                    <ShieldCheck size={16} />
                     Admin Panel
                   </Link>
                 )}
 
-                {/* SALDO MOBILE */}
-                <Link
-                  onClick={() => setMobile(false)}
-                  href="/dashboard"
-                  className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2"
-                >
-                  <Wallet
-                    size={17}
-                    className="text-cyan-300"
-                  />
-
-                  <span>
-                    Saldo: {formattedBalance}
-                  </span>
-                </Link>
-
-                {/* LOGOUT MOBILE */}
+                {/* MOBILE LOGOUT */}
                 <button
                   onClick={logout}
                   disabled={loggingOut}
-                  className="mt-1 flex w-full items-center gap-2 rounded-xl border border-pink-400/20 px-3 py-2 text-left text-pink-300 disabled:opacity-50"
+                  className="mt-2 flex w-full items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/[0.04] p-3 text-left text-xs font-black text-red-400 disabled:opacity-50"
                 >
                   <LogOut size={16} />
 
@@ -456,11 +677,11 @@ export default function SiteHeader() {
                 </button>
               </>
             ) : (
-              <>
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 <Link
                   onClick={() => setMobile(false)}
                   href="/login"
-                  className="mt-2 rounded-xl border border-white/10 px-3 py-2"
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3 text-center text-xs font-black text-slate-300"
                 >
                   Login
                 </Link>
@@ -468,11 +689,11 @@ export default function SiteHeader() {
                 <Link
                   onClick={() => setMobile(false)}
                   href="/register"
-                  className="rounded-xl px-3 py-2"
+                  className="rounded-xl border border-red-500/30 bg-red-600 p-3 text-center text-xs font-black text-white shadow-[0_0_20px_rgba(239,68,68,.20)]"
                 >
                   Daftar
                 </Link>
-              </>
+              </div>
             )}
           </div>
         </div>
