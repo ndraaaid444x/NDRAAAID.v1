@@ -63,6 +63,18 @@ export default function Admin() {
   const [mediaCategory, setMediaCategory] = useState('general')
   const [mediaSearch, setMediaSearch] = useState('')
   const [mediaUploading, setMediaUploading] = useState(false)
+  const [mediaGameId, setMediaGameId] = useState('')
+  const [mediaProductGameId, setMediaProductGameId] = useState('')
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
+  const [mediaPromoId, setMediaPromoId] = useState('')
+  const [homepageSlot, setHomepageSlot] = useState('hero')
+
+  const homepageSlots = [
+    ['hero', 'Hero utama'],
+    ['promo', 'Banner promo'],
+    ['event', 'Banner event'],
+    ['secondary', 'Banner lainnya'],
+  ]
 
   const [site, setSite] = useState<any>({
     name: 'NDRAAAID',
@@ -824,7 +836,7 @@ async function deleteVoucher(v: any) {
   async function uploadAsset(
     file: File,
     category: string,
-    callback?: (url: string) => void,
+    callback?: (url: string) => void | Promise<void>,
     expectedRatio?: '1:1' | '16:9'
   ) {
     if (
@@ -1063,7 +1075,7 @@ async function deleteVoucher(v: any) {
     }
 
     if (callback) {
-      callback(
+      await callback(
         urlData.publicUrl
       )
     }
@@ -1090,6 +1102,155 @@ async function deleteVoucher(v: any) {
       file,
       category,
       callback,
+      expectedRatio
+    )
+
+    e.target.value = ''
+  }
+
+  async function setGameLogoFromMedia(url: string) {
+    if (!mediaGameId) {
+      setMsg('Pilih game terlebih dahulu.')
+      return
+    }
+
+    const game = games.find((x) => x.id === mediaGameId)
+    if (!game) {
+      setMsg('Game tidak ditemukan.')
+      return
+    }
+
+    const { error } = await s
+      .from('games')
+      .update({ logo_url: url })
+      .eq('id', mediaGameId)
+
+    setMsg(
+      error?.message ||
+        `Logo ${game.name} berhasil disinkronkan dari Media Manager.`
+    )
+
+    if (!error) {
+      setMediaGameId('')
+      load()
+    }
+  }
+
+  async function applyProductMedia(url: string) {
+    if (!mediaProductGameId) {
+      setMsg('Pilih game produk terlebih dahulu.')
+      return
+    }
+
+    const targetProducts = products.filter(
+      (p) =>
+        p.game_id === mediaProductGameId &&
+        selectedProductIds.includes(p.id)
+    )
+
+    if (!targetProducts.length) {
+      setMsg('Pilih minimal satu nominal produk.')
+      return
+    }
+
+    const results = await Promise.all(
+      targetProducts.map((product) =>
+        s
+          .from('game_products')
+          .update({ image_url: url })
+          .eq('id', product.id)
+      )
+    )
+
+    const error = results.find((x) => x.error)?.error
+
+    setMsg(
+      error?.message ||
+        `Satu gambar berhasil diterapkan ke ${targetProducts.length} nominal produk.`
+    )
+
+    if (!error) {
+      setSelectedProductIds([])
+      load()
+    }
+  }
+
+  async function setPromoBannerFromMedia(url: string) {
+    if (!mediaPromoId) {
+      setMsg('Pilih promo terlebih dahulu.')
+      return
+    }
+
+    const promo = promos.find((x) => x.id === mediaPromoId)
+    if (!promo) {
+      setMsg('Promo tidak ditemukan.')
+      return
+    }
+
+    const { error } = await s
+      .from('promotions')
+      .update({ banner_url: url })
+      .eq('id', mediaPromoId)
+
+    setMsg(
+      error?.message ||
+        `Banner promo ${promo.name} berhasil disinkronkan.`
+    )
+
+    if (!error) {
+      setMediaPromoId('')
+      load()
+    }
+  }
+
+  async function setHomepageBannerFromMedia(url: string) {
+    const nextHomepage = {
+      ...(site.homepage_banners || {}),
+      [homepageSlot]: url,
+    }
+
+    const nextSite = {
+      ...site,
+      homepage_banners: nextHomepage,
+    }
+
+    const { error } = await s
+      .from('settings')
+      .upsert({
+        key: 'site',
+        value: nextSite,
+        updated_at: new Date().toISOString(),
+      })
+
+    setMsg(
+      error?.message ||
+        `Banner Homepage untuk ${
+          homepageSlots.find((x) => x[0] === homepageSlot)?.[1] ||
+          homepageSlot
+        } berhasil disimpan.`
+    )
+
+    if (!error) {
+      setSite(nextSite)
+      load()
+    }
+  }
+
+  async function uploadAndSync(
+    e: ChangeEvent<HTMLInputElement>,
+    category: string,
+    sync: (url: string) => Promise<void>,
+    expectedRatio?: '1:1' | '16:9'
+  ) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    await uploadAsset(
+      file,
+      category,
+      async (url) => {
+        await sync(url)
+      },
       expectedRatio
     )
 
@@ -3738,38 +3899,29 @@ async function deleteVoucher(v: any) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-bold text-cyan-300">
-                  MEDIA MANAGER
+                  MEDIA MANAGER TERPUSAT
                 </p>
 
                 <h2 className="text-2xl font-black">
-                  Upload Foto & Banner
+                  Kelola semua media website dari satu tempat
                 </h2>
 
-                <p className="mt-1 max-w-2xl text-sm text-slate-400">
-                  Semua gambar website disimpan di
-                  Supabase Storage dan bisa dipakai ulang.
-                  JPG, PNG, WEBP, GIF · maksimal 6 MB.
+                <p className="mt-1 max-w-3xl text-sm text-slate-400">
+                  Satu file upload dapat langsung disinkronkan ke Game, Produk,
+                  Promo, atau Homepage. Produk yang dipilih memakai URL media
+                  yang sama sehingga tidak membuat file Storage duplikat.
                 </p>
               </div>
 
               <label className="btn btn-primary cursor-pointer">
-                {mediaUploading
-                  ? 'Mengunggah...'
-                  : '＋ Upload Media'}
+                {mediaUploading ? 'Mengunggah...' : '＋ Upload Media Umum'}
 
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   className="hidden"
-                  disabled={
-                    mediaUploading
-                  }
-                  onChange={(e) =>
-                    uploadFromInput(
-                      e,
-                      mediaCategory
-                    )
-                  }
+                  disabled={mediaUploading}
+                  onChange={(e) => uploadFromInput(e, 'general')}
                 />
               </label>
             </div>
@@ -3777,109 +3929,320 @@ async function deleteVoucher(v: any) {
             <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_1fr]">
               <select
                 className="input"
-                value={
-                  mediaCategory
-                }
-                onChange={(e) =>
-                  setMediaCategory(
-                    e.target.value
-                  )
-                }
+                value={mediaCategory}
+                onChange={(e) => setMediaCategory(e.target.value)}
               >
-                <option value="all">
-                  Semua kategori
-                </option>
+                <option value="all">Semua kategori</option>
 
-                {mediaCategories.map(
-                  ([v, l]) => (
-                    <option
-                      key={v}
-                      value={v}
-                    >
-                      {l}
-                    </option>
-                  )
-                )}
+                {mediaCategories.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
               </select>
 
               <input
                 className="input"
                 placeholder="Cari nama file..."
-                value={
-                  mediaSearch
-                }
-                onChange={(e) =>
-                  setMediaSearch(
-                    e.target.value
-                  )
-                }
+                value={mediaSearch}
+                onChange={(e) => setMediaSearch(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            {filteredMedia.map(
-              (a) => (
-                <div
-                  key={a.id}
-                  className="glass overflow-hidden rounded-2xl"
-                >
-                  <img
-                    src={a.url}
-                    alt={
-                      a.alt_text ||
-                      a.name
-                    }
-                    className="aspect-square w-full object-cover"
-                  />
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div className="glass rounded-3xl p-5">
+              <p className="text-xs font-black uppercase tracking-widest text-cyan-300">
+                🎮 Logo Game
+              </p>
+              <h3 className="mt-1 text-lg font-black">
+                Sinkronkan logo ke game
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Rasio 1:1 · upload sekali lalu langsung memperbarui logo game.
+              </p>
 
-                  <div className="p-3">
-                    <p className="truncate text-sm font-bold">
-                      {a.name}
-                    </p>
+              <select
+                className="input mt-4"
+                value={mediaGameId}
+                onChange={(e) => setMediaGameId(e.target.value)}
+              >
+                <option value="">Pilih game</option>
+                {games.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
 
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {a.category} ·{' '}
-                      {(
-                        Number(
-                          a.size_bytes ||
-                            0
-                        ) /
-                        1024 /
-                        1024
-                      ).toFixed(
-                        2
-                      )}{' '}
-                      MB
-                    </p>
+              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
+                Upload & Pasang Logo
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={mediaUploading || !mediaGameId}
+                  onChange={(e) =>
+                    uploadAndSync(
+                      e,
+                      'games',
+                      setGameLogoFromMedia,
+                      '1:1'
+                    )
+                  }
+                />
+              </label>
+            </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() =>
-                          copyUrl(
-                            a.url
-                          )
-                        }
-                        className="btn btn-muted px-2 py-2 text-[11px]"
-                      >
-                        Copy URL
-                      </button>
+            <div className="glass rounded-3xl p-5">
+              <p className="text-xs font-black uppercase tracking-widest text-purple-300">
+                💎 Gambar Produk
+              </p>
+              <h3 className="mt-1 text-lg font-black">
+                Satu gambar untuk banyak nominal
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Rasio 1:1 · pilih game lalu satu, beberapa, atau semua nominal.
+              </p>
 
-                      <button
-                        onClick={() =>
-                          deleteMedia(
-                            a
-                          )
-                        }
-                        className="btn btn-muted px-2 py-2 text-[11px] text-red-300"
-                      >
-                        Hapus
-                      </button>
-                    </div>
+              <select
+                className="input mt-4"
+                value={mediaProductGameId}
+                onChange={(e) => {
+                  setMediaProductGameId(e.target.value)
+                  setSelectedProductIds([])
+                }}
+              >
+                <option value="">Pilih game</option>
+                {games.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+
+              {mediaProductGameId && (
+                <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-400">
+                      Nominal produk
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-cyan-300"
+                      onClick={() => {
+                        const ids = products
+                          .filter((p) => p.game_id === mediaProductGameId)
+                          .map((p) => p.id)
+                        setSelectedProductIds(
+                          selectedProductIds.length === ids.length ? [] : ids
+                        )
+                      }}
+                    >
+                      {selectedProductIds.length > 0 ? 'Batal pilih semua' : 'Pilih semua'}
+                    </button>
+                  </div>
+
+                  <div className="max-h-52 space-y-2 overflow-y-auto">
+                    {products
+                      .filter((p) => p.game_id === mediaProductGameId)
+                      .map((p) => (
+                        <label
+                          key={p.id}
+                          className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-2"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedProductIds.includes(p.id)}
+                            onChange={(e) =>
+                              setSelectedProductIds((current) =>
+                                e.target.checked
+                                  ? [...current, p.id]
+                                  : current.filter((id) => id !== p.id)
+                              )
+                            }
+                          />
+                          <span className="min-w-0 flex-1 text-sm">
+                            {p.name || p.nominal || p.sku || 'Produk'}
+                          </span>
+                          {p.image_url && (
+                            <span className="text-[10px] text-green-300">
+                              sudah ada gambar
+                            </span>
+                          )}
+                        </label>
+                      ))}
+
+                    {!products.some((p) => p.game_id === mediaProductGameId) && (
+                      <p className="py-3 text-center text-xs text-slate-500">
+                        Belum ada nominal untuk game ini.
+                      </p>
+                    )}
                   </div>
                 </div>
-              )
-            )}
+              )}
+
+              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
+                Upload & Terapkan ke {selectedProductIds.length || 0} produk
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={mediaUploading || !mediaProductGameId || !selectedProductIds.length}
+                  onChange={(e) =>
+                    uploadAndSync(
+                      e,
+                      'products',
+                      applyProductMedia,
+                      '1:1'
+                    )
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="glass rounded-3xl p-5">
+              <p className="text-xs font-black uppercase tracking-widest text-red-300">
+                📢 Banner Promo
+              </p>
+              <h3 className="mt-1 text-lg font-black">
+                Hubungkan banner ke promo
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Rasio 16:9 · banner otomatis masuk ke promo yang dipilih.
+              </p>
+
+              <select
+                className="input mt-4"
+                value={mediaPromoId}
+                onChange={(e) => setMediaPromoId(e.target.value)}
+              >
+                <option value="">Pilih promo</option>
+                {promos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+
+              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
+                Upload & Pasang Banner Promo
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={mediaUploading || !mediaPromoId}
+                  onChange={(e) =>
+                    uploadAndSync(
+                      e,
+                      'promotions',
+                      setPromoBannerFromMedia,
+                      '16:9'
+                    )
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="glass rounded-3xl p-5">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-300">
+                🏠 Banner Homepage
+              </p>
+              <h3 className="mt-1 text-lg font-black">
+                Kelola slot banner Homepage
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Rasio 16:9 · tersimpan di Website Settings pada slot yang dipilih.
+              </p>
+
+              <select
+                className="input mt-4"
+                value={homepageSlot}
+                onChange={(e) => setHomepageSlot(e.target.value)}
+              >
+                {homepageSlots.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+
+              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
+                Upload & Pasang Banner Homepage
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={mediaUploading}
+                  onChange={(e) =>
+                    uploadAndSync(
+                      e,
+                      'homepage',
+                      setHomepageBannerFromMedia,
+                      '16:9'
+                    )
+                  }
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="glass rounded-3xl p-5">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                  📁 Library Media
+                </p>
+                <h3 className="text-lg font-black">
+                  Semua file yang sudah tersimpan
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500">
+                {filteredMedia.length} media ditemukan
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {filteredMedia.map((a) => (
+              <div
+                key={a.id}
+                className="glass overflow-hidden rounded-2xl"
+              >
+                <img
+                  src={a.url}
+                  alt={a.alt_text || a.name}
+                  className="aspect-square w-full object-cover"
+                />
+
+                <div className="p-3">
+                  <p className="truncate text-sm font-bold">
+                    {a.name}
+                  </p>
+
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {a.category} ·{' '}
+                    {(Number(a.size_bytes || 0) / 1024 / 1024).toFixed(2)} MB
+                  </p>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => copyUrl(a.url)}
+                      className="btn btn-muted px-2 py-2 text-[11px]"
+                    >
+                      Copy URL
+                    </button>
+
+                    <button
+                      onClick={() => deleteMedia(a)}
+                      className="btn btn-muted px-2 py-2 text-[11px] text-red-300"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
 
             {!filteredMedia.length && (
               <div className="col-span-full rounded-2xl border border-dashed border-white/10 p-10 text-center text-slate-500">
