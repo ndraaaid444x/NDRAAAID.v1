@@ -89,6 +89,10 @@ export default function Admin() {
   const [mediaProductGameId, setMediaProductGameId] = useState('')
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
   const [mediaPromoId, setMediaPromoId] = useState('')
+  const [mediaPromoTitle, setMediaPromoTitle] = useState('')
+  const [mediaPromoDescription, setMediaPromoDescription] = useState('')
+  const [mediaPromoCode, setMediaPromoCode] = useState('')
+  const [mediaPromoType, setMediaPromoType] = useState<'text' | 'image' | 'both'>('both')
   const [homepageSlot, setHomepageSlot] = useState('hero')
 
   const homepageSlots = [
@@ -1385,32 +1389,84 @@ async function deleteVoucher(v: any) {
     }
   }
 
-  async function setPromoBannerFromMedia(url: string) {
-    if (!mediaPromoId) {
-      setMsg('Pilih promo terlebih dahulu.')
-      return
-    }
+  function selectMediaPromo(id: string) {
+    setMediaPromoId(id)
 
-    const promo = promos.find((x) => x.id === mediaPromoId)
+    const promo = promos.find((x) => x.id === id)
     if (!promo) {
-      setMsg('Promo tidak ditemukan.')
+      setMediaPromoTitle('')
+      setMediaPromoDescription('')
+      setMediaPromoCode('')
       return
     }
 
-    const { error } = await s
-      .from('promotions')
-      .update({ banner_url: url })
-      .eq('id', mediaPromoId)
+    setMediaPromoTitle(promo.name || '')
+    setMediaPromoDescription(promo.description || '')
+    setMediaPromoCode(promo.code || '')
+  }
+
+  async function savePromoContent(url?: string) {
+    const existing = mediaPromoId
+      ? promos.find((x) => x.id === mediaPromoId)
+      : null
+
+    const hasImage = Boolean(url)
+    const wantsText = mediaPromoType === 'text' || mediaPromoType === 'both'
+    const wantsImage = mediaPromoType === 'image' || mediaPromoType === 'both'
+
+    if (wantsText && !mediaPromoTitle.trim() && !existing) {
+      setMsg('Isi judul promo untuk konten teks.')
+      return
+    }
+
+    if (wantsImage && !hasImage && !existing?.banner_url) {
+      setMsg('Pilih file gambar jika tipe promo memakai gambar.')
+      return
+    }
+
+    const payload: any = {
+      is_active: existing?.is_active ?? true,
+    }
+
+    if (mediaPromoTitle.trim()) payload.name = mediaPromoTitle.trim()
+    else if (!existing) payload.name = 'Promo Baru'
+
+    if (mediaPromoType !== 'image') {
+      payload.description = mediaPromoDescription.trim() || null
+      payload.code = mediaPromoCode.trim() || null
+    }
+
+    if (mediaPromoType === 'text') {
+      payload.banner_url = null
+    } else if (hasImage) {
+      payload.banner_url = url
+    }
+
+    const query = existing
+      ? s.from('promotions').update(payload).eq('id', existing.id)
+      : s.from('promotions').insert(payload)
+
+    const { error } = await query
 
     setMsg(
       error?.message ||
-        `Banner promo ${promo.name} berhasil disinkronkan.`
+        (existing
+          ? `Promo ${existing.name} berhasil diperbarui.`
+          : 'Promo baru berhasil dibuat.')
     )
 
     if (!error) {
       setMediaPromoId('')
+      setMediaPromoTitle('')
+      setMediaPromoDescription('')
+      setMediaPromoCode('')
+      setMediaPromoType('both')
       load()
     }
+  }
+
+  async function savePromoTextOnly() {
+    await savePromoContent()
   }
 
   async function setHomepageBannerFromMedia(url: string) {
@@ -4452,42 +4508,107 @@ async function deleteVoucher(v: any) {
                 📢 Banner Promo
               </p>
               <h3 className="mt-1 text-lg font-black">
-                Hubungkan banner ke promo
+                Kelola konten promo
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                Rasio 16:9 · banner otomatis masuk ke promo yang dipilih.
+                Bisa teks saja, gambar saja, atau teks + gambar. Promo yang sudah ada bisa dipilih, atau buat promo baru tanpa memilih promo terlebih dahulu.
               </p>
 
-              <select
-                className="input mt-4"
-                value={mediaPromoId}
-                onChange={(e) => setMediaPromoId(e.target.value)}
-              >
-                <option value="">Pilih promo</option>
-                {promos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-
-              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
-                Upload & Pasang Banner Promo
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                  disabled={mediaUploading || !mediaPromoId}
+              <label className="mt-4 block text-xs font-bold text-slate-300">
+                Tipe konten
+                <select
+                  className="input mt-2"
+                  value={mediaPromoType}
                   onChange={(e) =>
-                    uploadAndSync(
-                      e,
-                      'promotions',
-                      setPromoBannerFromMedia,
-                      '16:9'
-                    )
+                    setMediaPromoType(e.target.value as 'text' | 'image' | 'both')
                   }
-                />
+                >
+                  <option value="text">Teks saja</option>
+                  <option value="image">Gambar saja</option>
+                  <option value="both">Teks + gambar</option>
+                </select>
               </label>
+
+              <label className="mt-3 block text-xs font-bold text-slate-300">
+                Pilih promo yang sudah ada (opsional)
+                <select
+                  className="input mt-2"
+                  value={mediaPromoId}
+                  onChange={(e) => selectMediaPromo(e.target.value)}
+                >
+                  <option value="">+ Buat promo baru</option>
+                  {promos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {mediaPromoType !== 'image' && (
+                <>
+                  <input
+                    className="input mt-3"
+                    placeholder="Judul promo"
+                    value={mediaPromoTitle}
+                    onChange={(e) => setMediaPromoTitle(e.target.value)}
+                  />
+
+                  <textarea
+                    className="input mt-3 min-h-20"
+                    placeholder="Deskripsi promo (opsional)"
+                    value={mediaPromoDescription}
+                    onChange={(e) => setMediaPromoDescription(e.target.value)}
+                  />
+
+                  <input
+                    className="input mt-3"
+                    placeholder="Kode promo (opsional)"
+                    value={mediaPromoCode}
+                    onChange={(e) => setMediaPromoCode(e.target.value)}
+                  />
+                </>
+              )}
+
+              {mediaPromoType !== 'text' && (
+                <label className="mt-3 block text-xs font-bold text-slate-300">
+                  File gambar banner (opsional untuk tipe teks)
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="input mt-2"
+                    disabled={mediaUploading}
+                    onChange={(e) =>
+                      uploadAndSync(
+                        e,
+                        'promotions',
+                        savePromoContent,
+                        '16:9'
+                      )
+                    }
+                  />
+                  <span className="mt-1 block text-[10px] text-slate-500">
+                    JPG, PNG, WEBP, GIF · maksimal 6 MB · rasio 16:9.
+                  </span>
+                </label>
+              )}
+
+              {mediaPromoId && (
+                <div className="mt-3 rounded-xl border border-cyan-400/10 bg-cyan-400/[.04] p-3 text-xs text-slate-400">
+                  Promo terpilih akan diperbarui. Jika tidak memilih promo, sistem membuat promo baru.
+                </div>
+              )}
+
+              {mediaPromoType === 'text' && (
+                <button
+                  type="button"
+                  className="btn btn-primary mt-3 w-full"
+                  disabled={mediaUploading}
+                  onClick={savePromoTextOnly}
+                >
+                  Simpan Promo Teks
+                </button>
+              )}
             </div>
 
             <div className="glass rounded-3xl p-5">
