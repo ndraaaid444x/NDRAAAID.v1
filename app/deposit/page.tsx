@@ -177,6 +177,10 @@ export default function DepositPage() {
     (x) => x.id === method
   )
 
+  const selectedMethodIsQris =
+    String(selectedMethod?.kind || '').trim().toUpperCase() === 'QRIS' ||
+    String(selectedMethod?.name || '').trim().toLowerCase().includes('qris')
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       {/* HEADER */}
@@ -320,7 +324,7 @@ export default function DepositPage() {
                   </div>
 
                   {/* QR */}
-                  {selectedMethod.qr_url && (
+                  {(selectedMethodIsQris || selectedMethod.qr_url) && (
                     <div className="mt-4 rounded-2xl border border-white/10 bg-white p-4">
                       <p className="mb-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
                         QR Pembayaran
@@ -328,8 +332,8 @@ export default function DepositPage() {
 
                       <div className="flex justify-center">
                         <img
-                          src={selectedMethod.qr_url}
-                          alt="QR pembayaran"
+                          src={selectedMethodIsQris ? '/qris.png' : selectedMethod.qr_url}
+                          alt={selectedMethodIsQris ? 'QRIS pembayaran' : 'QR pembayaran'}
                           className="h-auto max-h-72 w-full max-w-xs rounded-xl object-contain"
                         />
                       </div>
