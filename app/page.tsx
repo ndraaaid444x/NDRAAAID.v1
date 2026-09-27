@@ -1,15 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import {
-  ArrowRight,
-  ShieldCheck,
-  Zap,
-  Headphones,
-  Radio,
-  ExternalLink,
-  Sparkles,
-} from 'lucide-react'
+import { ArrowRight, ExternalLink } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 export default function Home() {
@@ -49,7 +41,7 @@ export default function Home() {
 
       try {
         const params = new URLSearchParams()
-        params.set('select', 'id,name,description,code,banner_url,content_type,is_active')
+        params.set('select', 'id,name,custom_text,description,code,banner_url,content_type,is_active')
         params.set('is_active', 'eq.true')
         params.set('limit', '1')
 
@@ -516,18 +508,29 @@ export default function Home() {
         >
           <div className="glass overflow-hidden rounded-3xl border border-pink-400/10">
             {promo.content_type !== 'text' && promo.banner_url && (
-              <img
-                src={promo.banner_url}
-                alt={promo.name || 'Banner Promo'}
-                className="max-h-[520px] w-full object-cover"
-              />
+              /\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(promo.banner_url) ? (
+                <video
+                  src={promo.banner_url}
+                  aria-label={promo.name || 'Banner Promo'}
+                  className="max-h-[520px] w-full object-cover"
+                  autoPlay muted loop playsInline
+                />
+              ) : (
+                <img
+                  src={promo.banner_url}
+                  alt={promo.name || 'Banner Promo'}
+                  className="max-h-[520px] w-full object-cover"
+                />
+              )
             )}
 
             {promo.content_type !== 'image' && (
               <div className="p-6 md:p-8">
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">
-                  PROMO
-                </p>
+                {promo.custom_text && (
+                  <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">
+                    {promo.custom_text}
+                  </p>
+                )}
 
                 {promo.name && (
                   <h2 className="mt-2 text-3xl font-black">
@@ -559,339 +562,117 @@ export default function Home() {
       )}
 
       {/* =====================================================
-          HERO
-      ===================================================== */}
-
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(34,211,238,.14),transparent_35%),radial-gradient(circle_at_80%_30%,rgba(139,92,246,.18),transparent_35%)]" />
-
-        <div className="relative mx-auto max-w-5xl px-4 py-16 md:py-20">
-          <div>
-            <div className="mb-5 inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-xs font-bold text-cyan-300">
-              ⚡ MANUAL VERIFIED TOP-UP
-            </div>
-
-            <h1 className="text-5xl font-black leading-[.98] md:text-7xl">
-              TOP UP GAME
-              <br />
-
-              <span className="gradient-text">
-                FAVORITMU
-              </span>
-            </h1>
-
-            <p className="mt-6 max-w-xl text-lg text-slate-400">
-              Top up game cepat, aman, dan mudah hanya di
-              NDRAAAID. Pembayaran dan top-up saat ini
-              diverifikasi serta diproses manual oleh Admin.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/games/"
-                className="btn btn-primary"
-              >
-                Top Up Sekarang
-
-                <ArrowRight
-                  className="ml-2"
-                  size={18}
-                />
-              </Link>
-
-              <Link
-                href="/#promo"
-                className="btn btn-muted"
-              >
-                Lihat Promo
-              </Link>
-            </div>
-
-            <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
-              <div className="glass rounded-2xl p-4">
-                <Zap size={20} />
-
-                <p className="mt-2 text-xs text-slate-400">
-                  Proses cepat
-                </p>
-              </div>
-
-              <div className="glass rounded-2xl p-4">
-                <ShieldCheck size={20} />
-
-                <p className="mt-2 text-xs text-slate-400">
-                  Manual verified
-                </p>
-              </div>
-
-              <div className="glass rounded-2xl p-4">
-                <Headphones size={20} />
-
-                <p className="mt-2 text-xs text-slate-400">
-                  Support
-                </p>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* =====================================================
-          CYBER / HOLOGRAM
-          KHUSUS BROADCAST TANPA LINK
+          BROADCAST WIDGETS
+          Dua widget kecil sejajar kiri-kanan.
+          TANPA label tambahan seperti LIVE / CYBER / INCOMING.
       ===================================================== */}
 
       {!loadingBroadcast &&
-        cyberBroadcasts.length > 0 &&
-        currentBroadcast && (
-          <section className="mx-auto max-w-7xl px-4 pt-5">
-            <div
-              className="group relative overflow-hidden rounded-[2rem] border border-cyan-400/25 bg-[#050713] shadow-[0_0_50px_rgba(34,211,238,.08)] select-none"
-              onPointerDown={
-                handleBroadcastPointerDown
-              }
-              onPointerUp={
-                handleBroadcastPointerUp
-              }
-              onPointerCancel={
-                handleBroadcastPointerUp
-              }
-              style={{
-                touchAction: 'pan-y',
-                cursor:
-                  cyberBroadcasts.length > 1
-                    ? 'grab'
-                    : 'default',
-              }}
-            >
-              {/* CYBER GLOW */}
-
-              <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
-
-              <div className="pointer-events-none absolute -right-24 -bottom-24 h-80 w-80 rounded-full bg-violet-600/15 blur-3xl" />
-
-              {/* GRID */}
-
-              <div
-                className="pointer-events-none absolute inset-0 opacity-[0.12]"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(rgba(34,211,238,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,.35) 1px, transparent 1px)',
-                  backgroundSize:
-                    '32px 32px',
-                }}
-              />
-
-              {/* TOP HUD */}
-
-              <div className="relative flex items-center justify-between border-b border-cyan-400/10 px-5 py-3 sm:px-7">
-                <div className="flex items-center gap-2">
-                  <Sparkles
-                    size={13}
-                    className="text-cyan-300"
-                  />
-
-                  <span className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-300 sm:text-[10px]">
-                    CYBER TRANSMISSION
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="hidden text-[9px] font-bold uppercase tracking-[0.2em] text-violet-400 sm:block">
-                    LIVE DATA
-                  </span>
-
-                  <span className="text-[9px] font-black tracking-[0.2em] text-slate-500">
-                    {String(
-                      activeBroadcast + 1
-                    ).padStart(2, '0')}
-                    /
-                    {String(
-                      cyberBroadcasts.length
-                    ).padStart(2, '0')}
-                  </span>
-                </div>
-              </div>
-
-              {/* SLIDER TRACK */}
-
-              <div className="relative overflow-hidden">
+        (currentBroadcast || linkedBroadcast) && (
+          <section className="mx-auto max-w-5xl px-4 pt-5">
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              {/* BROADCAST TANPA LINK */}
+              {currentBroadcast ? (
                 <div
-                  className="flex transition-transform duration-700 ease-[cubic-bezier(.22,1,.36,1)]"
+                  className="relative min-w-0 overflow-hidden rounded-2xl border border-cyan-400/20 bg-[#070a12] shadow-[0_0_24px_rgba(34,211,238,.06)] select-none"
+                  onPointerDown={handleBroadcastPointerDown}
+                  onPointerUp={handleBroadcastPointerUp}
+                  onPointerCancel={handleBroadcastPointerUp}
                   style={{
-                    transform: `translateX(-${
-                      activeBroadcast * 100
-                    }%)`,
+                    touchAction: 'pan-y',
+                    cursor:
+                      cyberBroadcasts.length > 1
+                        ? 'grab'
+                        : 'default',
                   }}
                 >
-                  {cyberBroadcasts.map(
-                    (broadcast) => (
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(34,211,238,.10),transparent_55%)]" />
+
+                  <div className="relative p-3 sm:p-4 md:p-5">
+                    <div className="overflow-hidden">
                       <div
-                        key={
-                          broadcast.id
-                        }
-                        className="w-full shrink-0"
+                        className="flex transition-transform duration-500 ease-out"
+                        style={{
+                          transform: `translateX(-${activeBroadcast * 100}%)`,
+                        }}
                       >
-                        <div className="relative min-h-[235px] overflow-hidden p-6 sm:min-h-[245px] sm:p-8 md:min-h-[260px] md:p-10">
-                          {/* SCAN LINE */}
-
-                          <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent" />
-
-                          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
-
-                          {/* CORNER MARKS */}
-
-                          <div className="pointer-events-none absolute left-4 top-4 h-5 w-5 border-l border-t border-cyan-400/50" />
-
-                          <div className="pointer-events-none absolute right-4 top-4 h-5 w-5 border-r border-t border-violet-400/50" />
-
-                          <div className="pointer-events-none absolute bottom-4 left-4 h-5 w-5 border-b border-l border-cyan-400/50" />
-
-                          <div className="pointer-events-none absolute bottom-4 right-4 h-5 w-5 border-b border-r border-violet-400/50" />
-
-                          {/* CONTENT */}
-
-                          <div className="relative">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-cyan-200">
-                                <Radio
-                                  size={11}
-                                />
-
-                                LIVE
-                              </span>
-
-                              <span className="rounded-full border border-violet-400/20 bg-violet-400/5 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-violet-300">
-                                {broadcast.type}
-                              </span>
-                            </div>
-
-                            <p className="mt-6 text-[9px] font-black uppercase tracking-[0.35em] text-slate-600">
-                              INCOMING BROADCAST
-                            </p>
-
-                            <h2 className="mt-2 max-w-4xl text-3xl font-black uppercase leading-tight tracking-tight text-white sm:text-4xl md:text-5xl">
+                        {cyberBroadcasts.map((broadcast) => (
+                          <div
+                            key={broadcast.id}
+                            className="w-full shrink-0 pr-1"
+                          >
+                            <h3 className="line-clamp-2 text-sm font-black leading-tight text-white sm:text-base md:text-lg">
                               {broadcast.title}
-                            </h2>
+                            </h3>
 
-                            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400 sm:text-base md:text-lg">
+                            <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-slate-400 sm:text-xs md:text-sm">
                               {broadcast.message}
                             </p>
                           </div>
-
-                          {/* BOTTOM HUD */}
-
-                          <div className="relative mt-7 flex items-end justify-between">
-                            <div className="flex items-center gap-1.5">
-                              {cyberBroadcasts.map(
-                                (
-                                  item,
-                                  index
-                                ) => (
-                                  <span
-                                    key={
-                                      item.id
-                                    }
-                                    className={`h-1.5 rounded-full transition-all duration-500 ${
-                                      index ===
-                                      activeBroadcast
-                                        ? 'w-10 bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,.8)]'
-                                        : 'w-1.5 bg-slate-700'
-                                    }`}
-                                  />
-                                )
-                              )}
-                            </div>
-
-                            <div className="hidden items-center gap-2 text-[8px] font-black uppercase tracking-[0.25em] text-slate-600 sm:flex">
-                              <span className="h-1 w-1 rounded-full bg-violet-400" />
-
-                              SIGNAL ACTIVE
-                            </div>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    )
-                  )}
+                    </div>
+
+                    {cyberBroadcasts.length > 1 && (
+                      <div className="mt-3 flex items-center gap-1.5">
+                        {cyberBroadcasts.map((item, index) => (
+                          <span
+                            key={item.id}
+                            className={`h-1 rounded-full transition-all duration-300 ${
+                              index === activeBroadcast
+                                ? 'w-5 bg-cyan-300'
+                                : 'w-1 bg-slate-700'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-          </section>
-        )}
+              ) : (
+                <div />
+              )}
 
-      {/* =====================================================
-          LINK BROADCAST
-          KHUSUS BROADCAST DENGAN LINK
-      ===================================================== */}
+              {/* BROADCAST DENGAN LINK */}
+              {linkedBroadcast ? (
+                <div className="relative min-w-0 overflow-hidden rounded-2xl border border-red-500/20 bg-[#0b0507] shadow-[0_0_24px_rgba(220,38,38,.06)]">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(239,68,68,.10),transparent_55%)]" />
 
-      {!loadingBroadcast &&
-        linkedBroadcast && (
-          <section className="mx-auto max-w-7xl px-4 pt-6">
-            <div className="relative overflow-hidden rounded-[2rem] border border-red-500/30 bg-gradient-to-br from-[#170407] via-[#080304] to-black shadow-[0_0_45px_rgba(220,38,38,.12)]">
-              <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-red-600/10 blur-3xl" />
+                  <div className="relative flex h-full flex-col p-3 sm:p-4 md:p-5">
+                    <h3 className="line-clamp-2 text-sm font-black leading-tight text-white sm:text-base md:text-lg">
+                      {linkedBroadcast.title}
+                    </h3>
 
-              <div className="relative p-5 sm:p-7 md:p-8">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                    <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-slate-400 sm:text-xs md:text-sm">
+                      {linkedBroadcast.message}
+                    </p>
 
-                    LIVE BROADCAST
-                  </span>
-
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
-                    {linkedBroadcast.type}
-                  </span>
+                    <div className="mt-auto pt-3">
+                      {String(linkedBroadcast.link_url).startsWith('/') ? (
+                        <Link
+                          href={linkedBroadcast.link_url}
+                          className="inline-flex w-full items-center justify-center rounded-xl bg-red-500/15 px-3 py-2 text-[11px] font-black text-red-200 ring-1 ring-red-500/25 transition hover:bg-red-500/25 sm:text-xs"
+                        >
+                          {linkedBroadcast.link_label || 'Lihat'}
+                          <ArrowRight size={14} className="ml-1.5" />
+                        </Link>
+                      ) : (
+                        <a
+                          href={linkedBroadcast.link_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex w-full items-center justify-center rounded-xl bg-red-500/15 px-3 py-2 text-[11px] font-black text-red-200 ring-1 ring-red-500/25 transition hover:bg-red-500/25 sm:text-xs"
+                        >
+                          {linkedBroadcast.link_label || 'Lihat'}
+                          <ExternalLink size={13} className="ml-1.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
-
-                <div className="mt-5">
-                  <h2 className="text-2xl font-black uppercase tracking-tight text-white sm:text-3xl md:text-4xl">
-                    {linkedBroadcast.title}
-                  </h2>
-
-                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400 sm:text-base">
-                    {linkedBroadcast.message}
-                  </p>
-                </div>
-
-                <div className="mt-6">
-                  {String(
-                    linkedBroadcast.link_url
-                  ).startsWith('/') ? (
-                    <Link
-                      href={
-                        linkedBroadcast.link_url
-                      }
-                      className="btn btn-primary w-full justify-center sm:w-auto"
-                    >
-                      {linkedBroadcast.link_label ||
-                        'Lihat Sekarang'}
-
-                      <ArrowRight
-                        size={17}
-                        className="ml-2"
-                      />
-                    </Link>
-                  ) : (
-                    <a
-                      href={
-                        linkedBroadcast.link_url
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-primary w-full justify-center sm:w-auto"
-                    >
-                      {linkedBroadcast.link_label ||
-                        'Lihat Sekarang'}
-
-                      <ExternalLink
-                        size={16}
-                        className="ml-2"
-                      />
-                    </a>
-                  )}
-                </div>
-              </div>
+              ) : (
+                <div />
+              )}
             </div>
           </section>
         )}
