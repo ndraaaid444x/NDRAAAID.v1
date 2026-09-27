@@ -1,6 +1,13 @@
 'use client'
 
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import {
+  ChangeEvent,
+  FormEvent,
+  PointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useRouter } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
@@ -38,6 +45,13 @@ const mediaCategories = [
 
 export default function Admin() {
   const [tab, setTab] = useState('orders')
+
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
+  const isDraggingMenu = useRef(false)
+  const dragStartX = useRef(0)
+  const dragStartScrollLeft = useRef(0)
+  const dragMoved = useRef(false)
+
   const [role, setRole] = useState('')
   const [msg, setMsg] = useState('')
 
@@ -321,6 +335,50 @@ s
     }
   }
 
+  function startMenuDrag(e: PointerEvent<HTMLDivElement>) {
+    const el = mobileMenuRef.current
+    if (!el) return
+
+    isDraggingMenu.current = true
+    dragMoved.current = false
+    dragStartX.current = e.clientX
+    dragStartScrollLeft.current = el.scrollLeft
+
+    el.setPointerCapture(e.pointerId)
+  }
+
+  function moveMenuDrag(e: PointerEvent<HTMLDivElement>) {
+    const el = mobileMenuRef.current
+    if (!el || !isDraggingMenu.current) return
+
+    const dx = e.clientX - dragStartX.current
+
+    if (Math.abs(dx) > 4) {
+      dragMoved.current = true
+    }
+
+    el.scrollLeft =
+      dragStartScrollLeft.current - dx
+  }
+
+  function endMenuDrag(e: PointerEvent<HTMLDivElement>) {
+    const el = mobileMenuRef.current
+
+    if (
+      el &&
+      el.hasPointerCapture(e.pointerId)
+    ) {
+      el.releasePointerCapture(e.pointerId)
+    }
+
+    isDraggingMenu.current = false
+
+    if (dragMoved.current) {
+      setTimeout(() => {
+        dragMoved.current = false
+      }, 0)
+    }
+ }
   useEffect(() => {
     load()
   }, [])
@@ -1884,7 +1942,15 @@ async function deleteVoucher(v: any) {
             </div>
 
             <div className="border-t border-white/10 p-3 lg:hidden">
-              <div className="flex gap-2 overflow-x-auto pb-1">
+<div
+  ref={mobileMenuRef}
+  onPointerDown={startMenuDrag}
+  onPointerMove={moveMenuDrag}
+  onPointerUp={endMenuDrag}
+  onPointerCancel={endMenuDrag}
+  className="flex cursor-grab select-none gap-2 overflow-x-auto pb-1 touch-pan-x active:cursor-grabbing"
+  style={{ scrollbarWidth: 'none' }}
+>
                 {[
                   ['orders', '🧾 Order'],
                   ['deposits', '💳 Deposit'],
@@ -1910,7 +1976,15 @@ async function deleteVoucher(v: any) {
                   .map((item) => (
                     <button
                       key={item[0]}
-                      onClick={() => setTab(item[0])}
+                      onClick={(e) => {
+  if (dragMoved.current) {
+    e.preventDefault()
+    dragMoved.current = false
+    return
+  }
+
+  setTab(item[0])
+}}
                       className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-bold transition ${
                         tab === item[0]
                           ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
