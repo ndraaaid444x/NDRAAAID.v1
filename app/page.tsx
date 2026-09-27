@@ -22,8 +22,12 @@ export default function Home() {
   const [activeBroadcast, setActiveBroadcast] = useState(0)
 
   const broadcastStartX = useRef<number | null>(null)
-  const broadcastDragging = useRef(false)
 
+  /*
+   * ============================================================
+   * LOAD GAME
+   * ============================================================
+   */
   useEffect(() => {
     let mounted = true
 
@@ -97,6 +101,9 @@ export default function Home() {
           )
         }
 
+        /*
+         * Hilangkan game duplikat berdasarkan ID.
+         */
         const uniqueGames = Array.from(
           new Map(
             data.map((game: any) => [
@@ -106,6 +113,9 @@ export default function Home() {
           ).values()
         )
 
+        /*
+         * Game populer berada di atas.
+         */
         uniqueGames.sort(
           (a: any, b: any) => {
             const popularA =
@@ -165,15 +175,18 @@ export default function Home() {
   }, [])
 
   /*
-   * LIVE BROADCAST
+   * ============================================================
+   * LOAD LIVE BROADCAST
+   * ============================================================
    *
-   * Tetap mengambil broadcast dari:
-   * Admin → broadcasts
+   * Tetap menggunakan tabel broadcasts yang sudah ada.
    *
-   * Hanya broadcast yang:
-   * - aktif
-   * - sudah dimulai
-   * - belum berakhir
+   * Hanya mengambil:
+   * - is_active = true
+   * - starts_at <= sekarang
+   * - ends_at > sekarang
+   *
+   * Tidak membuat database baru.
    */
   useEffect(() => {
     let mounted = true
@@ -260,10 +273,30 @@ export default function Home() {
 
         if (!mounted) return
 
-        setBroadcasts(
+        const nextBroadcasts =
           Array.isArray(data)
             ? data
             : []
+
+        setBroadcasts(nextBroadcasts)
+
+        /*
+         * Pastikan index slider tetap valid
+         * ketika jumlah broadcast berubah.
+         */
+        setActiveBroadcast(
+          (current) => {
+            if (
+              nextBroadcasts.length === 0
+            ) {
+              return 0
+            }
+
+            return Math.min(
+              current,
+              nextBroadcasts.length - 1
+            )
+          }
         )
       } catch (error) {
         console.error(
@@ -273,6 +306,7 @@ export default function Home() {
 
         if (mounted) {
           setBroadcasts([])
+          setActiveBroadcast(0)
         }
       } finally {
         if (mounted) {
@@ -284,7 +318,7 @@ export default function Home() {
     loadBroadcasts()
 
     /*
-     * Sinkronisasi broadcast dengan Admin
+     * Sinkronisasi dengan Broadcast Admin
      * setiap 30 detik.
      */
     const interval =
@@ -300,30 +334,20 @@ export default function Home() {
   }, [])
 
   /*
-   * Jika data broadcast berubah dan jumlahnya
-   * lebih sedikit dari index sebelumnya,
-   * kembalikan index ke posisi yang valid.
-   */
-  useEffect(() => {
-    if (activeBroadcast >= broadcasts.length) {
-      setActiveBroadcast(0)
-    }
-  }, [
-    broadcasts.length,
-    activeBroadcast,
-  ])
-
-  /*
+   * ============================================================
    * AUTO SLIDER
+   * ============================================================
    *
-   * Broadcast berganti setiap 5 detik.
+   * Broadcast otomatis berganti setiap 5 detik.
    *
-   * Karena activeBroadcast menjadi dependency,
-   * setiap swipe manual juga otomatis me-reset
-   * hitungan 5 detik.
+   * Ketika pengguna melakukan swipe manual,
+   * activeBroadcast berubah dan timer otomatis
+   * dimulai ulang dari 5 detik.
    */
   useEffect(() => {
-    if (broadcasts.length <= 1) return
+    if (broadcasts.length <= 1) {
+      return
+    }
 
     const timer = setTimeout(() => {
       setActiveBroadcast(
@@ -342,9 +366,11 @@ export default function Home() {
   ])
 
   /*
+   * ============================================================
    * SWIPE / DRAG BROADCAST
+   * ============================================================
    *
-   * Berlaku:
+   * Berlaku untuk:
    * - HP
    * - Tablet
    * - Desktop
@@ -352,10 +378,12 @@ export default function Home() {
   function handleBroadcastPointerDown(
     event: React.PointerEvent<HTMLDivElement>
   ) {
+    if (broadcasts.length <= 1) {
+      return
+    }
+
     broadcastStartX.current =
       event.clientX
-
-    broadcastDragging.current = false
 
     try {
       event.currentTarget.setPointerCapture(
@@ -364,32 +392,14 @@ export default function Home() {
     } catch {}
   }
 
-  function handleBroadcastPointerMove(
-    event: React.PointerEvent<HTMLDivElement>
-  ) {
-    if (
-      broadcastStartX.current === null
-    ) {
-      return
-    }
-
-    const distance =
-      Math.abs(
-        event.clientX -
-          broadcastStartX.current
-      )
-
-    if (distance > 8) {
-      broadcastDragging.current = true
-    }
-  }
-
   function handleBroadcastPointerUp(
     event: React.PointerEvent<HTMLDivElement>
   ) {
     if (
-      broadcastStartX.current === null
+      broadcastStartX.current === null ||
+      broadcasts.length <= 1
     ) {
+      broadcastStartX.current = null
       return
     }
 
@@ -404,12 +414,18 @@ export default function Home() {
       minimumSwipe
     ) {
       if (distance < 0) {
+        /*
+         * Swipe kiri
+         */
         setActiveBroadcast(
           (current) =>
             (current + 1) %
             broadcasts.length
         )
       } else {
+        /*
+         * Swipe kanan
+         */
         setActiveBroadcast(
           (current) =>
             (current - 1 +
@@ -426,14 +442,10 @@ export default function Home() {
         event.pointerId
       )
     } catch {}
-
-    setTimeout(() => {
-      broadcastDragging.current = false
-    }, 50)
   }
 
   /*
-   * Broadcast aktif yang sedang ditampilkan.
+   * Broadcast yang sedang aktif.
    */
   const currentBroadcast =
     broadcasts.length > 0
@@ -443,10 +455,12 @@ export default function Home() {
       : null
 
   /*
-   * CARD BESAR DI BAWAH:
+   * ============================================================
+   * BROADCAST YANG MEMILIKI LINK
+   * ============================================================
    *
-   * Hanya mengambil broadcast yang
-   * mempunyai link_url.
+   * Card besar hanya mengambil broadcast
+   * yang mempunyai link_url.
    */
   const linkedBroadcast =
     broadcasts.find(
@@ -557,20 +571,17 @@ export default function Home() {
       </section>
 
       {/* =====================================================
-          BROADCAST SLIDER
-          SEMUA DEVICE
-      ===================================================== */}
+          LIVE BROADCAST SLIDER
+          ===================================================== */}
+
       {!loadingBroadcast &&
         broadcasts.length > 0 &&
         currentBroadcast && (
-          <section className="mx-auto max-w-7xl px-4 pt-2">
+          <section className="mx-auto max-w-7xl px-4 pt-4">
             <div
-              className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-black/80 shadow-[0_0_30px_rgba(220,38,38,.10)] select-none touch-pan-y"
+              className="relative overflow-hidden rounded-[1.75rem] border border-red-500/25 bg-gradient-to-br from-[#120406] via-black to-[#08090d] shadow-[0_0_35px_rgba(220,38,38,.10)] select-none"
               onPointerDown={
                 handleBroadcastPointerDown
-              }
-              onPointerMove={
-                handleBroadcastPointerMove
               }
               onPointerUp={
                 handleBroadcastPointerUp
@@ -579,14 +590,35 @@ export default function Home() {
                 handleBroadcastPointerUp
               }
               style={{
+                touchAction:
+                  'pan-y',
                 cursor:
                   broadcasts.length > 1
                     ? 'grab'
                     : 'default',
               }}
             >
-              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-red-600/10 blur-3xl" />
+              {/* Decorative gaming glow */}
+              <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-red-600/10 blur-3xl" />
 
+              <div className="pointer-events-none absolute -bottom-24 -right-24 h-56 w-56 rounded-full bg-red-500/5 blur-3xl" />
+
+              {/* Top line */}
+              <div className="relative flex items-center justify-between border-b border-white/5 px-4 py-2.5 sm:px-6">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,.8)]" />
+
+                  <span className="text-[9px] font-black uppercase tracking-[0.25em] text-red-300 sm:text-[10px]">
+                    LIVE TRANSMISSION
+                  </span>
+                </div>
+
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                  AUTO 05s
+                </span>
+              </div>
+
+              {/* Slider */}
               <div className="relative overflow-hidden">
                 <div
                   className="flex transition-transform duration-500 ease-out"
@@ -599,180 +631,160 @@ export default function Home() {
                   {broadcasts.map(
                     (broadcast) => (
                       <div
-                        key={broadcast.id}
+                        key={
+                          broadcast.id
+                        }
                         className="w-full shrink-0"
                       >
-                        <div className="flex min-h-[88px] items-center gap-3 p-3 sm:min-h-[96px] sm:gap-4 sm:p-4 md:min-h-[104px] md:p-5">
-                          {/* ICON */}
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-[0_0_20px_rgba(220,38,38,.12)] sm:h-11 sm:w-11 md:h-12 md:w-12">
-                            <Radio
-                              size={19}
-                              className="text-red-400 md:h-5 md:w-5"
-                            />
-                          </div>
-
-                          {/* CONTENT */}
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[9px] font-black tracking-wider text-red-300 sm:px-2.5 sm:py-1 sm:text-[10px]">
-                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                        <div className="relative flex min-h-[150px] flex-col justify-between gap-5 p-5 sm:min-h-[165px] sm:p-6 md:min-h-[175px] md:p-7">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-red-300">
+                                <Radio
+                                  size={11}
+                                />
 
                                 LIVE
                               </span>
 
-                              <span className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:text-[10px]">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">
                                 {broadcast.type}
                               </span>
                             </div>
 
-                            <h2 className="truncate text-sm font-black text-white sm:text-base md:text-lg">
+                            <h2 className="mt-3 text-xl font-black uppercase tracking-tight text-white sm:text-2xl md:text-3xl">
                               {broadcast.title}
                             </h2>
 
-                            <p className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                            <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-400 sm:text-base">
                               {broadcast.message}
                             </p>
                           </div>
 
-                          {/* INDICATOR */}
-                          {broadcasts.length >
-                            1 && (
-                            <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+                          {/* Bottom accent */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
                               {broadcasts.map(
                                 (
                                   item,
-                                  dotIndex
+                                  index
                                 ) => (
                                   <span
                                     key={
                                       item.id
                                     }
-                                    className={`h-1.5 rounded-full transition-all ${
-                                      dotIndex ===
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                                      index ===
                                       activeBroadcast
-                                        ? 'w-5 bg-red-400'
+                                        ? 'w-8 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,.5)]'
                                         : 'w-1.5 bg-slate-700'
                                     }`}
                                   />
                                 )
                               )}
                             </div>
-                          )}
+
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-700">
+                              {String(
+                                activeBroadcast +
+                                  1
+                              ).padStart(
+                                2,
+                                '0'
+                              )}
+                              /
+                              {String(
+                                broadcasts.length
+                              ).padStart(
+                                2,
+                                '0'
+                              )}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )
                   )}
                 </div>
               </div>
-
-              {/* MOBILE DOTS */}
-              {broadcasts.length >
-                1 && (
-                <div className="relative flex justify-center gap-1.5 pb-2.5 sm:hidden">
-                  {broadcasts.map(
-                    (
-                      broadcast,
-                      dotIndex
-                    ) => (
-                      <span
-                        key={
-                          broadcast.id
-                        }
-                        className={`h-1.5 rounded-full transition-all ${
-                          dotIndex ===
-                          activeBroadcast
-                            ? 'w-5 bg-red-400'
-                            : 'w-1.5 bg-slate-700'
-                        }`}
-                      />
-                    )
-                  )}
-                </div>
-              )}
             </div>
           </section>
         )}
 
       {/* =====================================================
           LINK BROADCAST CARD
-          HANYA MUNCUL JIKA ADA LINK
+          HANYA UNTUK BROADCAST DENGAN LINK
       ===================================================== */}
+
       {!loadingBroadcast &&
         linkedBroadcast && (
-          <section className="mx-auto max-w-7xl px-4 pt-8">
-            <div className="relative overflow-hidden rounded-3xl border border-red-500/30 bg-black/80 shadow-[0_0_35px_rgba(220,38,38,.12)]">
-              <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-red-600/10 blur-3xl" />
+          <section className="mx-auto max-w-7xl px-4 pt-6">
+            <div className="relative overflow-hidden rounded-[2rem] border border-red-500/30 bg-gradient-to-br from-[#170407] via-[#080304] to-black shadow-[0_0_45px_rgba(220,38,38,.12)]">
+              {/* Glow */}
+              <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-red-600/10 blur-3xl" />
 
-              <div className="relative p-5 sm:p-6 md:p-7">
-                <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                  <div className="flex min-w-0 items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 shadow-[0_0_20px_rgba(220,38,38,.12)] sm:h-14 sm:w-14">
-                      <Radio
-                        size={22}
-                        className="text-red-400"
+              <div className="relative p-5 sm:p-7 md:p-8">
+                {/* Header */}
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-red-300">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+
+                    LIVE BROADCAST
+                  </span>
+
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
+                    {linkedBroadcast.type}
+                  </span>
+                </div>
+
+                {/* Content */}
+                <div className="mt-5">
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-white sm:text-3xl md:text-4xl">
+                    {linkedBroadcast.title}
+                  </h2>
+
+                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400 sm:text-base">
+                    {linkedBroadcast.message}
+                  </p>
+                </div>
+
+                {/* Link button */}
+                <div className="mt-6">
+                  {String(
+                    linkedBroadcast.link_url
+                  ).startsWith('/') ? (
+                    <Link
+                      href={
+                        linkedBroadcast.link_url
+                      }
+                      className="btn btn-primary w-full justify-center sm:w-auto"
+                    >
+                      {linkedBroadcast.link_label ||
+                        'Lihat Sekarang'}
+
+                      <ArrowRight
+                        size={17}
+                        className="ml-2"
                       />
-                    </div>
+                    </Link>
+                  ) : (
+                    <a
+                      href={
+                        linkedBroadcast.link_url
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary w-full justify-center sm:w-auto"
+                    >
+                      {linkedBroadcast.link_label ||
+                        'Lihat Sekarang'}
 
-                    <div className="min-w-0">
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-black tracking-wider text-red-300">
-                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-
-                          LIVE BROADCAST
-                        </span>
-
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          {linkedBroadcast.type}
-                        </span>
-                      </div>
-
-                      <h2 className="text-xl font-black text-white sm:text-2xl md:text-3xl">
-                        {linkedBroadcast.title}
-                      </h2>
-
-                      <p className="mt-2 text-sm leading-relaxed text-slate-400 sm:text-base">
-                        {linkedBroadcast.message}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="shrink-0">
-                    {String(
-                      linkedBroadcast.link_url
-                    ).startsWith('/') ? (
-                      <Link
-                        href={
-                          linkedBroadcast.link_url
-                        }
-                        className="btn btn-primary w-full justify-center md:w-auto"
-                      >
-                        {linkedBroadcast.link_label ||
-                          'Lihat Sekarang'}
-
-                        <ArrowRight
-                          size={17}
-                          className="ml-2"
-                        />
-                      </Link>
-                    ) : (
-                      <a
-                        href={
-                          linkedBroadcast.link_url
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-primary w-full justify-center md:w-auto"
-                      >
-                        {linkedBroadcast.link_label ||
-                          'Lihat Sekarang'}
-
-                        <ExternalLink
-                          size={16}
-                          className="ml-2"
-                        />
-                      </a>
-                    )}
-                  </div>
+                      <ExternalLink
+                        size={16}
+                        className="ml-2"
+                      />
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -782,6 +794,7 @@ export default function Home() {
       {/* =====================================================
           GAME POPULER
       ===================================================== */}
+
       <section className="mx-auto max-w-7xl px-4 py-16">
         <div className="flex items-end justify-between">
           <div>
@@ -893,6 +906,7 @@ export default function Home() {
       {/* =====================================================
           PROMO
       ===================================================== */}
+
       <section
         id="promo"
         className="mx-auto max-w-7xl px-4 py-10"
