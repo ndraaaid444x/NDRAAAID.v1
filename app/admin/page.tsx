@@ -4662,117 +4662,105 @@ async function deleteVoucher(v: any) {
       ===================================================== */}
 
       {tab === 'settings' && (
-        <form
-          onSubmit={saveSettings}
-          className="glass mt-7 max-w-2xl space-y-4 rounded-2xl p-6"
-        >
-          <h2 className="text-xl font-black">
-            Website Settings
-          </h2>
+        <section className="mt-7 max-w-5xl">
+          <div className="glass overflow-hidden rounded-3xl">
+            <div className="border-b border-white/10 bg-gradient-to-r from-cyan-400/[.06] via-transparent to-purple-500/[.06] p-6 md:p-7">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] font-black tracking-[.2em] text-cyan-300">
+                      SYSTEM CONFIG
+                    </span>
+                    <span className="text-xs text-slate-600">ADMIN ONLY</span>
+                  </div>
+                  <h2 className="mt-2 text-2xl font-black text-white">
+                    Pengaturan Website
+                  </h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                    Atur identitas website dan kontak yang digunakan di seluruh halaman NDRAAAID.v1.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 px-4 py-3">
+                  <p className="text-[9px] uppercase tracking-[.2em] text-slate-600">Status</p>
+                  <p className="mt-1 text-sm font-black text-emerald-300">● ONLINE</p>
+                </div>
+              </div>
+            </div>
 
-          <label className="field">
-            Nama website
+            <form onSubmit={saveSettings} className="p-6 md:p-7">
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Nama website</span>
+                  <input
+                    className="input w-full"
+                    value={site.name || ''}
+                    onChange={(e) => setSite({ ...site, name: e.target.value })}
+                    placeholder="NDRAAAID.v1"
+                  />
+                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Nama brand yang tampil di website.</span>
+                </label>
 
-            <input
-              value={
-                site.name || ''
-              }
-              onChange={(e) =>
-                setSite({
-                  ...site,
-                  name: e.target.value,
-                })
-              }
-            />
-          </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Tagline</span>
+                  <input
+                    className="input w-full"
+                    value={site.tagline || ''}
+                    onChange={(e) => setSite({ ...site, tagline: e.target.value })}
+                    placeholder="Top Up Game Cepat, Aman & Terpercaya"
+                  />
+                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Teks pendek untuk identitas website.</span>
+                </label>
 
-          <label className="field">
-            Tagline
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">WhatsApp</span>
+                  <input
+                    className="input w-full"
+                    value={site.whatsapp || ''}
+                    onChange={(e) => setSite({ ...site, whatsapp: e.target.value })}
+                    placeholder="62812..."
+                    inputMode="numeric"
+                  />
+                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Gunakan format internasional, contoh 628123456789.</span>
+                </label>
 
-            <input
-              value={
-                site.tagline ||
-                ''
-              }
-              onChange={(e) =>
-                setSite({
-                  ...site,
-                  tagline:
-                    e.target.value,
-                })
-              }
-            />
-          </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Instagram</span>
+                  <input
+                    className="input w-full"
+                    value={site.instagram || ''}
+                    onChange={(e) => setSite({ ...site, instagram: e.target.value })}
+                    placeholder="https://instagram.com/..."
+                  />
+                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Link Instagram yang akan digunakan website.</span>
+                </label>
+              </div>
 
-          <label className="field">
-            WhatsApp
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[.025] p-4 md:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-bold text-white">Maintenance mode</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">Jika aktif, website dapat ditampilkan dalam mode pemeliharaan.</p>
+                  </div>
+                  <select
+                    className="input w-full sm:w-40"
+                    value={site.maintenance ? 'true' : 'false'}
+                    onChange={(e) => setSite({ ...site, maintenance: e.target.value === 'true' })}
+                  >
+                    <option value="false">Off</option>
+                    <option value="true">On</option>
+                  </select>
+                </div>
+              </div>
 
-            <input
-              value={
-                site.whatsapp ||
-                ''
-              }
-              onChange={(e) =>
-                setSite({
-                  ...site,
-                  whatsapp:
-                    e.target.value,
-                })
-              }
-              placeholder="62812..."
-            />
-          </label>
-
-          <label className="field">
-            Instagram
-
-            <input
-              value={
-                site.instagram ||
-                ''
-              }
-              onChange={(e) =>
-                setSite({
-                  ...site,
-                  instagram:
-                    e.target.value,
-                })
-              }
-            />
-          </label>
-
-          <label className="field">
-            Maintenance mode
-
-            <select
-              value={
-                site.maintenance
-                  ? 'true'
-                  : 'false'
-              }
-              onChange={(e) =>
-                setSite({
-                  ...site,
-                  maintenance:
-                    e.target.value ===
-                    'true',
-                })
-              }
-            >
-              <option value="false">
-                Off
-              </option>
-
-              <option value="true">
-                On
-              </option>
-            </select>
-          </label>
-
-          <button className="btn btn-primary">
-            Simpan Settings
-          </button>
-        </form>
+              <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-slate-600">Perubahan tersimpan ke konfigurasi website.</p>
+                <button type="submit" className="btn btn-primary min-w-40">
+                  Simpan Pengaturan
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
       )}
 
       {/* =====================================================
