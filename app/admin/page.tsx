@@ -41,6 +41,10 @@ export default function Admin() {
   const [role, setRole] = useState('')
   const [msg, setMsg] = useState('')
 
+  const [editType, setEditType] = useState<'category' | 'game' | 'product' | null>(null)
+  const [editId, setEditId] = useState('')
+  const [editForm, setEditForm] = useState<any>({})
+
   const [orders, setOrders] = useState<any[]>([])
   const [games, setGames] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
@@ -467,6 +471,150 @@ s
         'Status diperbarui.'
     )
 
+    load()
+  }
+
+  function openEdit(type: 'category' | 'game' | 'product', row: any) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat mengedit katalog.')
+      return
+    }
+
+    setEditType(type)
+    setEditId(row.id)
+
+    if (type === 'category') {
+      setEditForm({
+        name: row.name || '',
+        slug: row.slug || '',
+        description: row.description || '',
+      })
+      return
+    }
+
+    if (type === 'game') {
+      setEditForm({
+        name: row.name || '',
+        slug: row.slug || '',
+        description: row.description || '',
+        category_id: row.category_id || '',
+        logo_url: row.logo_url || '',
+        banner_url: row.banner_url || '',
+      })
+      return
+    }
+
+    setEditForm({
+      game_id: row.game_id || '',
+      name: row.name || '',
+      nominal: row.nominal ?? '',
+      sku: row.sku || '',
+      price: row.price ?? '',
+      image_url: row.image_url || '',
+    })
+  }
+
+  function closeEdit() {
+    setEditType(null)
+    setEditId('')
+    setEditForm({})
+  }
+
+  async function saveEdit() {
+    if (!editType || !editId) return
+
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat mengedit katalog.')
+      closeEdit()
+      return
+    }
+
+    let table = ''
+    let payload: any = {}
+
+    if (editType === 'category') {
+      table = 'game_categories'
+      payload = {
+        name: String(editForm.name || '').trim(),
+        slug: String(editForm.slug || '')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '-'),
+        description: String(editForm.description || '').trim() || null,
+      }
+
+      if (!payload.name || !payload.slug) {
+        setMsg('Nama dan slug kategori wajib diisi.')
+        return
+      }
+    }
+
+    if (editType === 'game') {
+      table = 'games'
+      payload = {
+        name: String(editForm.name || '').trim(),
+        slug: String(editForm.slug || '')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '-'),
+        description: String(editForm.description || '').trim() || null,
+        category_id: editForm.category_id || null,
+        logo_url: String(editForm.logo_url || '').trim() || null,
+        banner_url: String(editForm.banner_url || '').trim() || null,
+      }
+
+      if (!payload.name || !payload.slug) {
+        setMsg('Nama dan slug game wajib diisi.')
+        return
+      }
+    }
+
+    if (editType === 'product') {
+      table = 'game_products'
+
+      const price = Number(editForm.price)
+      if (!Number.isFinite(price) || price < 0) {
+        setMsg('Harga produk tidak valid.')
+        return
+      }
+
+      payload = {
+        game_id: editForm.game_id,
+        name: String(editForm.name || '').trim(),
+        nominal: String(editForm.nominal || '').trim(),
+        sku: String(editForm.sku || '').trim(),
+        price,
+        image_url: String(editForm.image_url || '').trim() || null,
+      }
+
+      if (
+        !payload.game_id ||
+        !payload.name ||
+        !payload.nominal ||
+        !payload.sku
+      ) {
+        setMsg('Game, nama, nominal, dan SKU wajib diisi.')
+        return
+      }
+    }
+
+    const { error } = await s
+      .from(table)
+      .update(payload)
+      .eq('id', editId)
+
+    setMsg(
+      error?.message ||
+        `${
+          editType === 'category'
+            ? 'Kategori'
+            : editType === 'game'
+              ? 'Game'
+              : 'Produk'
+        } berhasil diperbarui.`
+    )
+
+    if (!error) closeEdit()
     load()
   }
 
@@ -2356,6 +2504,15 @@ async function deleteVoucher(v: any) {
                 </div>
 
                 <div className="flex gap-2">
+                  {['owner', 'admin'].includes(role) && (
+                    <button
+                      onClick={() => openEdit('category', c)}
+                      className="btn btn-primary text-xs"
+                    >
+                      Edit
+                    </button>
+                  )}
+
                   <button
                     onClick={() =>
                       toggle(
@@ -2611,19 +2768,30 @@ async function deleteVoucher(v: any) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() =>
-                    toggle(
-                      'games',
-                      g.id
-                    )
-                  }
-                  className="btn btn-muted text-xs"
-                >
-                  {g.is_active
-                    ? 'Nonaktifkan'
-                    : 'Aktifkan'}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {['owner', 'admin'].includes(role) && (
+                    <button
+                      onClick={() => openEdit('game', g)}
+                      className="btn btn-primary text-xs"
+                    >
+                      Edit
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() =>
+                      toggle(
+                        'games',
+                        g.id
+                      )
+                    }
+                    className="btn btn-muted text-xs"
+                  >
+                    {g.is_active
+                      ? 'Nonaktifkan'
+                      : 'Aktifkan'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -2795,19 +2963,30 @@ async function deleteVoucher(v: any) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() =>
-                    toggle(
-                      'game_products',
-                      p.id
-                    )
-                  }
-                  className="btn btn-muted text-xs"
-                >
-                  {p.is_active
-                    ? 'Nonaktifkan'
-                    : 'Aktifkan'}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {['owner', 'admin'].includes(role) && (
+                    <button
+                      onClick={() => openEdit('product', p)}
+                      className="btn btn-primary text-xs"
+                    >
+                      Edit
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() =>
+                      toggle(
+                        'game_products',
+                        p.id
+                      )
+                    }
+                    className="btn btn-muted text-xs"
+                  >
+                    {p.is_active
+                      ? 'Nonaktifkan'
+                      : 'Aktifkan'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -4689,6 +4868,263 @@ async function deleteVoucher(v: any) {
       )}
         </div>
       </div>
+
+      {editType && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950 p-5 shadow-2xl shadow-cyan-950/30">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">
+                  EDIT CATALOG
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-white">
+                  {editType === 'category'
+                    ? 'Edit Kategori'
+                    : editType === 'game'
+                      ? 'Edit Game'
+                      : 'Edit Produk / Nominal'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Perubahan langsung diterapkan ke data website.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeEdit}
+                className="rounded-xl border border-white/10 px-3 py-2 text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {editType === 'category' && (
+                <>
+                  <input
+                    className="input"
+                    placeholder="Nama kategori"
+                    value={editForm.name || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="input"
+                    placeholder="Slug"
+                    value={editForm.slug || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        slug: e.target.value,
+                      })
+                    }
+                  />
+                  <textarea
+                    className="input min-h-24"
+                    placeholder="Deskripsi"
+                    value={editForm.description || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </>
+              )}
+
+              {editType === 'game' && (
+                <>
+                  <input
+                    className="input"
+                    placeholder="Nama game"
+                    value={editForm.name || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="input"
+                    placeholder="Slug"
+                    value={editForm.slug || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        slug: e.target.value,
+                      })
+                    }
+                  />
+                  <select
+                    className="input"
+                    value={editForm.category_id || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        category_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Tanpa kategori</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <textarea
+                    className="input min-h-24"
+                    placeholder="Deskripsi"
+                    value={editForm.description || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="input"
+                    placeholder="URL logo game"
+                    value={editForm.logo_url || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        logo_url: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    className="input"
+                    placeholder="URL banner game"
+                    value={editForm.banner_url || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        banner_url: e.target.value,
+                      })
+                    }
+                  />
+                </>
+              )}
+
+              {editType === 'product' && (
+                <>
+                  <select
+                    className="input"
+                    value={editForm.game_id || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        game_id: e.target.value,
+                      })
+                    }
+                  >
+                    {games.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    className="input"
+                    placeholder="Nama produk"
+                    value={editForm.name || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    className="input"
+                    placeholder="Nominal"
+                    value={editForm.nominal || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        nominal: e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    className="input"
+                    placeholder="SKU"
+                    value={editForm.sku || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        sku: e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    type="number"
+                    min="0"
+                    className="input"
+                    placeholder="Harga"
+                    value={editForm.price ?? ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        price: e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    className="input"
+                    placeholder="URL gambar produk"
+                    value={editForm.image_url || ''}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        image_url: e.target.value,
+                      })
+                    }
+                  />
+
+                  {editForm.image_url && (
+                    <img
+                      src={editForm.image_url}
+                      alt="Preview produk"
+                      className="h-24 w-24 rounded-xl object-cover"
+                    />
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeEdit}
+                className="btn btn-muted"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                className="btn btn-primary"
+              >
+                Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
