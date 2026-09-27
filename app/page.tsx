@@ -424,7 +424,6 @@ export default function Home() {
     return () => {
       mounted = false
       clearInterval(interval)
-      clearTimeout(timeout)
     }
   }, [])
 
