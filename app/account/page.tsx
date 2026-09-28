@@ -120,26 +120,26 @@ export default function Account() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-10 md:py-14">
-      <div className="mb-8">
+    <main className="mx-auto w-full max-w-3xl px-4 py-8 md:py-10">
+      <div className="mb-5">
         <p className="text-sm font-bold uppercase tracking-wider text-cyan-300">
           Account
         </p>
 
-        <h1 className="mt-2 text-4xl font-black tracking-tight text-white md:text-5xl">
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-white md:text-4xl">
           Profile
         </h1>
 
-        <p className="mt-3 text-sm leading-6 text-slate-400 md:text-base">
+        <p className="mt-1 text-sm leading-5 text-slate-500">
           Kelola informasi akun kamu di sini.
         </p>
       </div>
 
       <form
         onSubmit={saveProfile}
-        className="glass rounded-3xl border border-white/10 p-5 shadow-2xl sm:p-7"
+        className="glass rounded-2xl border border-white/10 p-4 shadow-2xl sm:p-5"
       >
-        <div className="grid gap-5">
+        <div className="grid gap-3.5">
           {/* NAMA */}
           <div>
             <label
@@ -166,7 +166,7 @@ export default function Account() {
                   })
                 }
                 placeholder="Masukkan nama"
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/60 py-3.5 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
+                className="w-full rounded-2xl border border-white/10 bg-slate-950/60 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
               />
             </div>
           </div>
@@ -191,7 +191,7 @@ export default function Account() {
                 type="text"
                 value={profile.username || ''}
                 disabled
-                className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.03] py-3.5 pl-11 pr-4 text-sm text-slate-500 outline-none"
+                className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.03] py-3 pl-11 pr-4 text-sm text-slate-500 outline-none"
               />
             </div>
 
@@ -220,7 +220,7 @@ export default function Account() {
                 type="email"
                 value={profile.email || ''}
                 disabled
-                className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.03] py-3.5 pl-11 pr-4 text-sm text-slate-500 outline-none"
+                className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.03] py-3 pl-11 pr-4 text-sm text-slate-500 outline-none"
               />
             </div>
 
@@ -256,7 +256,7 @@ export default function Account() {
                   })
                 }
                 placeholder="Contoh: 081234567890"
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/60 py-3.5 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
+                className="w-full rounded-2xl border border-white/10 bg-slate-950/60 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
               />
             </div>
           </div>
@@ -281,7 +281,7 @@ export default function Account() {
         )}
 
         {/* BUTTON */}
-        <div className="mt-7 flex justify-end">
+        <div className="mt-5 flex justify-end">
           <button
             type="submit"
             disabled={saving}
