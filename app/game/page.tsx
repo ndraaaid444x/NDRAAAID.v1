@@ -101,19 +101,21 @@ export default function GamePage() {
   return (
     <section className="mx-auto max-w-6xl px-4 py-12">
       <div className="glass overflow-hidden rounded-3xl">
-        <div className="relative min-h-52 overflow-hidden bg-gradient-to-br from-cyan-500/10 via-purple-500/15 to-pink-500/10 p-8">
-          {game.banner_url && (
+        <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
+          {game.banner_url ? (
             <img
               src={game.banner_url}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover opacity-25"
+              alt={game.name || 'Game banner'}
+              className="absolute inset-0 h-full w-full object-cover"
             />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-purple-500/15 to-pink-500/10" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-transparent" />
-          <div className="relative">
-            <p className="text-sm font-bold text-cyan-300">TOP UP GAME</p>
-            <h1 className="mt-2 text-4xl font-black">{game.name}</h1>
-            <p className="mt-3 max-w-2xl text-slate-300">
+
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/45 to-slate-950/5" />
+          <div className="absolute inset-x-0 bottom-0 z-10 p-4 md:p-6">
+            <h1 className="text-xl font-black leading-tight text-white md:text-2xl">{game.name}</h1>
+            <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-300 md:text-xs">
               {game.description || 'Pilih produk dan masukkan data akunmu.'}
             </p>
           </div>
