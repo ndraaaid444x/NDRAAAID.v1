@@ -682,20 +682,22 @@ export default function Home() {
         >
           <div className="glass overflow-hidden rounded-3xl border border-pink-400/10">
             {promo.content_type !== 'text' && promo.banner_url && (
-              /\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(promo.banner_url) ? (
+              <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
+                {/\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(promo.banner_url) ? (
                 <video
                   src={promo.banner_url}
                   aria-label={promo.name || 'Banner Promo'}
-                  className="max-h-[520px] w-full object-cover"
+                  className="h-full w-full object-cover"
                   autoPlay muted loop playsInline
                 />
               ) : (
                 <img
                   src={promo.banner_url}
                   alt={promo.name || 'Banner Promo'}
-                  className="max-h-[520px] w-full object-cover"
+                  className="h-full w-full object-cover"
                 />
-              )
+                )}
+              </div>
             )}
 
             {promo.content_type !== 'image' && (
