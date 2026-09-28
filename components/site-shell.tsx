@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import SiteHeader from '@/components/site-header'
 import ChatWidget from '@/components/chat-widget'
 import WhatsApp from '@/components/whatsapp'
+import BackButton from '@/components/back-button'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
 export default function SiteShell({
@@ -12,6 +14,7 @@ export default function SiteShell({
   children: React.ReactNode
 }) {
   const [number, setNumber] = useState('')
+  const pathname = usePathname()
 
   useEffect(() => {
     supabaseBrowser()
@@ -74,11 +77,21 @@ export default function SiteShell({
     }
   }, [])
 
+  const showBackButton = pathname !== '/'
+
   return (
     <>
       <SiteHeader />
 
-      <main>{children}</main>
+      <main>
+        {showBackButton && (
+          <div className="mx-auto w-full max-w-7xl px-4 pt-3 sm:px-6 sm:pt-4">
+            <BackButton />
+          </div>
+        )}
+
+        {children}
+      </main>
 
       <ChatWidget />
 
