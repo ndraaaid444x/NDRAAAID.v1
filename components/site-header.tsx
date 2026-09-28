@@ -491,236 +491,35 @@ export default function SiteHeader() {
         </div>
       </div>
 
-      {/* MOBILE GAMING MENU */}
+      {/* MOBILE SHORTCUT MENU */}
       {mobile && (
         <div className="border-t border-red-500/15 bg-[#050507]/98 px-3 pb-4 pt-3 backdrop-blur-2xl lg:hidden">
-
-          <div className="mx-auto max-w-7xl">
-
+          <div className="mx-auto max-w-7xl rounded-2xl border border-white/[.07] bg-[#09090d]/95 p-3 shadow-[0_24px_60px_rgba(0,0,0,.55)]">
             {user ? (
-              <Link
-                href="/dashboard"
-                onClick={() => setMobile(false)}
-                className="mb-3 flex items-center justify-between rounded-2xl border border-red-500/25 bg-gradient-to-r from-red-500/[0.10] to-transparent p-3"
-              >
-                <div className="flex items-center gap-3">
-
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10">
-                    <UserRound
-                      size={17}
-                      className="text-red-400"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
-                      PLAYER
-                    </div>
-
-                    <div className="mt-1 text-sm font-black text-white">
-                      {displayName}
-                    </div>
-                  </div>
-
+              <div className="mb-2.5 flex items-center justify-between rounded-xl border border-red-500/15 bg-red-500/[.035] px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-500/25 bg-red-500/[.06]"><UserRound size={16} className="text-red-400" /></div>
+                  <div className="min-w-0"><div className="truncate text-xs font-black text-white">{displayName}</div><div className="mt-0.5 text-[9px] text-slate-600">Saldo</div></div>
                 </div>
-
-                <div className="text-right">
-                  <div className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
-                    WALLET
-                  </div>
-
-                  <div className="mt-1 text-xs font-black text-red-400">
-                    {formattedBalance}
-                  </div>
-                </div>
-              </Link>
-            ) : (
-              <div className="mb-3 rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-3">
-                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-red-400">
-                  NDRAAAID.v1
-                </div>
-
-                <div className="mt-1 text-sm font-black text-white">
-                  Gaming Top Up Center
-                </div>
+                <div className="text-right"><div className="text-[11px] font-black text-red-300">{formattedBalance}</div></div>
               </div>
-            )}
+            ) : null}
 
-            {/* MAIN MENU */}
-            <div className="grid grid-cols-2 gap-2">
-
-              <Link
-                onClick={() => setMobile(false)}
-                href="/"
-                className="flex items-center gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs font-black text-white"
-              >
-                <Gamepad2
-                  size={16}
-                  className="text-red-400"
-                />
-                HOME
-              </Link>
-
-              <Link
-                onClick={() => setMobile(false)}
-                href="/games"
-                className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-black text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
-              >
-                <Gamepad2
-                  size={16}
-                  className="text-red-400"
-                />
-                GAMES
-              </Link>
-
-              <Link
-                onClick={() => setMobile(false)}
-                href="/#promo"
-                className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-black text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
-              >
-                <Gift
-                  size={16}
-                  className="text-red-400"
-                />
-                PROMO
-              </Link>
-
-              <Link
-                onClick={() => setMobile(false)}
-                href="/orders/track"
-                className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-black text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
-              >
-                <ReceiptText
-                  size={16}
-                  className="text-red-400"
-                />
-                TRANSAKSI
-              </Link>
-
-              <Link
-                onClick={() => setMobile(false)}
-                href="/terms"
-                className="col-span-2 flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-black text-slate-300 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-white"
-              >
-                <CircleHelp
-                  size={16}
-                  className="text-red-400"
-                />
-                BANTUAN
-              </Link>
-
+            <div className="grid gap-1.5">
+              <Link href="/account" onClick={() => setMobile(false)} className="flex items-center justify-between rounded-lg border border-white/[.06] bg-white/[.018] px-3 py-2.5"><span className="flex items-center gap-2.5 text-xs font-bold text-slate-300"><UserRound size={15} className="text-red-400" />Profil</span><span className="text-[9px] text-slate-600">Nama & saldo</span></Link>
+              <Link href="/dashboard" onClick={() => setMobile(false)} className="flex items-center justify-between rounded-lg border border-white/[.06] bg-white/[.018] px-3 py-2.5"><span className="flex items-center gap-2.5 text-xs font-bold text-slate-300"><LayoutDashboard size={15} className="text-red-400" />Dashboard Akun</span><span className="text-[9px] text-slate-600">Aktivitas akun</span></Link>
+              {user && <Link href="/deposit" onClick={() => setMobile(false)} className="flex items-center justify-between rounded-lg border border-white/[.06] bg-white/[.018] px-3 py-2.5"><span className="flex items-center gap-2.5 text-xs font-bold text-slate-300"><Wallet size={15} className="text-red-400" />Deposit Saldo</span><span className="text-[9px] text-slate-600">Top up saldo</span></Link>}
+              <Link href="/terms" onClick={() => setMobile(false)} className="flex items-center justify-between rounded-lg border border-white/[.06] bg-white/[.018] px-3 py-2.5"><span className="flex items-center gap-2.5 text-xs font-bold text-slate-300"><CircleHelp size={15} className="text-red-400" />Bantuan</span><span className="text-[9px] text-slate-600">Pusat bantuan</span></Link>
             </div>
 
-            {user ? (
-              <>
-                {/* ACCOUNT */}
-                <div className="mt-2 grid grid-cols-2 gap-2">
-
-                  <Link
-                    onClick={() => setMobile(false)}
-                    href="/dashboard"
-                    className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
-                  >
-                    <LayoutDashboard
-                      size={15}
-                      className="text-red-400"
-                    />
-                    Dashboard
-                  </Link>
-
-                  <Link
-                    onClick={() => setMobile(false)}
-                    href="/account"
-                    className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
-                  >
-                    <UserRound
-                      size={15}
-                      className="text-red-400"
-                    />
-                    Profile
-                  </Link>
-
-                  <Link
-                    onClick={() => setMobile(false)}
-                    href="/orders"
-                    className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
-                  >
-                    <ReceiptText
-                      size={15}
-                      className="text-red-400"
-                    />
-                    Transaksi
-                  </Link>
-
-                  <Link
-                    onClick={() => setMobile(false)}
-                    href="/notifications"
-                    className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 text-xs font-bold text-slate-300"
-                  >
-                    <Bell
-                      size={15}
-                      className="text-red-400"
-                    />
-
-                    Notifikasi
-
-                    {unread > 0 && (
-                      <span className="ml-auto rounded-full bg-red-500/15 px-1.5 py-0.5 text-[8px] font-black text-red-400">
-                        {unread}
-                      </span>
-                    )}
-                  </Link>
-
-                </div>
-
-                {isAdmin && (
-                  <Link
-                    onClick={() => setMobile(false)}
-                    href="/admin"
-                    className="mt-2 flex items-center gap-3 rounded-xl border border-red-500/25 bg-red-500/[0.05] p-3 text-xs font-black text-red-400"
-                  >
-                    <ShieldCheck size={16} />
-                    ADMIN PANEL
-                  </Link>
-                )}
-
-                {/* LOGOUT */}
-                <button
-                  onClick={logout}
-                  disabled={loggingOut}
-                  className="mt-2 flex w-full items-center gap-3 rounded-xl border border-red-500/25 bg-red-500/[0.04] p-3 text-left text-xs font-black text-red-400 disabled:opacity-50"
-                >
-                  <LogOut size={16} />
-
-                  {loggingOut
-                    ? 'Keluar...'
-                    : 'LOGOUT'}
-                </button>
-              </>
-            ) : (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-
-                <Link
-                  onClick={() => setMobile(false)}
-                  href="/login"
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-3 text-center text-xs font-black text-slate-300"
-                >
-                  LOGIN
-                </Link>
-
-                <Link
-                  onClick={() => setMobile(false)}
-                  href="/register"
-                  className="rounded-xl border border-red-500/40 bg-red-600 p-3 text-center text-xs font-black text-white shadow-[0_0_20px_rgba(239,68,68,.2)]"
-                >
-                  DAFTAR
-                </Link>
-
+            {user && (
+              <div className="mt-2 flex items-center justify-end">
+                <button onClick={logout} disabled={loggingOut} className="rounded-lg px-2 py-1 text-[9px] font-black text-red-400 hover:bg-red-500/[.06] disabled:opacity-50"><LogOut size={12} className="mr-1 inline" />{loggingOut ? 'Keluar...' : 'Logout'}</button>
               </div>
             )}
-
           </div>
         </div>
+      )}
       )}
     </header>
   )

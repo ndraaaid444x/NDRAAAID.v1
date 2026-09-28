@@ -173,19 +173,9 @@ export default function TopupForm({
                   : 'border-white/10 bg-slate-950/40 hover:border-white/20'
               }`}
             >
-              {p.image_url ? (
-                <img
-                  src={p.image_url}
-                  alt=""
-                  className="mb-3 aspect-video w-full rounded-xl object-cover"
-                />
-              ) : (
-                <div className="mb-3 flex aspect-video items-center justify-center rounded-xl bg-slate-900 text-2xl">
-                  🎮
-                </div>
-              )}
-
-              <div className="font-bold">{p.name}</div>
+              <div className="min-h-[4.25rem] flex items-center">
+                <div className="font-bold leading-snug">{p.name || p.nominal}</div>
+              </div>
 
               <div className="mt-2 text-sm text-cyan-300">
                 Rp {Number(p.price).toLocaleString('id-ID')}
