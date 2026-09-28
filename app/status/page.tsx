@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import PaymentProof from '@/components/payment-proof'
@@ -35,7 +35,7 @@ const labels: Record<string, string> = Object.fromEntries(
   Object.entries(statusInfo).map(([key, value]) => [key, value.label])
 )
 
-export default function OrderStatusPage() {
+function OrderStatusContent() {
   const router = useRouter()
   const params = useParams<{ status: string }>()
   const searchParams = useSearchParams()
@@ -103,7 +103,11 @@ export default function OrderStatusPage() {
 
     let method = null
     if (paymentRow?.payment_method_id) {
-      const { data } = await s.from('payment_methods').select('*').eq('id', paymentRow.payment_method_id).maybeSingle()
+      const { data } = await s
+        .from('payment_methods')
+        .select('*')
+        .eq('id', paymentRow.payment_method_id)
+        .maybeSingle()
       method = data
     }
 
@@ -123,40 +127,6 @@ export default function OrderStatusPage() {
     if (first) setLoading(false)
   }, [id, params.status, routeStatus, router])
 
-  // Realtime memperbarui Buyer segera setelah Admin mengubah status.
-  // Polling 3 detik tetap dipertahankan sebagai fallback jika koneksi Realtime terputus.
-  useEffect(() => {
-    if (!id) return
-
-    const s = supabaseBrowser()
-    const channel = s
-      .channel(`order-status-${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `id=eq.${id}`,
-        },
-        (payload) => {
-          const nextStatus = String((payload.new as any)?.status || '')
-          if (nextStatus && nextStatus !== routeStatus) {
-            router.replace(
-              `/order/${statusSlug[nextStatus] || 'menunggu-pembayaran'}?id=${encodeURIComponent(id)}`
-            )
-            return
-          }
-          load(false)
-        }
-      )
-      .subscribe()
-
-    return () => {
-      void s.removeChannel(channel)
-    }
-  }, [id, routeStatus, router, load])
-
   useEffect(() => {
     load(true)
     const timer = window.setInterval(() => load(false), 3000)
@@ -170,6 +140,55 @@ export default function OrderStatusPage() {
     [paymentMethod]
   )
 
+  const customerEntries = useMemo(() => {
+    const data = o?.customer_data
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return []
+
+    const privateKeys = new Set([
+      'email',
+      'phone',
+      'whatsapp',
+      'wa',
+      'telephone',
+      'phone_number',
+      'whatsapp_number',
+    ])
+
+    const labelMap: Record<string, string> = {
+      id: 'ID',
+      user_id: 'User ID',
+      server: 'Server',
+      zone: 'Zone',
+      zone_id: 'Zone ID',
+      riot_id: 'Riot ID',
+      riotid: 'Riot ID',
+      tag: 'Tag',
+      name: 'Nama',
+      username: 'Username',
+      player_id: 'Player ID',
+      playerid: 'Player ID',
+      uid: 'UID',
+    }
+
+    return Object.entries(data)
+      .filter(([key, value]) => {
+        const normalized = key.toLowerCase().replace(/[\s-]/g, '_')
+        return !privateKeys.has(normalized) && value !== null && value !== undefined && String(value).trim() !== ''
+      })
+      .map(([key, value]) => ({
+        key,
+        label:
+          labelMap[key.toLowerCase()] ||
+          key
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        value:
+          typeof value === 'object'
+            ? JSON.stringify(value)
+            : String(value),
+      }))
+  }, [o])
+
   if (loading || !o) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-12 text-center text-slate-400">
@@ -178,85 +197,214 @@ export default function OrderStatusPage() {
     )
   }
 
-  const info = statusInfo[o.status] || { label: o.status, color: 'text-slate-300', icon: '•' }
+  const info = statusInfo[o.status] || {
+    label: o.status,
+    color: 'text-slate-300',
+    icon: '•',
+  }
+
   const compact = o.status === 'SUCCESS' || ['FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED'].includes(o.status)
-  const reference = payment?.external_reference || `REF-${o.order_code}`
+  const subtotal = Number(o.subtotal ?? o.total ?? 0)
+  const discount = Number(o.discount ?? 0)
+  const total = Number(o.total ?? Math.max(0, subtotal - discount))
+  const voucherCode = String(o.voucher_code || '').trim()
+  const hasDiscount = discount > 0 || Boolean(voucherCode)
+  const reference = payment?.external_reference || ''
 
   return (
-    <main className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10">
-      <section className="glass rounded-2xl p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Status Pesanan</p>
-            <h1 className={`mt-1 text-xl font-black sm:text-2xl ${info.color}`}>
+    <main className="mx-auto w-full max-w-2xl px-3 py-5 sm:px-4 sm:py-8">
+      <section className="glass overflow-hidden rounded-2xl p-3.5 sm:p-5">
+        <header className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Status Pesanan
+            </p>
+            <h1 className={`mt-1 text-lg font-black sm:text-xl ${info.color}`}>
               {info.icon} {info.label}
             </h1>
           </div>
-          <div className="text-right">
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">#{o.order_code}</span>
-            <p className="mt-2 text-[10px] uppercase tracking-wide text-slate-500">Ref ID</p>
-            <p className="max-w-[170px] break-all text-xs font-bold text-cyan-300">{reference}</p>
+          <div className="shrink-0 rounded-lg bg-white/5 px-2.5 py-1.5 text-right">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Order ID</p>
+            <p className="max-w-[150px] break-all text-[11px] font-black text-slate-200">
+              {o.order_code}
+            </p>
+          </div>
+        </header>
+
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Produk</p>
+              <p className="mt-0.5 truncate text-sm font-black text-slate-100">
+                {o.games?.name || 'Produk'}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-md bg-white/5 px-2 py-1 text-[9px] font-bold text-slate-400">
+              {info.label}
+            </span>
+          </div>
+
+          {o.order_items?.length > 0 && (
+            <div className="mt-2 border-t border-white/5 pt-2">
+              {o.order_items.map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 py-0.5 text-xs">
+                  <span className="truncate text-slate-500">{item.product_name}</span>
+                  {item.quantity && Number(item.quantity) > 1 && (
+                    <span className="shrink-0 text-slate-600">×{item.quantity}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {customerEntries.length > 0 && (
+          <div className="mt-2.5 rounded-xl border border-white/10 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Data Game
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {customerEntries.map((entry) => (
+                <div key={entry.key} className="min-w-0 rounded-lg bg-white/[0.025] px-2.5 py-2">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                    {entry.label}
+                  </p>
+                  <p className="mt-0.5 break-all text-xs font-bold text-slate-200">
+                    {entry.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2.5 rounded-xl border border-white/10 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Rincian Pembayaran
+            </p>
+            <p className="text-[10px] font-semibold text-slate-600">
+              {paymentMethod?.name || 'Pembayaran'}
+            </p>
+          </div>
+
+          <div className="mt-2 space-y-1.5 text-xs">
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-500">Subtotal</span>
+              <span className="font-semibold text-slate-300">
+                Rp {subtotal.toLocaleString('id-ID')}
+              </span>
+            </div>
+
+            {hasDiscount && (
+              <>
+                {voucherCode && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Voucher</span>
+                    <span className="font-bold text-cyan-300">{voucherCode}</span>
+                  </div>
+                )}
+                {discount > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Diskon</span>
+                    <span className="font-bold text-emerald-300">
+                      -Rp {discount.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="mt-2 flex items-center justify-between gap-4 border-t border-white/10 pt-2">
+              <span className="font-bold text-slate-300">Total</span>
+              <span className="text-base font-black text-cyan-300">
+                Rp {total.toLocaleString('id-ID')}
+              </span>
+            </div>
           </div>
         </div>
 
-        {o.status === 'SUCCESS' ? (
-          <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4">
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
-              <div>
-                <p className="text-[11px] text-slate-500">STRUK TRANSAKSI</p>
-                <p className="mt-1 text-sm font-black">Pembayaran Berhasil</p>
-              </div>
-              <span className="text-xl">✓</span>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-              <div><p className="text-[11px] text-slate-500">No. Referensi</p><p className="mt-0.5 font-bold break-all">{reference}</p></div>
-              <div><p className="text-[11px] text-slate-500">Order ID</p><p className="mt-0.5 font-bold break-all">{o.order_code}</p></div>
-              <div><p className="text-[11px] text-slate-500">Produk</p><p className="mt-0.5 font-semibold">{o.games?.name || 'Produk'}</p></div>
-              <div><p className="text-[11px] text-slate-500">Metode</p><p className="mt-0.5 font-semibold">{paymentMethod?.name || 'Pembayaran'}</p></div>
-              <div><p className="text-[11px] text-slate-500">Total</p><p className="mt-0.5 font-black text-cyan-300">Rp {Number(o.total || 0).toLocaleString('id-ID')}</p></div>
-              <div><p className="text-[11px] text-slate-500">Tanggal</p><p className="mt-0.5 font-semibold">{new Date(o.updated_at || o.created_at).toLocaleString('id-ID')}</p></div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mt-4 rounded-xl bg-slate-950/50 p-3">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-slate-400">{o.games?.name || 'Produk'}</span>
-                <span className="font-black">Rp {Number(o.total || 0).toLocaleString('id-ID')}</span>
-              </div>
-              {o.order_items?.map((item: any) => (
-                <p key={item.id} className="mt-1 text-xs text-slate-500">{item.product_name}</p>
-              ))}
-            </div>
+        {o.status === 'PENDING_PAYMENT' && (
+          <div className="mt-2.5 rounded-xl border border-amber-400/10 bg-amber-400/[0.03] p-3">
+            <p className="text-xs font-black text-slate-200">
+              {paymentMethod?.name || 'Metode pembayaran'}
+            </p>
 
-            {o.status === 'PENDING_PAYMENT' && (
-              <div className="mt-3 rounded-xl bg-slate-950/50 p-3">
-                <p className="text-sm font-bold">{paymentMethod?.name || 'Metode pembayaran'}</p>
-                {paymentMethodIsQris && (
-                  <div className="mt-3 rounded-xl bg-white p-2">
-                    <p className="mb-2 text-center text-xs font-bold text-slate-900">Scan QRIS untuk pembayaran</p>
-                    <img src="/qris.png" alt="QRIS Pembayaran" className="mx-auto block w-full max-w-[220px] rounded-lg" />
-                  </div>
-                )}
-                <p className="mt-2 text-xs text-slate-500">{paymentMethod?.instruction || 'Bayar sesuai total lalu upload bukti.'}</p>
+            {paymentMethodIsQris && (
+              <div className="mt-2.5 rounded-xl bg-white p-2">
+                <p className="mb-2 text-center text-[10px] font-bold text-slate-900">
+                  Scan QRIS untuk pembayaran
+                </p>
+                <img
+                  src="/qris.png"
+                  alt="QRIS Pembayaran"
+                  className="mx-auto block w-full max-w-[210px] rounded-lg"
+                />
               </div>
             )}
 
-            {o.status === 'PENDING_PAYMENT' && <PaymentProof orderId={o.id} />}
-          </>
+            <p className="mt-2 text-[11px] leading-5 text-slate-500">
+              {paymentMethod?.instruction || 'Bayar sesuai total lalu upload bukti.'}
+            </p>
+          </div>
         )}
 
-        <div className="mt-4 rounded-xl border border-white/10 p-3">
-          <p className="text-xs font-bold text-slate-400">Perjalanan Pesanan</p>
-          <div className="mt-2 grid gap-2">
+        {o.status === 'PENDING_PAYMENT' && (
+          <div className="mt-2.5">
+            <PaymentProof orderId={o.id} />
+          </div>
+        )}
+
+        {o.status === 'SUCCESS' && (
+          <div className="mt-2.5 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.035] p-3">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2.5">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                  Struk Transaksi
+                </p>
+                <p className="mt-0.5 text-sm font-black text-emerald-300">
+                  Pembayaran Berhasil
+                </p>
+              </div>
+              <span className="text-lg">✓</span>
+            </div>
+
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-white/[0.025] p-2">
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">REFF ID</p>
+                <p className="mt-0.5 break-all text-[11px] font-bold text-slate-200">
+                  {reference || 'Belum tersedia'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-white/[0.025] p-2">
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">Tanggal</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-300">
+                  {new Date(o.updated_at || o.created_at).toLocaleString('id-ID')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2.5 rounded-xl border border-white/10 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Perjalanan Pesanan
+          </p>
+
+          <div className="mt-2 space-y-2">
             {history.map((item: any) => (
-              <div key={item.id} className="flex gap-2 border-l-2 border-purple-500/40 pl-3">
+              <div key={item.id} className="flex gap-2.5 border-l-2 border-purple-500/40 pl-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold">{labels[item.new_status] || item.new_status}</p>
-                  <p className="text-[10px] text-slate-500">{new Date(item.created_at).toLocaleString('id-ID')}</p>
-                  {item.note && !String(item.note).toLowerCase().includes('diproses manual oleh owner') && (
-                    <p className="mt-0.5 text-xs text-slate-500">{item.note}</p>
-                  )}
+                  <p className="text-xs font-bold text-slate-300">
+                    {labels[item.new_status] || item.new_status}
+                  </p>
+                  <p className="text-[9px] text-slate-600">
+                    {new Date(item.created_at).toLocaleString('id-ID')}
+                  </p>
+                  {item.note &&
+                    !String(item.note).toLowerCase().includes('diproses manual oleh owner') && (
+                      <p className="mt-0.5 text-[10px] leading-4 text-slate-500">{item.note}</p>
+                    )}
                 </div>
               </div>
             ))}
@@ -264,7 +412,12 @@ export default function OrderStatusPage() {
         </div>
 
         {proof && proofUrl && !compact && (
-          <a href={proofUrl} target="_blank" rel="noreferrer" className="mt-3 block text-center text-xs font-bold text-cyan-300">
+          <a
+            href={proofUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2.5 block rounded-lg border border-cyan-400/20 bg-cyan-400/[0.04] px-3 py-2 text-center text-[11px] font-bold text-cyan-300"
+          >
             Lihat bukti pembayaran →
           </a>
         )}
@@ -273,12 +426,26 @@ export default function OrderStatusPage() {
           <button
             type="button"
             onClick={() => router.push('/review')}
-            className="mt-4 w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2.5 text-sm font-black text-cyan-300"
+            className="mt-2.5 w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2.5 text-xs font-black text-cyan-300 transition hover:bg-cyan-400/15"
           >
             ⭐ Beri Penilaian
           </button>
         )}
       </section>
     </main>
+  )
+}
+
+export default function OrderStatusPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-2xl px-4 py-12 text-center text-slate-400">
+          Memuat transaksi...
+        </main>
+      }
+    >
+      <OrderStatusContent />
+    </Suspense>
   )
 }
