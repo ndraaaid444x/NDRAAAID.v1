@@ -12,6 +12,8 @@ import {
   Smartphone,
   Monitor,
   Ticket,
+  Gamepad2,
+  Flame,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -841,115 +843,134 @@ export default function Home() {
       )}
 
       {/* =====================================================
-          GAME POPULER
+          GAME POPULER — COMPACT / RESPONSIVE
       ===================================================== */}
 
-      <section className="mx-auto max-w-7xl px-4 py-12 md:py-16">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight md:text-3xl">GAME POPULER</h2>
-            <p className="mt-1 text-xs font-medium text-slate-500">Produk</p>
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:py-14">
+        <div className="flex items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-black uppercase tracking-tight sm:text-3xl">GAME POPULER</h2>
+            <p className="mt-1 text-[10px] font-medium text-slate-500 sm:text-xs">Produk</p>
           </div>
-          <Link href="/games/" className="text-xs font-bold text-slate-300 transition hover:text-cyan-300">Lihat semua →</Link>
+          <Link href="/games/" className="shrink-0 text-[11px] font-bold text-slate-400 transition hover:text-white sm:text-sm">
+            Lihat semua <ArrowRight className="ml-1 inline" size={13} />
+          </Link>
         </div>
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Kategori produk">
+
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none sm:mt-5" role="tablist" aria-label="Kategori produk">
           {[
-            { key: 'popular', label: 'Game Populer', icon: Sparkles },
+            { key: 'popular', label: 'Game Populer', icon: Flame },
             { key: 'mobile-games', label: 'Game Mobile', icon: Smartphone },
             { key: 'pc-games', label: 'PC Game', icon: Monitor },
             { key: 'voucher-digital', label: 'Digital', icon: Ticket },
           ].map(({ key, label, icon: Icon }) => (
-            <button key={key} type="button" onClick={() => setHomeCategory(key)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition ${homeCategory === key ? 'border-cyan-400/35 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-white/20 hover:text-white'}`}>
-              <Icon size={15} strokeWidth={2} /> {label}
+            <button
+              key={key}
+              type="button"
+              onClick={() => setHomeCategory(key)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[10px] font-black transition sm:px-4 sm:text-xs ${
+                homeCategory === key
+                  ? 'border-red-400/70 bg-red-500 text-white shadow-[0_0_18px_rgba(255,23,68,.18)]'
+                  : 'border-white/10 bg-[#070b12]/80 text-slate-400 hover:border-red-400/30 hover:text-white'
+              }`}
+            >
+              <Icon size={13} strokeWidth={2.2} />
+              {label}
             </button>
           ))}
         </div>
 
         {loadingGames && (
-          <div className="mt-7 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center">
-            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-cyan-400" />
-
-            <p className="mt-3 text-sm text-slate-400">
-              Memuat game...
-            </p>
-
-            <p className="mt-1 text-xs text-slate-600">
-              Mohon tunggu sebentar
-            </p>
+          <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center">
+            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-red-400" />
+            <p className="mt-3 text-sm text-slate-400">Memuat game...</p>
           </div>
         )}
 
-        {!loadingGames &&
-          gameError && (
-            <div className="mt-7 rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
-              <p className="font-bold text-red-300">
-                Game gagal dimuat
-              </p>
+        {!loadingGames && gameError && (
+          <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
+            <p className="font-bold text-red-300">Game gagal dimuat</p>
+            <p className="mt-2 break-words text-sm text-red-200/80">{gameError}</p>
+            <button type="button" onClick={() => window.location.reload()} className="btn btn-muted mt-4">
+              Muat Ulang
+            </button>
+          </div>
+        )}
 
-              <p className="mt-2 break-words text-sm text-red-200/80">
-                {gameError}
-              </p>
+        {!loadingGames && !gameError && games.length === 0 && (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-sm text-slate-400">
+            Game tidak ditemukan.
+          </div>
+        )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.reload()
-                }}
-                className="btn btn-muted mt-4"
-              >
-                Muat Ulang
-              </button>
-            </div>
-          )}
+        {!loadingGames && !gameError && games.length > 0 && (() => {
+          const visibleGames = homeCategory === 'popular'
+            ? ['mobile-games', 'pc-games', 'voucher-digital']
+                .flatMap((category) => games.filter((g) => g.popular === true && g.game_categories?.slug === category).slice(0, 3))
+                .slice(0, 9)
+            : games.filter((g) => g.game_categories?.slug === homeCategory).slice(0, 9)
 
-        {!loadingGames &&
-          !gameError &&
-          games.length === 0 && (
-            <div className="mt-7 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-sm text-slate-400">
-              Game tidak ditemukan.
-            </div>
-          )}
+          return visibleGames.length > 0 ? (
+            <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6 lg:gap-3">
+              {visibleGames.map((g, index) => {
+                const category = g.game_categories?.slug
+                const categoryLabel = category === 'mobile-games'
+                  ? 'Game Mobile'
+                  : category === 'pc-games'
+                    ? 'PC Game'
+                    : 'Digital'
 
-        {!loadingGames &&
-          !gameError &&
-          games.length > 0 && (
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
-              {(homeCategory === 'popular'
-                ? ['mobile-games', 'pc-games', 'voucher-digital'].flatMap((category) => games.filter((g) => g.popular === true && g.game_categories?.slug === category).slice(0, 3)).slice(0, 9)
-                : games.filter((g) => g.game_categories?.slug === homeCategory).slice(0, 9)
-              ).map((g) => (
+                return (
                   <Link
                     key={g.id}
-                    href={`/game/?slug=${encodeURIComponent(
-                      g.slug
-                    )}`}
-                    className="glass group overflow-hidden rounded-xl p-2.5 transition hover:-translate-y-1 hover:border-cyan-400/30 sm:p-3"
+                    href={`/game/?slug=${encodeURIComponent(g.slug)}`}
+                    className={`glass group min-w-0 overflow-hidden rounded-xl p-2.5 transition hover:-translate-y-0.5 hover:border-red-400/40 sm:rounded-2xl sm:p-3 ${index >= 6 ? 'max-[639px]:hidden' : ''}`}
                   >
-                    <div className="flex aspect-square items-center justify-center rounded-lg bg-slate-900 text-3xl sm:text-4xl">
+                    <div className="relative aspect-[1/1.02] overflow-hidden rounded-lg bg-slate-900 sm:rounded-xl">
                       {g.logo_url ? (
                         <img
                           src={g.logo_url}
                           alt={g.name}
-                          className="h-full w-full rounded-xl object-cover"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                          loading="lazy"
                         />
                       ) : (
-                        '—'
+                        <div className="flex h-full w-full items-center justify-center text-slate-600">
+                          <Gamepad2 size={28} />
+                        </div>
+                      )}
+
+                      {g.popular === true && (
+                        <span className="absolute left-1.5 top-1.5 rounded-md border border-red-300/20 bg-red-500/90 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-white sm:text-[8px]">
+                          Populer
+                        </span>
                       )}
                     </div>
 
-                    <h3 className="mt-2 truncate text-sm font-bold sm:text-base">
+                    <h3 className="mt-2 line-clamp-1 text-[11px] font-black leading-4 text-white sm:text-xs">
                       {g.name}
                     </h3>
 
-                    <p className="mt-1 text-xs text-slate-500">
-                      Top Up →
-                    </p>
-                  </Link>
-                ))}
-            </div>
-          )}
-      </section>
+                    <div className="mt-1 flex min-w-0 items-center gap-1 text-[8px] font-medium text-slate-500 sm:text-[9px]">
+                      {category === 'mobile-games' ? <Smartphone size={10} /> : category === 'pc-games' ? <Monitor size={10} /> : <Ticket size={10} />}
+                      <span className="truncate">{categoryLabel}</span>
+                    </div>
 
+                    <div className="mt-2 flex items-center justify-between gap-1 border-t border-white/5 pt-2">
+                      <span className="text-[8px] font-bold text-slate-500 sm:text-[9px]">Top Up</span>
+                      <ArrowRight size={12} className="shrink-0 text-red-400 transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-xl border border-white/10 bg-slate-950/40 p-5 text-center text-xs text-slate-500">
+              Belum ada game pada kategori ini.
+            </div>
+          )
+        })()}
+      </section>
 
     </div>
   )
