@@ -29,6 +29,9 @@ import {
   Image as ImageIcon,
   Megaphone,
   Tags,
+  Pencil,
+  Trash2,
+  Power,
   CheckCircle2,
   Clock3,
   XCircle,
@@ -64,7 +67,6 @@ const tabs = [
 
 const mediaCategories = [
   ['games', '🎮 Logo Game'],
-  ['products', '💎 Gambar Produk'],
   ['promotions', '📢 Banner Promo'],
   ['general', '📁 Media Lainnya'],
 ]
@@ -260,8 +262,6 @@ export default function Admin() {
   const [mediaSearch, setMediaSearch] = useState('')
   const [mediaUploading, setMediaUploading] = useState(false)
   const [mediaGameId, setMediaGameId] = useState('')
-  const [mediaProductGameId, setMediaProductGameId] = useState('')
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
   const [mediaPromoCustomText, setMediaPromoCustomText] = useState('')
   const [mediaPromoTitle, setMediaPromoTitle] = useState('')
   const [mediaPromoDescription, setMediaPromoDescription] = useState('')
@@ -296,7 +296,6 @@ export default function Admin() {
     nominal: '',
     sku: '',
     price: '',
-    image_url: '',
   })
 
   const [methodForm, setMethodForm] = useState({
@@ -930,6 +929,33 @@ s
     load()
   }
 
+
+  async function deleteProduct(product: any) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat menghapus produk.')
+      return
+    }
+
+    const label = product.name || product.nominal || product.sku || 'produk ini'
+    if (!confirm(`Hapus ${label}?\n\nProduk yang sudah terhubung dengan riwayat transaksi mungkin tidak dapat dihapus.`)) return
+
+    const { error } = await s
+      .from('game_products')
+      .delete()
+      .eq('id', product.id)
+
+    if (error) {
+      setMsg(`Produk tidak dapat dihapus. ${error.message}`)
+      return
+    }
+
+    // Hapus langsung dari state agar daftar Products segera berubah
+    // tanpa menunggu reload halaman.
+    setProducts((current) => current.filter((item) => item.id !== product.id))
+    setMsg(`Produk ${label} berhasil dihapus.`)
+    await load()
+  }
+
   function openEdit(type: 'category' | 'game' | 'product', row: any) {
     if (!['owner', 'admin'].includes(role)) {
       setMsg('Hanya Owner/Admin yang dapat mengedit katalog.')
@@ -966,7 +992,6 @@ s
       nominal: row.nominal ?? '',
       sku: row.sku || '',
       price: row.price ?? '',
-      image_url: row.image_url || '',
     })
   }
 
@@ -1040,7 +1065,6 @@ s
         nominal: String(editForm.nominal || '').trim(),
         sku: String(editForm.sku || '').trim(),
         price,
-        image_url: String(editForm.image_url || '').trim() || null,
       }
 
       if (
@@ -1815,45 +1839,6 @@ async function deleteVoucher(v: any) {
 
     if (!error) {
       setMediaGameId('')
-      load()
-    }
-  }
-
-  async function applyProductMedia(url: string) {
-    if (!mediaProductGameId) {
-      setMsg('Pilih game produk terlebih dahulu.')
-      return
-    }
-
-    const targetProducts = products.filter(
-      (p) =>
-        p.game_id === mediaProductGameId &&
-        selectedProductIds.includes(p.id)
-    )
-
-    if (!targetProducts.length) {
-      setMsg('Pilih minimal satu nominal produk.')
-      return
-    }
-
-    const results = await Promise.all(
-      targetProducts.map((product) =>
-        s
-          .from('game_products')
-          .update({ image_url: url })
-          .eq('id', product.id)
-      )
-    )
-
-    const error = results.find((x) => x.error)?.error
-
-    setMsg(
-      error?.message ||
-        `Satu gambar berhasil diterapkan ke ${targetProducts.length} nominal produk.`
-    )
-
-    if (!error) {
-      setSelectedProductIds([])
       load()
     }
   }
@@ -3531,8 +3516,6 @@ async function deleteVoucher(v: any) {
                       sku: '',
                       price:
                         '',
-                      image_url:
-                        '',
                     })
                   )
               )
@@ -3596,40 +3579,6 @@ async function deleteVoucher(v: any) {
               />
             ))}
 
-            <label className="block text-sm font-semibold">
-              Foto produk
-
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="input mt-2"
-                onChange={(e) =>
-                  uploadFromInput(
-                    e,
-                    'products',
-                    (url) =>
-                      setProdForm(
-                        (v) => ({
-                          ...v,
-                          image_url:
-                            url,
-                        })
-                      )
-                  )
-                }
-              />
-            </label>
-
-            {prodForm.image_url && (
-              <img
-                src={
-                  prodForm.image_url
-                }
-                alt="Preview produk"
-                className="h-24 w-24 rounded-xl object-cover"
-              />
-            )}
-
             <button className="btn btn-primary">
               Tambah Produk
             </button>
@@ -3647,57 +3596,43 @@ async function deleteVoucher(v: any) {
             {limitAdminItems(filteredProducts, productFilterActive).map((p) => (
               <div
                 key={p.id}
-                className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
+                className="glass rounded-xl border border-white/[.06] px-3 py-2.5"
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  {p.image_url ? (
-                    <img
-                      src={p.image_url}
-                      alt=""
-                      className="h-12 w-12 rounded-xl object-cover"
-                    />
-                  ) : (
-                    <div className="h-12 w-12 rounded-xl bg-slate-900" />
-                  )}
-
-                  <div>
-                    <b>{p.name}</b>
-
-                    <p className="text-xs text-slate-500">
-                      {p.games?.name}{' '}
-                      · {p.sku} · Rp{' '}
-                      {Number(
-                        p.price
-                      ).toLocaleString(
-                        'id-ID'
-                      )}
-                    </p>
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="truncate text-sm font-bold text-white">{p.name || p.nominal}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider ${p.is_active ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-400/10 text-slate-400'}`}>
+                        {p.is_active ? 'Aktif' : 'Nonaktif'}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
+                      <span>{p.games?.name || 'Game'}</span>
+                      <span>•</span>
+                      <span>{p.nominal || '-'}</span>
+                      <span>•</span>
+                      <span>{p.sku || '-'}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-slate-300">Rp {Number(p.price || 0).toLocaleString('id-ID')}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {['owner', 'admin'].includes(role) && (
-                    <button
-                      onClick={() => openEdit('product', p)}
-                      className="btn btn-primary text-xs"
-                    >
-                      Edit
+                  <div className="flex shrink-0 items-center gap-1">
+                    {['owner', 'admin'].includes(role) && (
+                      <>
+                        <button type="button" onClick={() => openEdit('product', p)} className="btn btn-muted !px-2 !py-1.5" title="Edit produk" aria-label="Edit produk">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => deleteProduct(p)} className="btn btn-muted !px-2 !py-1.5 text-red-300 hover:border-red-400/30 hover:bg-red-500/10" title="Hapus produk/nominal" aria-label="Hapus produk/nominal">
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline text-[10px] font-bold">Hapus</span>
+                        </button>
+                      </>
+                    )}
+                    <button type="button" onClick={() => toggle('game_products', p.id)} className="btn btn-muted !px-2 !py-1.5" title={p.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={p.is_active ? 'Nonaktifkan' : 'Aktifkan'}>
+                      <Power className={`h-3.5 w-3.5 ${p.is_active ? 'text-emerald-300' : 'text-slate-500'}`} />
                     </button>
-                  )}
-
-                  <button
-                    onClick={() =>
-                      toggle(
-                        'game_products',
-                        p.id
-                      )
-                    }
-                    className="btn btn-muted text-xs"
-                  >
-                    {p.is_active
-                      ? 'Nonaktifkan'
-                      : 'Aktifkan'}
-                  </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -5010,113 +4945,6 @@ async function deleteVoucher(v: any) {
             </div>
 
             <div className="glass rounded-3xl p-5">
-              <p className="text-xs font-black uppercase tracking-widest text-purple-300">
-                💎 Gambar Produk
-              </p>
-              <h3 className="mt-1 text-lg font-black">
-                Satu gambar untuk banyak nominal
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                Rasio 1:1 · pilih game lalu satu, beberapa, atau semua nominal.
-              </p>
-
-              <select
-                className="input mt-4"
-                value={mediaProductGameId}
-                onChange={(e) => {
-                  setMediaProductGameId(e.target.value)
-                  setSelectedProductIds([])
-                }}
-              >
-                <option value="">Pilih game</option>
-                {games.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-
-              {mediaProductGameId && (
-                <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs text-slate-400">
-                      Nominal produk
-                    </span>
-                    <button
-                      type="button"
-                      className="text-xs font-bold text-cyan-300"
-                      onClick={() => {
-                        const ids = products
-                          .filter((p) => p.game_id === mediaProductGameId)
-                          .map((p) => p.id)
-                        setSelectedProductIds(
-                          selectedProductIds.length === ids.length ? [] : ids
-                        )
-                      }}
-                    >
-                      {selectedProductIds.length > 0 ? 'Batal pilih semua' : 'Pilih semua'}
-                    </button>
-                  </div>
-
-                  <div className="max-h-52 space-y-2 overflow-y-auto">
-                    {products
-                      .filter((p) => p.game_id === mediaProductGameId)
-                      .map((p) => (
-                        <label
-                          key={p.id}
-                          className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-2"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedProductIds.includes(p.id)}
-                            onChange={(e) =>
-                              setSelectedProductIds((current) =>
-                                e.target.checked
-                                  ? [...current, p.id]
-                                  : current.filter((id) => id !== p.id)
-                              )
-                            }
-                          />
-                          <span className="min-w-0 flex-1 text-sm">
-                            {p.name || p.nominal || p.sku || 'Produk'}
-                          </span>
-                          {p.image_url && (
-                            <span className="text-[10px] text-green-300">
-                              sudah ada gambar
-                            </span>
-                          )}
-                        </label>
-                      ))}
-
-                    {!products.some((p) => p.game_id === mediaProductGameId) && (
-                      <p className="py-3 text-center text-xs text-slate-500">
-                        Belum ada nominal untuk game ini.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
-                Upload & Terapkan ke {selectedProductIds.length || 0} produk
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                  disabled={mediaUploading || !mediaProductGameId || !selectedProductIds.length}
-                  onChange={(e) =>
-                    uploadAndSync(
-                      e,
-                      'products',
-                      applyProductMedia,
-                      '1:1'
-                    )
-                  }
-                />
-              </label>
-            </div>
-
-            <div className="glass rounded-3xl p-5">
               <p className="text-xs font-black uppercase tracking-widest text-red-300">
                 📢 Banner Promo
               </p>
@@ -5865,26 +5693,6 @@ async function deleteVoucher(v: any) {
                       })
                     }
                   />
-
-                  <input
-                    className="input"
-                    placeholder="URL gambar produk"
-                    value={editForm.image_url || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        image_url: e.target.value,
-                      })
-                    }
-                  />
-
-                  {editForm.image_url && (
-                    <img
-                      src={editForm.image_url}
-                      alt="Preview produk"
-                      className="h-24 w-24 rounded-xl object-cover"
-                    />
-                  )}
                 </>
               )}
             </div>
