@@ -1466,7 +1466,12 @@ async function deleteVoucher(v: any) {
       `Media berhasil diunggah ke kategori ${category}.`
     )
 
-    load()
+    // Banner Promo memakai state preview sementara. Jangan reload data
+    // setelah upload, karena load() akan menimpa URL banner yang baru
+    // diunggah sebelum tombol Simpan Perubahan Banner Promo ditekan.
+    if (category !== 'promotions') {
+      load()
+    }
   }
 
   async function uploadFromInput(
