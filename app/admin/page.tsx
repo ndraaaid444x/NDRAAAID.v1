@@ -47,7 +47,8 @@ export default function Admin() {
   const [tab, setTab] = useState('orders')
 
   function changeTab(nextTab: string) {
-    setTab(nextTab)
+    sessionStorage.setItem('admin_active_tab', nextTab)
+    window.location.reload()
   }
 
   const mobileMenuRef = useRef<HTMLDivElement | null>(null)
@@ -405,6 +406,12 @@ s
     }
  }
   useEffect(() => {
+    const savedTab = sessionStorage.getItem('admin_active_tab')
+    if (savedTab && tabs.includes(savedTab)) {
+      setTab(savedTab)
+      sessionStorage.removeItem('admin_active_tab')
+    }
+
     load()
   }, [])
 
@@ -2156,8 +2163,8 @@ async function deleteVoucher(v: any) {
                         <button
                           type="button"
                           key={item[0]}
-                          onPointerDown={() => setTab(item[0])}
-                          onClick={() => setTab(item[0])}
+                          onPointerDown={() => changeTab(item[0])}
+                          onClick={() => changeTab(item[0])}
                           style={{
                             position: 'relative',
                             zIndex: 20,
@@ -2246,8 +2253,8 @@ async function deleteVoucher(v: any) {
                     <button
                       type="button"
                       key={item[0]}
-                      onPointerDown={() => setTab(item[0])}
-                      onClick={() => setTab(item[0])}
+                      onPointerDown={() => changeTab(item[0])}
+                      onClick={() => changeTab(item[0])}
                       style={{
                         position: 'relative',
                         zIndex: 20,
@@ -4751,7 +4758,7 @@ async function deleteVoucher(v: any) {
               <button
                 type="button"
                 className="btn btn-primary mt-4 w-full"
-                onClick={() => setTab('promotions')}
+                onClick={() => changeTab('promotions')}
               >
                 Buka Pengaturan Banner Promo
               </button>
