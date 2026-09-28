@@ -220,6 +220,8 @@ export default function OrderStatusClient() {
               <div>
                 <p className="text-[11px] text-slate-500">STRUK TRANSAKSI</p>
                 <p className="mt-1 text-sm font-black">Pembayaran Berhasil</p>
+                <p className="mt-1 text-[11px] text-slate-500">Order ID</p>
+                <p className="text-xs font-bold text-slate-200">#{o.order_code}</p>
               </div>
               <span className="text-xl">✓</span>
             </div>
