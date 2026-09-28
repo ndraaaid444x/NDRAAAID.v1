@@ -136,10 +136,14 @@ const adminMenuGroups: readonly AdminMenuGroup[] = [
 
 export default function Admin() {
   const [tab, setTab] = useState('dashboard')
+  const liveRefreshBusy = useRef(false)
 
   function changeTab(nextTab: string) {
+    // Perpindahan menu dilakukan dengan state saja.
+    // Jangan reload halaman karena akan mengembalikan scroll/posisi
+    // dan terasa seperti menu 'memantul' setiap kali disentuh.
     sessionStorage.setItem('admin_active_tab', nextTab)
-    window.location.reload()
+    setTab(nextTab)
   }
 
   const [role, setRole] = useState('')
@@ -446,6 +450,50 @@ s
     }
   }
 
+  async function refreshLiveData() {
+    if (liveRefreshBusy.current) return
+    liveRefreshBusy.current = true
+
+    try {
+      // Silent background refresh: hanya data operasional yang cepat berubah.
+      // Tidak mengubah tab, tidak reload halaman, dan tidak menyentuh form yang
+      // sedang diedit oleh admin.
+      const [
+        { data: latestOrders },
+        { data: latestDeposits },
+        { data: latestWalletTx },
+      ] = await Promise.all([
+        s
+          .from('orders')
+          .select(
+            'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(name),profiles(username,name)'
+          )
+          .order('created_at', { ascending: false })
+          .limit(200),
+        s
+          .from('member_deposits')
+          .select(`
+            *,
+            profiles:profiles!member_deposits_user_id_fkey(username,email,name),
+            payment_methods:payment_methods!member_deposits_payment_method_id_fkey(name,kind)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(200),
+        s
+          .from('wallet_transactions')
+          .select('*,profiles(username,email)')
+          .order('created_at', { ascending: false })
+          .limit(200),
+      ])
+
+      if (latestOrders) setOrders(latestOrders)
+      if (latestDeposits) setDeposits(latestDeposits)
+      if (latestWalletTx) setWalletTx(latestWalletTx)
+    } finally {
+      liveRefreshBusy.current = false
+    }
+  }
+
   useEffect(() => {
     const savedTab = sessionStorage.getItem('admin_active_tab')
     if (savedTab && tabs.includes(savedTab)) {
@@ -454,6 +502,14 @@ s
     }
 
     load()
+
+    // Auto-sync setiap 8 detik tanpa reload halaman.
+    // Admin tetap berada di menu, posisi scroll, filter, dan form tidak terganggu.
+    const interval = window.setInterval(() => {
+      refreshLiveData()
+    }, 8000)
+
+    return () => window.clearInterval(interval)
   }, [])
 
   useEffect(() => {
