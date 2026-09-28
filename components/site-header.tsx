@@ -520,7 +520,6 @@ export default function SiteHeader() {
           </div>
         </div>
       )}
-      )}
     </header>
   )
 }
