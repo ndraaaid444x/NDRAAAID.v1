@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
 } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -91,6 +92,25 @@ const adminIcons: Record<string, LucideIcon> = {
 type AdminMenuItem = readonly [string, string]
 type AdminMenuGroup = { title: string; items: readonly AdminMenuItem[] }
 
+function AdminFilterShell({
+  active,
+  onReset,
+  children,
+}: {
+  active: boolean
+  onReset: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="mt-3 rounded-xl border border-white/[.07] bg-black/20 p-2.5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+        <button type="button" onClick={onReset} disabled={!active} className="btn btn-muted shrink-0 text-xs disabled:cursor-not-allowed disabled:opacity-40">Reset Filter</button>
+      </div>
+    </div>
+  )
+}
+
 const adminMenuGroups: readonly AdminMenuGroup[] = [
   {
     title: 'UTAMA',
@@ -154,6 +174,64 @@ export default function Admin() {
   const [editForm, setEditForm] = useState<any>({})
 
   const [orders, setOrders] = useState<any[]>([])
+  const [orderSearch, setOrderSearch] = useState('')
+  const [orderStatusFilter, setOrderStatusFilter] = useState('')
+  const [orderDateFilter, setOrderDateFilter] = useState('')
+  const [orderMemberFilter, setOrderMemberFilter] = useState('')
+  const [orderGameFilter, setOrderGameFilter] = useState('')
+
+  const [depositSearch, setDepositSearch] = useState('')
+  const [depositStatusFilter, setDepositStatusFilter] = useState('')
+  const [depositMethodFilter, setDepositMethodFilter] = useState('')
+  const [depositDateFilter, setDepositDateFilter] = useState('')
+
+  const [depositHistorySearch, setDepositHistorySearch] = useState('')
+  const [depositHistoryStatusFilter, setDepositHistoryStatusFilter] = useState('')
+  const [depositHistoryMethodFilter, setDepositHistoryMethodFilter] = useState('')
+  const [depositHistoryDateFilter, setDepositHistoryDateFilter] = useState('')
+
+  const [walletSearch, setWalletSearch] = useState('')
+  const [walletTypeFilter, setWalletTypeFilter] = useState('')
+  const [walletDateFilter, setWalletDateFilter] = useState('')
+
+  const [categorySearch, setCategorySearch] = useState('')
+  const [categoryStatusFilter, setCategoryStatusFilter] = useState('')
+
+  const [gameSearch, setGameSearch] = useState('')
+  const [gameCategoryFilter, setGameCategoryFilter] = useState('')
+  const [gameStatusFilter, setGameStatusFilter] = useState('')
+  const [gamePopularFilter, setGamePopularFilter] = useState('')
+
+  const [productSearch, setProductSearch] = useState('')
+  const [productGameFilter, setProductGameFilter] = useState('')
+  const [productCategoryFilter, setProductCategoryFilter] = useState('')
+  const [productStatusFilter, setProductStatusFilter] = useState('')
+  const [productPopularFilter, setProductPopularFilter] = useState('')
+  const [productPriceSort, setProductPriceSort] = useState('')
+
+  const [paymentSearch, setPaymentSearch] = useState('')
+  const [paymentKindFilter, setPaymentKindFilter] = useState('')
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('')
+
+  const [voucherSearch, setVoucherSearch] = useState('')
+  const [voucherStatusFilter, setVoucherStatusFilter] = useState('')
+  const [voucherTypeFilter, setVoucherTypeFilter] = useState('')
+
+  const [voucherUsageSearch, setVoucherUsageSearch] = useState('')
+  const [voucherUsageDateFilter, setVoucherUsageDateFilter] = useState('')
+
+  const [broadcastSearch, setBroadcastSearch] = useState('')
+  const [broadcastStatusFilter, setBroadcastStatusFilter] = useState('')
+  const [broadcastTypeFilter, setBroadcastTypeFilter] = useState('')
+  const [broadcastDateFilter, setBroadcastDateFilter] = useState('')
+
+  const [userSearch, setUserSearch] = useState('')
+  const [userRoleFilter, setUserRoleFilter] = useState('')
+  const [userStatusFilter, setUserStatusFilter] = useState('')
+
+  const [reviewSearch, setReviewSearch] = useState('')
+  const [reviewRatingFilter, setReviewRatingFilter] = useState('')
+  const [reviewModerationFilter, setReviewModerationFilter] = useState('')
   const [games, setGames] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
@@ -258,6 +336,125 @@ export default function Admin() {
   const router = useRouter()
   const s = supabaseBrowser()
 
+  const dateMatches = (value: any, filter: string) =>
+    !filter || String(value || '').slice(0, 10) === filter
+
+  const limitAdminItems = <T,>(items: T[], active: boolean) =>
+    active ? items : items.slice(0, 3)
+
+  const depositFilterActive = Boolean(depositSearch || depositStatusFilter || depositMethodFilter || depositDateFilter)
+  const filteredPendingDeposits = deposits.filter((d) => {
+    const q = depositSearch.trim().toLowerCase()
+    const member = d.profiles?.name || d.profiles?.username || d.profiles?.email || ''
+    const method = d.payment_methods?.name || d.payment_methods?.kind || ''
+    return d.status === 'PENDING' &&
+      (!q || [d.deposit_code, member, method, d.status].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!depositStatusFilter || d.status === depositStatusFilter) &&
+      (!depositMethodFilter || d.payment_methods?.kind === depositMethodFilter || d.payment_methods?.name === depositMethodFilter) &&
+      dateMatches(d.created_at, depositDateFilter)
+  })
+
+  const depositHistoryFilterActive = Boolean(depositHistorySearch || depositHistoryStatusFilter || depositHistoryMethodFilter || depositHistoryDateFilter)
+  const filteredDepositHistory = deposits.filter((d) => {
+    const q = depositHistorySearch.trim().toLowerCase()
+    const member = d.profiles?.name || d.profiles?.username || d.profiles?.email || ''
+    const method = d.payment_methods?.name || d.payment_methods?.kind || ''
+    return (!q || [d.deposit_code, member, method, d.status].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!depositHistoryStatusFilter || d.status === depositHistoryStatusFilter) &&
+      (!depositHistoryMethodFilter || d.payment_methods?.kind === depositHistoryMethodFilter || d.payment_methods?.name === depositHistoryMethodFilter) &&
+      dateMatches(d.created_at, depositHistoryDateFilter)
+  })
+
+  const walletFilterActive = Boolean(walletSearch || walletTypeFilter || walletDateFilter)
+  const filteredWalletTx = walletTx.filter((tx) => {
+    const q = walletSearch.trim().toLowerCase()
+    const member = tx.profiles?.name || tx.profiles?.username || tx.profiles?.email || tx.user_id || ''
+    return (!q || [member, tx.type, tx.reason].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!walletTypeFilter || tx.type === walletTypeFilter) &&
+      dateMatches(tx.created_at, walletDateFilter)
+  })
+
+  const categoryFilterActive = Boolean(categorySearch || categoryStatusFilter)
+  const filteredCategories = categories.filter((c) => {
+    const q = categorySearch.trim().toLowerCase()
+    return (!q || [c.name, c.slug, c.description].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!categoryStatusFilter || (categoryStatusFilter === 'active' ? c.is_active !== false : c.is_active === false))
+  })
+
+  const gameFilterActive = Boolean(gameSearch || gameCategoryFilter || gameStatusFilter || gamePopularFilter)
+  const filteredGames = games.filter((g) => {
+    const q = gameSearch.trim().toLowerCase()
+    return (!q || [g.name, g.slug, g.description].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!gameCategoryFilter || g.category_id === gameCategoryFilter) &&
+      (!gameStatusFilter || (gameStatusFilter === 'active' ? g.is_active !== false : g.is_active === false)) &&
+      (!gamePopularFilter || (gamePopularFilter === 'popular' ? Boolean(g.popular) : !Boolean(g.popular)))
+  })
+
+  const productFilterActive = Boolean(productSearch || productGameFilter || productCategoryFilter || productStatusFilter || productPopularFilter || productPriceSort)
+  const filteredProducts = products.filter((p) => {
+    const q = productSearch.trim().toLowerCase()
+    const gameName = p.games?.name || ''
+    return (!q || [p.name, p.nominal, p.sku, gameName].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!productGameFilter || p.game_id === productGameFilter) &&
+      (!productCategoryFilter || p.games?.category_id === productCategoryFilter) &&
+      (!productStatusFilter || (productStatusFilter === 'active' ? p.is_active !== false : p.is_active === false)) &&
+      (!productPopularFilter || (productPopularFilter === 'popular' ? Boolean(p.games?.popular) : !Boolean(p.games?.popular)))
+  }).sort((a, b) => {
+    if (productPriceSort === 'asc') return Number(a.price || 0) - Number(b.price || 0)
+    if (productPriceSort === 'desc') return Number(b.price || 0) - Number(a.price || 0)
+    return 0
+  })
+
+  const paymentFilterActive = Boolean(paymentSearch || paymentKindFilter || paymentStatusFilter)
+  const filteredMethods = methods.filter((m) => {
+    const q = paymentSearch.trim().toLowerCase()
+    return (!q || [m.name, m.kind, m.account_name, m.account_number].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!paymentKindFilter || m.kind === paymentKindFilter) &&
+      (!paymentStatusFilter || (paymentStatusFilter === 'active' ? m.is_active !== false : m.is_active === false))
+  })
+
+  const voucherFilterActive = Boolean(voucherSearch || voucherStatusFilter || voucherTypeFilter)
+  const filteredVouchers = vouchers.filter((v) => {
+    const q = voucherSearch.trim().toLowerCase()
+    return (!q || [v.code, v.discount_type].some((x) => String(x || '').toLowerCase().includes(q))) &&
+      (!voucherStatusFilter || (voucherStatusFilter === 'active' ? v.is_active !== false : v.is_active === false)) &&
+      (!voucherTypeFilter || v.discount_type === voucherTypeFilter)
+  })
+
+  const voucherUsageFilterActive = Boolean(voucherUsageSearch || voucherUsageDateFilter)
+  const filteredVoucherUsages = voucherUsages.filter((vu) => {
+    const q = voucherUsageSearch.trim().toLowerCase()
+    const user = vu.profiles?.username || vu.profiles?.name || vu.profiles?.email || vu.user_id || ''
+    const order = vu.orders?.order_code || vu.order_id || ''
+    return (!q || [vu.voucher_code, user, order].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      dateMatches(vu.used_at, voucherUsageDateFilter)
+  })
+
+  const broadcastFilterActive = Boolean(broadcastSearch || broadcastStatusFilter || broadcastTypeFilter || broadcastDateFilter)
+  const filteredBroadcasts = broadcasts.filter((b) => {
+    const q = broadcastSearch.trim().toLowerCase()
+    return (!q || [b.title, b.message, b.type].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!broadcastStatusFilter || (broadcastStatusFilter === 'active' ? b.is_active !== false : b.is_active === false)) &&
+      (!broadcastTypeFilter || b.type === broadcastTypeFilter) &&
+      dateMatches(b.created_at, broadcastDateFilter)
+  })
+
+  const userFilterActive = Boolean(userSearch || userRoleFilter || userStatusFilter)
+  const filteredUsers = users.filter((u) => {
+    const q = userSearch.trim().toLowerCase()
+    return (!q || [u.name, u.username, u.email].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!userRoleFilter || u.role === userRoleFilter) &&
+      (!userStatusFilter || (userStatusFilter === 'active' ? !u.is_suspended : Boolean(u.is_suspended)))
+  })
+
+  const reviewFilterActive = Boolean(reviewSearch || reviewRatingFilter || reviewModerationFilter)
+  const filteredCustomerReviews = customerReviews.filter((review) => {
+    const q = reviewSearch.trim().toLowerCase()
+    return (!q || [review.reviewer_display, review.review_text, review.order_id].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!reviewRatingFilter || Number(review.rating) === Number(reviewRatingFilter)) &&
+      (!reviewModerationFilter || (reviewModerationFilter === 'approved' ? Boolean(review.is_approved) : !Boolean(review.is_approved)))
+  })
+
   async function load() {
     const {
       data: { user },
@@ -304,7 +501,7 @@ export default function Admin() {
       s
         .from('orders')
         .select(
-          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(name),profiles(username,name)'
+          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(id,name),profiles(id,username,name,email)'
         )
         .order('created_at', { ascending: false })
         .limit(200),
@@ -322,7 +519,7 @@ export default function Admin() {
 
       s
         .from('game_products')
-        .select('*,games(name)')
+        .select('*,games(id,name,category_id,popular)')
         .order('created_at', { ascending: false }),
 
       s
@@ -466,7 +663,7 @@ s
         s
           .from('orders')
           .select(
-            'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(name),profiles(username,name)'
+            'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(id,name),profiles(id,username,name,email)'
           )
           .order('created_at', { ascending: false })
           .limit(200),
@@ -2380,8 +2577,88 @@ async function deleteVoucher(v: any) {
       )}
 
       {tab === 'orders' && (
-        <div className="mt-7 space-y-3">
-          {orders.map((o) => (
+        <div className="mt-5 space-y-3">
+          <section className="glass rounded-xl p-3.5 md:p-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.18em] text-rose-400">OPERASIONAL</p>
+                <h2 className="mt-0.5 text-lg font-black text-white">Order</h2>
+                <p className="mt-0.5 text-[10px] text-slate-500">Tanpa filter hanya 3 order terbaru yang ditampilkan.</p>
+              </div>
+              <p className="text-[10px] text-slate-600">{(() => {
+                const q = orderSearch.trim().toLowerCase()
+                const filtered = orders.filter((o) => {
+                  const member = o.profiles?.username || o.profiles?.name || o.profiles?.email || ''
+                  const game = o.games?.name || ''
+                  const matchesSearch = !q || [o.order_code, member, game, o.status].some((v) => String(v || '').toLowerCase().includes(q))
+                  const matchesStatus = !orderStatusFilter || o.status === orderStatusFilter
+                  const matchesMember = !orderMemberFilter || o.profiles?.id === orderMemberFilter
+                  const matchesGame = !orderGameFilter || o.games?.id === orderGameFilter
+                  const matchesDate = !orderDateFilter || String(o.created_at || '').slice(0, 10) === orderDateFilter
+                  return matchesSearch && matchesStatus && matchesMember && matchesGame && matchesDate
+                })
+                return (orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) ? `${filtered.length} hasil` : `${orders.length} total`
+              })()}</p>
+            </div>
+
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <label className="relative block">
+                <span className="sr-only">Cari order</span>
+                <input
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Cari ID order, member, atau game..."
+                  className="input w-full text-xs"
+                />
+              </label>
+              <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="input text-xs">
+                <option value="">Semua Status</option>
+                <option value="PENDING_PAYMENT">Menunggu Pembayaran</option>
+                <option value="PAYMENT_RECEIVED">Pembayaran Diterima</option>
+                <option value="PROCESSING">Diproses</option>
+                <option value="SUCCESS">Selesai</option>
+                <option value="FAILED">Gagal</option>
+                <option value="CANCELLED">Dibatalkan</option>
+                <option value="EXPIRED">Kadaluarsa</option>
+              </select>
+              <select value={orderMemberFilter} onChange={(e) => setOrderMemberFilter(e.target.value)} className="input text-xs">
+                <option value="">Semua Member</option>
+                {users.map((u) => <option key={u.id} value={u.id}>{u.username || u.name || u.email}</option>)}
+              </select>
+              <select value={orderGameFilter} onChange={(e) => setOrderGameFilter(e.target.value)} className="input text-xs">
+                <option value="">Semua Game</option>
+                {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+              <input
+                type="date"
+                value={orderDateFilter}
+                onChange={(e) => setOrderDateFilter(e.target.value)}
+                className="input text-xs"
+                aria-label="Filter tanggal order"
+              />
+              <button
+                type="button"
+                onClick={() => { setOrderSearch(''); setOrderStatusFilter(''); setOrderMemberFilter(''); setOrderGameFilter(''); setOrderDateFilter('') }}
+                disabled={!orderSearch && !orderStatusFilter && !orderMemberFilter && !orderGameFilter && !orderDateFilter}
+                className="btn btn-muted text-xs disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Reset
+              </button>
+            </div>
+          </section>
+
+          {orders
+            .filter((o) => {
+              const q = orderSearch.trim().toLowerCase()
+              const member = o.profiles?.username || o.profiles?.name || o.profiles?.email || ''
+              const game = o.games?.name || ''
+              const matchesSearch = !q || [o.order_code, member, game, o.status].some((v) => String(v || '').toLowerCase().includes(q))
+              const matchesStatus = !orderStatusFilter || o.status === orderStatusFilter
+              const matchesDate = !orderDateFilter || String(o.created_at || '').slice(0, 10) === orderDateFilter
+              return matchesSearch && matchesStatus && matchesDate
+            })
+            .slice((orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) ? undefined : 0, (orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) ? undefined : 3)
+            .map((o) => (
             <div
               key={o.id}
               className="glass rounded-xl p-3.5 md:p-4"
@@ -2505,6 +2782,20 @@ async function deleteVoucher(v: any) {
               Belum ada order.
             </p>
           )}
+
+          {orders.length > 0 &&
+            (orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) &&
+            !orders.some((o) => {
+              const q = orderSearch.trim().toLowerCase()
+              const member = o.profiles?.username || o.profiles?.name || o.profiles?.email || ''
+              const game = o.games?.name || ''
+              const matchesSearch = !q || [o.order_code, member, game, o.status].some((v) => String(v || '').toLowerCase().includes(q))
+              const matchesStatus = !orderStatusFilter || o.status === orderStatusFilter
+              const matchesDate = !orderDateFilter || String(o.created_at || '').slice(0, 10) === orderDateFilter
+              return matchesSearch && matchesStatus && matchesDate
+            }) && (
+              <p className="py-8 text-center text-xs text-slate-500">Tidak ada order yang sesuai dengan filter.</p>
+            )}
         </div>
       )}
 
@@ -2519,20 +2810,16 @@ async function deleteVoucher(v: any) {
               Deposit Member — Perlu Diproses
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
-              Setujui atau tolak bukti deposit.
-              Persetujuan menambah saldo secara atomik
-              dan hanya dapat dilakukan sekali.
-            </p>
+            <p className="mt-1 text-sm text-slate-400">Setujui atau tolak bukti deposit. Persetujuan menambah saldo secara atomik dan hanya dapat dilakukan sekali.</p>
+            <AdminFilterShell active={depositFilterActive} onReset={() => { setDepositSearch(''); setDepositStatusFilter(''); setDepositMethodFilter(''); setDepositDateFilter('') }}>
+              <input className="input text-xs" placeholder="Cari ID deposit/member..." value={depositSearch} onChange={(e) => setDepositSearch(e.target.value)} />
+              <select className="input text-xs" value={depositStatusFilter} onChange={(e) => setDepositStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="PENDING">PENDING</option></select>
+              <select className="input text-xs" value={depositMethodFilter} onChange={(e) => setDepositMethodFilter(e.target.value)}><option value="">Semua Metode</option>{methods.map((m) => <option key={m.id} value={m.kind || m.name}>{m.name}</option>)}</select>
+              <input type="date" className="input text-xs" value={depositDateFilter} onChange={(e) => setDepositDateFilter(e.target.value)} />
+            </AdminFilterShell>
           </div>
 
-          {deposits
-            .filter(
-              (d) =>
-                d.status ===
-                'PENDING'
-            )
-            .map((d) => (
+          {limitAdminItems(filteredPendingDeposits, depositFilterActive).map((d) => (
               <div
                 key={d.id}
                 className="glass rounded-xl p-3.5 md:p-4"
@@ -2644,13 +2931,16 @@ async function deleteVoucher(v: any) {
               Riwayat Deposit
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
-              Seluruh pengajuan deposit member,
-              termasuk APPROVED dan REJECTED.
-            </p>
+            <p className="mt-1 text-sm text-slate-400">Seluruh pengajuan deposit member, termasuk APPROVED dan REJECTED.</p>
+            <AdminFilterShell active={depositHistoryFilterActive} onReset={() => { setDepositHistorySearch(''); setDepositHistoryStatusFilter(''); setDepositHistoryMethodFilter(''); setDepositHistoryDateFilter('') }}>
+              <input className="input text-xs" placeholder="Cari ID deposit/member..." value={depositHistorySearch} onChange={(e) => setDepositHistorySearch(e.target.value)} />
+              <select className="input text-xs" value={depositHistoryStatusFilter} onChange={(e) => setDepositHistoryStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select>
+              <select className="input text-xs" value={depositHistoryMethodFilter} onChange={(e) => setDepositHistoryMethodFilter(e.target.value)}><option value="">Semua Metode</option>{methods.map((m) => <option key={m.id} value={m.kind || m.name}>{m.name}</option>)}</select>
+              <input type="date" className="input text-xs" value={depositHistoryDateFilter} onChange={(e) => setDepositHistoryDateFilter(e.target.value)} />
+            </AdminFilterShell>
           </div>
 
-          {deposits.map((d) => (
+          {limitAdminItems(filteredDepositHistory, depositHistoryFilterActive).map((d) => (
             <div
               key={d.id}
               className="glass rounded-xl p-3 md:p-3.5"
@@ -2731,13 +3021,15 @@ async function deleteVoucher(v: any) {
               Riwayat Wallet
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
-              Semua perubahan saldo member yang
-              tercatat di ledger.
-            </p>
+            <p className="mt-1 text-sm text-slate-400">Semua perubahan saldo member yang tercatat di ledger.</p>
+            <AdminFilterShell active={walletFilterActive} onReset={() => { setWalletSearch(''); setWalletTypeFilter(''); setWalletDateFilter('') }}>
+              <input className="input text-xs" placeholder="Cari member/reason..." value={walletSearch} onChange={(e) => setWalletSearch(e.target.value)} />
+              <select className="input text-xs" value={walletTypeFilter} onChange={(e) => setWalletTypeFilter(e.target.value)}><option value="">Semua Tipe</option>{Array.from(new Set(walletTx.map((x) => x.type).filter(Boolean))).map((x) => <option key={x} value={x}>{x}</option>)}</select>
+              <input type="date" className="input text-xs" value={walletDateFilter} onChange={(e) => setWalletDateFilter(e.target.value)} />
+            </AdminFilterShell>
           </div>
 
-          {walletTx.map((tx) => (
+          {limitAdminItems(filteredWalletTx, walletFilterActive).map((tx) => (
             <div
               key={tx.id}
               className="glass rounded-xl p-3 md:p-3.5"
@@ -2884,7 +3176,11 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {categories.map((c) => (
+            <AdminFilterShell active={categoryFilterActive} onReset={() => { setCategorySearch(''); setCategoryStatusFilter('') }}>
+              <input className="input text-xs" placeholder="Cari kategori..." value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} />
+              <select className="input text-xs" value={categoryStatusFilter} onChange={(e) => setCategoryStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+            </AdminFilterShell>
+            {limitAdminItems(filteredCategories, categoryFilterActive).map((c) => (
               <div
                 key={c.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -3141,7 +3437,13 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {games.map((g) => (
+            <AdminFilterShell active={gameFilterActive} onReset={() => { setGameSearch(''); setGameCategoryFilter(''); setGameStatusFilter(''); setGamePopularFilter('') }}>
+              <input className="input text-xs" placeholder="Cari game..." value={gameSearch} onChange={(e) => setGameSearch(e.target.value)} />
+              <select className="input text-xs" value={gameCategoryFilter} onChange={(e) => setGameCategoryFilter(e.target.value)}><option value="">Semua Kategori</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+              <select className="input text-xs" value={gameStatusFilter} onChange={(e) => setGameStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+              <select className="input text-xs" value={gamePopularFilter} onChange={(e) => setGamePopularFilter(e.target.value)}><option value="">Popular: Semua</option><option value="popular">Popular</option><option value="normal">Bukan Popular</option></select>
+            </AdminFilterShell>
+            {limitAdminItems(filteredGames, gameFilterActive).map((g) => (
               <div
                 key={g.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -3334,7 +3636,15 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {products.map((p) => (
+            <AdminFilterShell active={productFilterActive} onReset={() => { setProductSearch(''); setProductGameFilter(''); setProductCategoryFilter(''); setProductStatusFilter(''); setProductPopularFilter(''); setProductPriceSort('') }}>
+              <input className="input text-xs" placeholder="Cari produk/SKU..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+              <select className="input text-xs" value={productGameFilter} onChange={(e) => setProductGameFilter(e.target.value)}><option value="">Semua Game</option>{games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+              <select className="input text-xs" value={productCategoryFilter} onChange={(e) => setProductCategoryFilter(e.target.value)}><option value="">Semua Kategori</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+              <select className="input text-xs" value={productStatusFilter} onChange={(e) => setProductStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+              <select className="input text-xs" value={productPopularFilter} onChange={(e) => setProductPopularFilter(e.target.value)}><option value="">Game Popular: Semua</option><option value="popular">Game Popular</option><option value="normal">Bukan Popular</option></select>
+              <select className="input text-xs" value={productPriceSort} onChange={(e) => setProductPriceSort(e.target.value)}><option value="">Harga: Default</option><option value="asc">Harga terendah</option><option value="desc">Harga tertinggi</option></select>
+            </AdminFilterShell>
+            {limitAdminItems(filteredProducts, productFilterActive).map((p) => (
               <div
                 key={p.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -3478,7 +3788,12 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {methods.map((m) => (
+            <AdminFilterShell active={paymentFilterActive} onReset={() => { setPaymentSearch(''); setPaymentKindFilter(''); setPaymentStatusFilter('') }}>
+              <input className="input text-xs" placeholder="Cari metode..." value={paymentSearch} onChange={(e) => setPaymentSearch(e.target.value)} />
+              <select className="input text-xs" value={paymentKindFilter} onChange={(e) => setPaymentKindFilter(e.target.value)}><option value="">Semua Jenis</option>{Array.from(new Set(methods.map((m) => m.kind).filter(Boolean))).map((x) => <option key={x} value={x}>{x}</option>)}</select>
+              <select className="input text-xs" value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+            </AdminFilterShell>
+            {limitAdminItems(filteredMethods, paymentFilterActive).map((m) => (
               <div
                 key={m.id}
                 className="glass rounded-xl p-3 md:p-3.5"
@@ -3796,17 +4111,16 @@ async function deleteVoucher(v: any) {
 
             <div className="space-y-3">
               <div className="glass rounded-xl p-3.5 md:p-4">
-                <h2 className="text-xl font-black">
-                  Daftar Voucher
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-400">
-                  Owner/Admin dapat mengatur limit.
-                  Stok awal hanya dapat diubah Owner.
-                </p>
+                <h2 className="text-xl font-black">Daftar Voucher</h2>
+                <p className="mt-1 text-sm text-slate-400">Owner/Admin dapat mengatur limit. Stok awal hanya dapat diubah Owner.</p>
+                <AdminFilterShell active={voucherFilterActive} onReset={() => { setVoucherSearch(''); setVoucherStatusFilter(''); setVoucherTypeFilter('') }}>
+                  <input className="input text-xs" placeholder="Cari kode voucher..." value={voucherSearch} onChange={(e) => setVoucherSearch(e.target.value)} />
+                  <select className="input text-xs" value={voucherStatusFilter} onChange={(e) => setVoucherStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+                  <select className="input text-xs" value={voucherTypeFilter} onChange={(e) => setVoucherTypeFilter(e.target.value)}><option value="">Semua Tipe</option><option value="PERCENT">Persen</option><option value="FIXED">Nominal</option></select>
+                </AdminFilterShell>
               </div>
 
-              {vouchers.map((v) => {
+              {limitAdminItems(filteredVouchers, voucherFilterActive).map((v) => {
                 const used =
                   Number(
                     v.usage_count || 0
@@ -4033,7 +4347,11 @@ async function deleteVoucher(v: any) {
           </div>
 
           <div className="space-y-3">
-            {voucherUsages.map((vu) => {
+            <AdminFilterShell active={voucherUsageFilterActive} onReset={() => { setVoucherUsageSearch(''); setVoucherUsageDateFilter('') }}>
+              <input className="input text-xs" placeholder="Cari kode/member/order..." value={voucherUsageSearch} onChange={(e) => setVoucherUsageSearch(e.target.value)} />
+              <input type="date" className="input text-xs" value={voucherUsageDateFilter} onChange={(e) => setVoucherUsageDateFilter(e.target.value)} />
+            </AdminFilterShell>
+            {limitAdminItems(filteredVoucherUsages, voucherUsageFilterActive).map((vu) => {
               const user =
                 vu.profiles
 
@@ -4503,16 +4821,17 @@ async function deleteVoucher(v: any) {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black">
-                  Riwayat Broadcast
-                </h2>
-
-                <span className="text-xs text-slate-500">
-                  Terbaru di atas
-                </span>
+                <h2 className="text-xl font-black">Riwayat Broadcast</h2>
+                <span className="text-xs text-slate-500">Terbaru di atas</span>
               </div>
+              <AdminFilterShell active={broadcastFilterActive} onReset={() => { setBroadcastSearch(''); setBroadcastStatusFilter(''); setBroadcastTypeFilter(''); setBroadcastDateFilter('') }}>
+                <input className="input text-xs" placeholder="Cari judul/pesan..." value={broadcastSearch} onChange={(e) => setBroadcastSearch(e.target.value)} />
+                <select className="input text-xs" value={broadcastStatusFilter} onChange={(e) => setBroadcastStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+                <select className="input text-xs" value={broadcastTypeFilter} onChange={(e) => setBroadcastTypeFilter(e.target.value)}><option value="">Semua Tipe</option>{Array.from(new Set(broadcasts.map((b) => b.type).filter(Boolean))).map((x) => <option key={x} value={x}>{x}</option>)}</select>
+                <input type="date" className="input text-xs" value={broadcastDateFilter} onChange={(e) => setBroadcastDateFilter(e.target.value)} />
+              </AdminFilterShell>
 
-              {broadcasts.map(
+              {limitAdminItems(filteredBroadcasts, broadcastFilterActive).map(
                 (b) => (
                   <div
                     key={b.id}
@@ -4835,7 +5154,7 @@ async function deleteVoucher(v: any) {
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            {filteredMedia.map((a) => (
+            {limitAdminItems(filteredMedia, Boolean(mediaSearch || mediaCategory !== 'all')).map((a) => (
               <div
                 key={a.id}
                 className="glass overflow-hidden rounded-2xl"
@@ -4891,18 +5210,16 @@ async function deleteVoucher(v: any) {
       {tab === 'users' && (
         <section className="mt-7 space-y-3">
           <div className="glass rounded-xl p-3.5 md:p-4">
-            <h2 className="text-xl font-black">
-              Customer & Wallet
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-400">
-              Suspend/aktifkan, kelola role, dan Owner
-              dapat menambah atau mengurangi saldo dengan
-              alasan serta riwayat audit.
-            </p>
+            <h2 className="text-xl font-black">Customer & Wallet</h2>
+            <p className="mt-1 text-sm text-slate-400">Suspend/aktifkan, kelola role, dan Owner dapat menambah atau mengurangi saldo dengan alasan serta riwayat audit.</p>
+            <AdminFilterShell active={userFilterActive} onReset={() => { setUserSearch(''); setUserRoleFilter(''); setUserStatusFilter('') }}>
+              <input className="input text-xs" placeholder="Cari nama/username/email..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
+              <select className="input text-xs" value={userRoleFilter} onChange={(e) => setUserRoleFilter(e.target.value)}><option value="">Semua Role</option><option value="owner">Owner</option><option value="admin">Admin</option><option value="customer_service">Customer Service</option><option value="user">Member</option></select>
+              <select className="input text-xs" value={userStatusFilter} onChange={(e) => setUserStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="suspended">Suspended</option></select>
+            </AdminFilterShell>
           </div>
 
-          {users.map((u) => {
+          {limitAdminItems(filteredUsers, userFilterActive).map((u) => {
             const balance =
               Number(
                 wallets.find(
@@ -5097,7 +5414,14 @@ async function deleteVoucher(v: any) {
               <p className="mt-1 text-sm text-slate-500">Hanya ulasan dari order berstatus SUCCESS yang bisa masuk. Ulasan tampil di Home setelah disetujui.</p>
             </div>
             <div className="divide-y divide-white/10">
-              {customerReviews.map((review) => (
+              <div className="p-5">
+                <AdminFilterShell active={reviewFilterActive} onReset={() => { setReviewSearch(''); setReviewRatingFilter(''); setReviewModerationFilter('') }}>
+                  <input className="input text-xs" placeholder="Cari pelanggan/review/order..." value={reviewSearch} onChange={(e) => setReviewSearch(e.target.value)} />
+                  <select className="input text-xs" value={reviewRatingFilter} onChange={(e) => setReviewRatingFilter(e.target.value)}><option value="">Semua Rating</option><option value="5">5 ★</option><option value="4">4 ★</option><option value="3">3 ★</option><option value="2">2 ★</option><option value="1">1 ★</option></select>
+                  <select className="input text-xs" value={reviewModerationFilter} onChange={(e) => setReviewModerationFilter(e.target.value)}><option value="">Semua Moderasi</option><option value="approved">Ditampilkan</option><option value="pending">Menunggu</option></select>
+                </AdminFilterShell>
+              </div>
+              {limitAdminItems(filteredCustomerReviews, reviewFilterActive).map((review) => (
                 <div key={review.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
