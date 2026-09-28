@@ -193,7 +193,9 @@ export default function OrderStatusClient() {
 
   const info = statusInfo[o.status] || { label: o.status, color: 'text-slate-300', icon: '•' }
   const compact = o.status === 'SUCCESS' || ['FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED'].includes(o.status)
-  const reference = payment?.external_reference || `REF-${o.order_code}`
+
+  const customerData = o.customer_data && typeof o.customer_data === 'object' ? o.customer_data : {}
+  const customerDataEntries = Object.entries(customerData).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '')
 
   return (
     <main className="mx-auto max-w-2xl px-3 py-6 sm:px-4 sm:py-10">
@@ -206,9 +208,9 @@ export default function OrderStatusClient() {
             </h1>
           </div>
           <div className="text-right">
-            <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">#{o.order_code}</span>
-            <p className="mt-2 text-[10px] uppercase tracking-wide text-slate-500">Ref ID</p>
-            <p className="max-w-[170px] break-all text-xs font-bold text-cyan-300">{reference}</p>
+            {o.status !== 'SUCCESS' && (
+              <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">#{o.order_code}</span>
+            )}
           </div>
         </div>
 
@@ -222,8 +224,6 @@ export default function OrderStatusClient() {
               <span className="text-xl">✓</span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-              <div><p className="text-[11px] text-slate-500">No. Referensi</p><p className="mt-0.5 font-bold break-all">{reference}</p></div>
-              <div><p className="text-[11px] text-slate-500">Order ID</p><p className="mt-0.5 font-bold break-all">{o.order_code}</p></div>
               <div><p className="text-[11px] text-slate-500">Produk</p><p className="mt-0.5 font-semibold">{o.games?.name || 'Produk'}</p></div>
               <div><p className="text-[11px] text-slate-500">Metode</p><p className="mt-0.5 font-semibold">{paymentMethod?.name || 'Pembayaran'}</p></div>
               <div><p className="text-[11px] text-slate-500">Total</p><p className="mt-0.5 font-black text-cyan-300">Rp {Number(o.total || 0).toLocaleString('id-ID')}</p></div>
@@ -257,6 +257,20 @@ export default function OrderStatusClient() {
 
             {o.status === 'PENDING_PAYMENT' && <PaymentProof orderId={o.id} />}
           </>
+        )}
+
+        {customerDataEntries.length > 0 && (
+          <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/40 p-3">
+            <p className="text-xs font-bold text-slate-400">DATA PESANAN</p>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {customerDataEntries.map(([key, value]) => (
+                <div key={key} className="rounded-lg bg-white/[0.03] px-3 py-2">
+                  <p className="text-[11px] font-semibold text-slate-500">{key.replace(/_/g, ' ')}</p>
+                  <p className="mt-0.5 break-all text-sm font-bold text-slate-200">{String(value)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         <div className="mt-4 rounded-xl border border-white/10 p-3">
