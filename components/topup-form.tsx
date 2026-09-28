@@ -161,27 +161,27 @@ export default function TopupForm({
       <div>
         <h2 className="text-xl font-black">2. Pilih nominal</h2>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {products.map((p) => (
             <button
               type="button"
               key={p.id}
               onClick={() => setSelected(p)}
-              className={`rounded-2xl border p-3 text-left transition ${
+              className={`rounded-xl border p-2.5 text-left transition ${
                 selected?.id === p.id
                   ? 'border-cyan-400 bg-cyan-400/10 shadow-[0_0_25px_rgba(34,211,238,.12)]'
                   : 'border-white/10 bg-slate-950/40 hover:border-white/20'
               }`}
             >
-              <div className="min-h-[4.25rem] flex items-center">
-                <div className="font-bold leading-snug">{p.name || p.nominal}</div>
+              <div className="flex min-h-[3.25rem] items-center">
+                <div className="line-clamp-2 text-xs font-bold leading-snug sm:text-sm">{p.name || p.nominal}</div>
               </div>
 
-              <div className="mt-2 text-sm text-cyan-300">
+              <div className="mt-1.5 text-xs font-semibold text-cyan-300 sm:text-sm">
                 Rp {Number(p.price).toLocaleString('id-ID')}
               </div>
 
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 truncate text-[10px] text-slate-500 sm:text-[11px]">
                 {p.sku}
               </div>
             </button>
