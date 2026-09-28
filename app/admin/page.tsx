@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   Clock3,
   XCircle,
+  type LucideIcon,
 } from 'lucide-react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
@@ -68,7 +69,7 @@ const mediaCategories = [
   ['general', '📁 Media Lainnya'],
 ]
 
-const adminIcons: Record<string, any> = {
+const adminIcons: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   orders: ShoppingCart,
   deposits: WalletCards,
@@ -88,7 +89,10 @@ const adminIcons: Record<string, any> = {
   settings: Settings,
 }
 
-const adminMenuGroups = [
+type AdminMenuItem = readonly [string, string]
+type AdminMenuGroup = { title: string; items: readonly AdminMenuItem[] }
+
+const adminMenuGroups: readonly AdminMenuGroup[] = [
   {
     title: 'UTAMA',
     items: [['dashboard', 'Dashboard']],
@@ -2363,7 +2367,7 @@ async function deleteVoucher(v: any) {
             <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
               <div className="mb-3"><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">AKTIVITAS</p><h3 className="mt-0.5 text-sm font-black text-white">Ringkasan Cepat</h3></div>
               <div className="grid grid-cols-2 gap-2">
-                {[['Produk aktif', activeProducts, Package], ['Game aktif', games.filter((g) => g.is_active !== false).length, Gamepad2], ['Deposit masuk', deposits.length, WalletCards], ['Wallet transaksi', walletTx.length, Wallet]].map(([label, value, Icon]) => <div key={String(label)} className="rounded-xl border border-white/[.06] bg-white/[.02] p-2.5"><Icon className="h-4 w-4 text-rose-300" /><p className="mt-2 text-sm font-black text-white">{value as any}</p><p className="text-[9px] text-slate-600">{label as string}</p></div>)}
+                {([['Produk aktif', activeProducts, Package], ['Game aktif', games.filter((g) => g.is_active !== false).length, Gamepad2], ['Deposit masuk', deposits.length, WalletCards], ['Wallet transaksi', walletTx.length, Wallet]] as readonly [string, number, LucideIcon][]).map(([label, value, Icon]) => <div key={label} className="rounded-xl border border-white/[.06] bg-white/[.02] p-2.5"><Icon className="h-4 w-4 text-rose-300" /><p className="mt-2 text-sm font-black text-white">{value}</p><p className="text-[9px] text-slate-600">{label}</p></div>)}
               </div>
             </div>
           </div>
