@@ -8,8 +8,31 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Megaphone, ShoppingCart, WalletCards, Download, Wallet, FolderTree, Gamepad2, Package, CreditCard, Ticket, Radio, Images, Users, Star, MessageSquare, Settings, Search, ListFilter, X, CircleCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import {
+  Activity,
+  Bell,
+  CircleDollarSign,
+  CreditCard,
+  Gamepad2,
+  History,
+  LayoutDashboard,
+  MessageSquare,
+  Package,
+  Radio,
+  Settings,
+  ShoppingCart,
+  Ticket,
+  Users,
+  Wallet,
+  WalletCards,
+  Image as ImageIcon,
+  Megaphone,
+  Tags,
+  CheckCircle2,
+  Clock3,
+  XCircle,
+} from 'lucide-react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
 const transitions: Record<string, string[]> = {
@@ -19,6 +42,7 @@ const transitions: Record<string, string[]> = {
 }
 
 const tabs = [
+  'dashboard',
   'orders',
   'deposits',
   'deposit-history',
@@ -44,15 +68,73 @@ const mediaCategories = [
   ['general', '📁 Media Lainnya'],
 ]
 
+const adminIcons: Record<string, any> = {
+  dashboard: LayoutDashboard,
+  orders: ShoppingCart,
+  deposits: WalletCards,
+  'deposit-history': History,
+  'wallet-history': Wallet,
+  categories: Tags,
+  games: Gamepad2,
+  products: Package,
+  payments: CreditCard,
+  vouchers: Ticket,
+  promotions: Megaphone,
+  broadcasts: Radio,
+  media: ImageIcon,
+  users: Users,
+  reviews: MessageSquare,
+  chat: MessageSquare,
+  settings: Settings,
+}
+
+const adminMenuGroups = [
+  {
+    title: 'UTAMA',
+    items: [['dashboard', 'Dashboard']],
+  },
+  {
+    title: 'OPERASIONAL',
+    items: [
+      ['orders', 'Order'],
+      ['deposits', 'Deposit'],
+      ['deposit-history', 'Riwayat Deposit'],
+      ['wallet-history', 'Riwayat Wallet'],
+    ],
+  },
+  {
+    title: 'KATALOG',
+    items: [
+      ['categories', 'Kategori'],
+      ['games', 'Games'],
+      ['products', 'Produk'],
+    ],
+  },
+  {
+    title: 'SISTEM',
+    items: [
+      ['payments', 'Pembayaran'],
+      ['vouchers', 'Voucher'],
+      ['promotions', 'Banner Promo'],
+      ['broadcasts', 'Live Broadcast'],
+      ['media', 'Media Manager'],
+    ],
+  },
+  {
+    title: 'MANAGEMENT',
+    items: [
+      ['users', 'Member & Wallet'],
+      ['reviews', 'Ulasan & Running Text'],
+      ['chat', 'Live Chat'],
+      ['settings', 'Pengaturan'],
+    ],
+  },
+] as const
+
 export default function Admin() {
-  const [tab, setTab] = useState('orders')
+  const [tab, setTab] = useState('dashboard')
 
   function changeTab(nextTab: string) {
-    setAdminSearch('')
-    setAdminStatus('all')
-    setAdminCategory('all')
-    setAdminGame('all')
-    setAdminPopular('all')
     sessionStorage.setItem('admin_active_tab', nextTab)
     window.location.reload()
   }
@@ -65,11 +147,6 @@ export default function Admin() {
 
   const [role, setRole] = useState('')
   const [msg, setMsg] = useState('')
-  const [adminSearch, setAdminSearch] = useState('')
-  const [adminStatus, setAdminStatus] = useState('all')
-  const [adminCategory, setAdminCategory] = useState('all')
-  const [adminGame, setAdminGame] = useState('all')
-  const [adminPopular, setAdminPopular] = useState('all')
 
   const [editType, setEditType] = useState<'category' | 'game' | 'product' | null>(null)
   const [editId, setEditId] = useState('')
@@ -132,7 +209,6 @@ export default function Admin() {
     logo_url: '',
     banner_url: '',
     category_id: '',
-    popular: false,
   })
 
   const [prodForm, setProdForm] = useState({
@@ -227,7 +303,7 @@ export default function Admin() {
       s
         .from('orders')
         .select(
-          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(id,name,category_id,game_categories(id,name)),profiles(username,name)'
+          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(name),profiles(username,name)'
         )
         .order('created_at', { ascending: false })
         .limit(200),
@@ -245,7 +321,7 @@ export default function Admin() {
 
       s
         .from('game_products')
-        .select('*,games(id,name,category_id,game_categories(id,name))')
+        .select('*,games(name)')
         .order('created_at', { ascending: false }),
 
       s
@@ -674,7 +750,6 @@ s
         category_id: row.category_id || '',
         logo_url: row.logo_url || '',
         banner_url: row.banner_url || '',
-        popular: Boolean(row.popular),
       })
       return
     }
@@ -736,7 +811,6 @@ s
         category_id: editForm.category_id || null,
         logo_url: String(editForm.logo_url || '').trim() || null,
         banner_url: String(editForm.banner_url || '').trim() || null,
-        popular: Boolean(editForm.popular),
       }
 
       if (!payload.name || !payload.slug) {
@@ -2084,7 +2158,7 @@ async function deleteVoucher(v: any) {
     load()
   }
 
-  const filteredMediaAll =
+  const filteredMedia =
     mediaAssets.filter(
       (a) =>
         a.name
@@ -2097,218 +2171,108 @@ async function deleteVoucher(v: any) {
           a.category ===
             mediaCategory)
     )
-  const filteredMedia = (mediaSearch.trim() || mediaCategory !== 'all') ? filteredMediaAll : filteredMediaAll.slice(0, 3)
 
-  const filterActive = Boolean(adminSearch.trim() || adminStatus !== 'all' || adminCategory !== 'all' || adminGame !== 'all' || adminPopular !== 'all')
-
-  function adminVisible(items: any[]) {
-    const q = adminSearch.trim().toLowerCase()
-    const filtered = items.filter((item: any) => {
-      const text = [item?.name,item?.username,item?.email,item?.order_code,item?.deposit_code,item?.voucher_code,item?.code,item?.sku,item?.profiles?.name,item?.profiles?.username,item?.profiles?.email,item?.games?.name,item?.game_categories?.name,item?.reason,item?.type,item?.title,item?.message,item?.reviewer_display,item?.review_text,item?.description].filter(Boolean).join(' ').toLowerCase()
-      const status = String(item?.status || '').toLowerCase()
-      const category = String(item?.category_id || item?.game_categories?.id || '')
-      const game = String(item?.game_id || item?.games?.id || '')
-      const popular = item?.popular ? 'on' : 'off'
-      return (!q || text.includes(q)) && (adminStatus === 'all' || status === adminStatus) && (adminCategory === 'all' || category === adminCategory) && (adminGame === 'all' || game === adminGame) && (adminPopular === 'all' || popular === adminPopular)
+  const successfulOrders = orders.filter((o) => o.status === 'SUCCESS')
+  const pendingOrders = orders.filter((o) => o.status === 'PENDING_PAYMENT')
+  const processingOrders = orders.filter((o) => o.status === 'PROCESSING')
+  const cancelledOrders = orders.filter((o) => ['CANCELLED', 'EXPIRED', 'FAILED'].includes(o.status))
+  const totalIncome = successfulOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
+  const totalCustomers = users.filter((u) => u.role === 'customer').length
+  const activeProducts = products.filter((p) => p.is_active !== false).length
+  const statusTotal = Math.max(orders.length, 1)
+  const statusSegments = [
+    { label: 'Selesai', value: successfulOrders.length, icon: CheckCircle2, cls: 'text-emerald-300', bg: 'bg-emerald-400' },
+    { label: 'Proses', value: processingOrders.length, icon: Clock3, cls: 'text-amber-300', bg: 'bg-amber-400' },
+    { label: 'Menunggu', value: pendingOrders.length, icon: Clock3, cls: 'text-cyan-300', bg: 'bg-cyan-400' },
+    { label: 'Gagal / Batal', value: cancelledOrders.length, icon: XCircle, cls: 'text-rose-300', bg: 'bg-rose-400' },
+  ]
+  const donutStops = (() => {
+    let current = 0
+    return statusSegments.map((segment) => {
+      const start = current
+      current += (segment.value / statusTotal) * 360
+      return `${segment.bg === 'bg-emerald-400' ? '#34d399' : segment.bg === 'bg-amber-400' ? '#fbbf24' : segment.bg === 'bg-cyan-400' ? '#22d3ee' : '#fb7185'} ${start}deg ${current}deg`
     })
-    return filterActive ? filtered : filtered.slice(0, 3)
+  })()
+
+  const menuButton = (item: readonly [string, string], mobile = false) => {
+    const Icon = adminIcons[item[0]] || Activity
+    return (
+      <button
+        type="button"
+        key={item[0]}
+        onPointerDown={() => changeTab(item[0])}
+        onClick={() => changeTab(item[0])}
+        style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
+        className={`group flex items-center transition ${
+          mobile
+            ? `min-w-max rounded-xl border px-3 py-2 text-[11px] font-semibold ${tab === item[0] ? 'border-rose-400/30 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`
+            : `w-full gap-3 rounded-xl px-3 py-2.5 text-left text-sm ${tab === item[0] ? 'border border-rose-400/20 bg-rose-400/10 text-rose-200' : 'border border-transparent text-slate-400 hover:bg-white/[.04] hover:text-white'}`
+        }`}
+      >
+        <Icon className={mobile ? 'h-4 w-4 shrink-0' : 'h-[17px] w-[17px] shrink-0'} strokeWidth={1.8} />
+        <span>{item[1]}</span>
+        {!mobile && tab === item[0] && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,.9)]" />}
+      </button>
+    )
   }
 
-  const filterLabels: Record<string,string> = {orders:'Cari order, member, atau game...',deposits:'Cari deposit, member, atau metode...','deposit-history':'Cari riwayat deposit...','wallet-history':'Cari member, tipe, atau alasan...',categories:'Cari kategori...',games:'Cari game...',products:'Cari produk, SKU, atau game...',payments:'Cari metode pembayaran...',vouchers:'Cari kode voucher...',promotions:'Cari promo...',broadcasts:'Cari broadcast...',users:'Cari member, username, atau email...',reviews:'Cari ulasan atau nama member...'}
-  const showAdminFilters = ['orders','deposits','deposit-history','wallet-history','categories','games','products','payments','vouchers','promotions','broadcasts','users','reviews'].includes(tab)
-  function resetAdminFilters(){setAdminSearch('');setAdminStatus('all');setAdminCategory('all');setAdminGame('all');setAdminPopular('all')}
-
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,.08),transparent_32%),radial-gradient(circle_at_top_right,rgba(168,85,247,.08),transparent_28%)]">
-      <div className="mx-auto flex max-w-[1500px] gap-5 px-3 py-4 md:px-5 lg:py-6">
-        <aside className="hidden w-64 shrink-0 lg:block">
-          <div className="sticky top-5 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
-            <div className="border-b border-white/10 p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_25px_rgba(34,211,238,.12)]">
-                  <Gamepad2 size={21} strokeWidth={1.8} />
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,23,68,.07),transparent_30%),radial-gradient(circle_at_top_right,rgba(168,85,247,.06),transparent_25%)]">
+      <div className="mx-auto flex max-w-[1500px] gap-4 px-3 py-3 md:px-5 lg:py-5">
+        <aside className="hidden w-[224px] shrink-0 lg:block">
+          <div className="sticky top-4 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/90 shadow-xl backdrop-blur-xl">
+            <div className="border-b border-white/10 px-4 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-400/10">
+                  <Gamepad2 className="h-5 w-5 text-rose-300" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">
-                    Admin
-                  </p>
-                  <h2 className="truncate text-lg font-black text-white">
-                    NDRAAAID.v1
-                  </h2>
+                  <p className="text-[9px] font-black uppercase tracking-[.22em] text-slate-500">Admin Panel</p>
+                  <h2 className="truncate text-sm font-black text-white">NDRAAAID<span className="text-rose-400">.v1</span></h2>
                 </div>
               </div>
-              <div className="mt-4 flex items-center justify-between rounded-2xl border border-emerald-400/10 bg-emerald-400/5 px-3 py-2">
-                <span className="text-[11px] text-slate-500">Mode</span>
-                <span className="text-[11px] font-bold text-emerald-300">● ONLINE</span>
+              <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-400/10 bg-emerald-400/[.04] px-2.5 py-1.5">
+                <span className="text-[10px] text-slate-500">Status</span>
+                <span className="text-[10px] font-bold text-emerald-300">● ONLINE</span>
               </div>
             </div>
-
-            <nav className="max-h-[calc(100vh-190px)] space-y-5 overflow-y-auto p-3">
-              {[
-                {
-                  title: 'PROMOSI',
-                  items: [
-                    ['promotions', 'Megaphone', 'Banner Promo'],
-                  ],
-                },
-                {
-                  title: 'OPERASIONAL',
-                  items: [
-                    ['orders', 'ShoppingCart', 'Order'],
-                    ['deposits', 'WalletCards', 'Deposit'],
-                    ['deposit-history', 'Download', 'Riwayat Deposit'],
-                    ['wallet-history', 'Wallet', 'Riwayat Wallet'],
-                  ],
-                },
-                {
-                  title: 'KATALOG',
-                  items: [
-                    ['categories', 'FolderTree', 'Kategori'],
-                    ['games', 'Gamepad2', 'Games'],
-                    ['products', 'Package', 'Produk'],
-                  ],
-                },
-                {
-                  title: 'SISTEM',
-                  items: [
-                    ['payments', 'CreditCard', 'Pembayaran'],
-                    ['vouchers', 'Ticket', 'Voucher'],
-                    ['broadcasts', 'Radio', 'Live Broadcast'],
-                    ['media', 'Images', 'Media Manager'],
-                  ],
-                },
-                {
-                  title: 'MANAGEMENT',
-                  items: [
-                    ['users', 'Users', 'Member & Wallet'],
-                    ['reviews', 'Star', 'Ulasan & Running Text'],
-                    ['chat', 'MessageSquare', 'Live Chat'],
-                    ['settings', 'Settings', 'Pengaturan'],
-                  ],
-                },
-              ].map((group) => (
+            <nav className="max-h-[calc(100vh-170px)] space-y-4 overflow-y-auto p-2.5">
+              {adminMenuGroups.map((group) => (
                 <div key={group.title}>
-                  <p className="px-3 pb-2 text-[9px] font-black tracking-[.25em] text-slate-600">
-                    {group.title}
-                  </p>
-                  <div className="space-y-1">
+                  <p className="px-2 pb-1.5 text-[8px] font-black tracking-[.22em] text-slate-600">{group.title}</p>
+                  <div className="space-y-0.5">
                     {group.items
-                      .filter(
-                        (item) =>
-                          (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) &&
-                          (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))
-                      )
-                      .map((item) => (
-                        <button
-                          type="button"
-                          key={item[0]}
-                          onPointerDown={() => changeTab(item[0])}
-                          onClick={() => changeTab(item[0])}
-                          style={{
-                            position: 'relative',
-                            zIndex: 20,
-                            pointerEvents: 'auto',
-                            touchAction: 'manipulation',
-                          }}
-                          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                            tab === item[0]
-                              ? 'border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.08)]'
-                              : 'border border-transparent text-slate-400 hover:bg-white/[.04] hover:text-white'
-                          }`}
-                        >
-                          <span className="flex w-5 items-center justify-center">{(() => { const I = ({Megaphone,ShoppingCart,WalletCards,Download,Wallet,FolderTree,Gamepad2,Package,CreditCard,Ticket,Radio,Images,Users,Star,MessageSquare,Settings} as any)[item[1]]; return I ? <I size={17} strokeWidth={1.8} /> : null })()}</span>
-                          <span className="font-semibold">{item[2]}</span>
-                          {tab === item[0] && (
-                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.9)]" />
-                          )}
-                        </button>
-                      ))}
+                      .filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role)))
+                      .map((item) => menuButton(item))}
                   </div>
                 </div>
               ))}
             </nav>
+            <div className="border-t border-white/10 px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5"><Users className="h-4 w-4 text-slate-400" /></div>
+                <div className="min-w-0"><p className="text-[10px] font-bold text-white">Admin</p><p className="text-[9px] text-slate-500">{role || 'Admin'}</p></div>
+              </div>
+            </div>
           </div>
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 shadow-2xl shadow-purple-950/10 backdrop-blur-xl">
-            <div className="relative p-5 md:p-6">
-              <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl" />
-              <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[9px] font-black tracking-[.22em] text-cyan-300">
-                      CONTROL CENTER
-                    </span>
-                    <span className="text-[10px] text-slate-600">v1</span>
-                  </div>
-                  <h1 className="mt-2 text-2xl font-black tracking-tight text-white md:text-3xl">
-                    NDRAAAID<span className="text-cyan-300">.v1</span>
-                  </h1>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Kelola toko, transaksi, katalog, media, dan member dalam satu panel.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="rounded-2xl border border-white/10 bg-white/[.03] px-4 py-2.5">
-                    <p className="text-[9px] uppercase tracking-widest text-slate-600">Role</p>
-                    <p className="text-sm font-bold text-white">{role || 'ADMIN'}</p>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 px-4 py-2.5">
-                    <p className="text-[9px] uppercase tracking-widest text-slate-600">Status</p>
-                    <p className="text-sm font-bold text-emerald-300">ONLINE</p>
-                  </div>
-                </div>
+          <header className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80 shadow-xl backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[.2em] text-rose-400">CONTROL CENTER</p>
+                <h1 className="truncate text-lg font-black text-white md:text-xl">Admin <span className="text-rose-400">NDRAAAID.v1</span></h1>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <div className="hidden items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.025] px-2.5 py-1.5 sm:flex"><Bell className="h-3.5 w-3.5 text-slate-500" /><span className="text-[10px] text-slate-500">Panel</span></div>
+                <div className="rounded-lg border border-emerald-400/10 bg-emerald-400/[.04] px-2.5 py-1.5"><span className="text-[10px] font-bold text-emerald-300">ONLINE</span></div>
               </div>
             </div>
-
-            <div className="border-t border-white/10 p-3 lg:hidden">
-         <div className="grid grid-cols-3 gap-3">
-                {[
-                  ['orders', 'ShoppingCart', 'Order'],
-                  ['deposits', 'WalletCards', 'Deposit'],
-                  ['deposit-history', 'Download', 'Riwayat'],
-                  ['wallet-history', 'Wallet', 'Wallet'],
-                  ['categories', 'FolderTree', 'Kategori'],
-                  ['games', 'Gamepad2', 'Games'],
-                  ['products', 'Package', 'Produk'],
-                  ['payments', 'CreditCard', 'Bayar'],
-                  ['vouchers', 'Ticket', 'Voucher'],
-                  ['promotions', 'Megaphone', 'Promo'],
-                  ['broadcasts', 'Radio', 'Broadcast'],
-                  ['media', 'Images', 'Media'],
-                  ['users', 'Users', 'Member'],
-                  ['reviews', 'Star', 'Ulasan'],
-                  ['chat', 'MessageSquare', 'Chat'],
-                  ['settings', 'Settings', 'Setting'],
-                ]
-                  .filter(
-                    (item) =>
-                      (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) &&
-                      (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))
-                  )
-                  .map((item) => (
-                    <button
-                      type="button"
-                      key={item[0]}
-                      onPointerDown={() => changeTab(item[0])}
-                      onClick={() => changeTab(item[0])}
-                      style={{
-                        position: 'relative',
-                        zIndex: 20,
-                        pointerEvents: 'auto',
-                        touchAction: 'manipulation',
-                      }}
-                      className={`w-full rounded-xl border px-3 py-3 text-sm font-bold transition ${
-                        tab === item[0]
-                          ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
-                          : 'border-white/10 bg-white/[.03] text-slate-400'
-                      }`}
-                    >
-                      <span className="flex items-center justify-center gap-2">{(() => { const map:any={ShoppingCart,WalletCards,Download,Wallet,FolderTree,Gamepad2,Package,CreditCard,Ticket,Megaphone,Radio,Images,Users,Star,MessageSquare,Settings}; const I=map[item[1]]; return I ? <I size={16} strokeWidth={1.8}/> : null })()}<span>{item[2]}</span></span>
-                    </button>
-                  ))}
+            <div className="border-t border-white/10 p-2.5 lg:hidden">
+              <div ref={mobileMenuRef} onPointerDown={startMenuDrag} onPointerMove={moveMenuDrag} onPointerUp={endMenuDrag} onPointerCancel={endMenuDrag} className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {adminMenuGroups.flatMap((group) => group.items).filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))).map((item) => menuButton(item, true))}
               </div>
             </div>
           </header>
@@ -2319,73 +2283,99 @@ async function deleteVoucher(v: any) {
         </div>
       )}
 
-      {showAdminFilters && (
-        <div className="mt-5 glass rounded-2xl p-3 sm:p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="relative min-w-0 flex-1"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><input className="input pl-9" value={adminSearch} onChange={(e)=>setAdminSearch(e.target.value)} placeholder={filterLabels[tab] || 'Cari data...'} /></div>
-            {['orders','deposits','deposit-history','wallet-history','vouchers','broadcasts'].includes(tab) && <select className="input lg:max-w-44" value={adminStatus} onChange={(e)=>setAdminStatus(e.target.value)}><option value="all">Semua Status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="success">Success</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option></select>}
-            {['games','products'].includes(tab) && <select className="input lg:max-w-44" value={adminCategory} onChange={(e)=>setAdminCategory(e.target.value)}><option value="all">Semua Kategori</option>{categories.map((c)=><option key={c.id} value={c.id}>{c.name}</option>)}</select>}
-            {tab === 'products' && <select className="input lg:max-w-44" value={adminGame} onChange={(e)=>setAdminGame(e.target.value)}><option value="all">Semua Game</option>{games.map((g)=><option key={g.id} value={g.id}>{g.name}</option>)}</select>}
-            {tab === 'games' && <select className="input lg:max-w-40" value={adminPopular} onChange={(e)=>setAdminPopular(e.target.value)}><option value="all">Popular: Semua</option><option value="on">Popular ON</option><option value="off">Popular OFF</option></select>}
-            <button type="button" onClick={resetAdminFilters} className="btn btn-muted shrink-0 text-xs"><X size={14}/> Reset</button>
-          </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500"><ListFilter size={13}/> Tanpa filter hanya 3 item. Gunakan filter untuk melihat semua hasil yang sesuai.</div>
-        </div>
-      )}
-
-      <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
-          ['Total Order', orders.length],
-          [
-            'Pending',
-            orders.filter(
-              (x) =>
-                x.status ===
-                'PENDING_PAYMENT'
-            ).length,
-          ],
-          [
-            'Processing',
-            orders.filter(
-              (x) =>
-                x.status ===
-                'PROCESSING'
-            ).length,
-          ],
-          [
-            'Success',
-            orders.filter(
-              (x) =>
-                x.status ===
-                'SUCCESS'
-            ).length,
-          ],
-        ].map(([k, v]) => (
-          <div
-            key={String(k)}
-            className="glass rounded-2xl p-4"
-          >
-            <p className="text-xs text-slate-500">
-              {k}
-            </p>
-
-            <b className="mt-1 block text-2xl">
-              {v}
-            </b>
-          </div>
-        ))}
-      </div>
-
       {/* =====================================================
           ORDER / RIWAYAT
       ===================================================== */}
 
+      {tab === 'dashboard' && (
+        <section className="mt-5 space-y-4">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/65 px-4 py-4 md:px-5">
+            <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.2em] text-rose-400">OVERVIEW</p>
+                <h2 className="mt-1 text-xl font-black text-white md:text-2xl">Selamat datang, Admin</h2>
+                <p className="mt-1 text-xs text-slate-500">Ringkasan toko dibuat compact agar informasi penting tetap cepat terlihat.</p>
+              </div>
+              <div className="text-[10px] text-slate-600">Data dari panel saat ini</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+            {[
+              { label: 'Total Produk', value: products.length, icon: Package, note: `${activeProducts} aktif` },
+              { label: 'Income Masuk', value: `Rp ${totalIncome.toLocaleString('id-ID')}`, icon: CircleDollarSign, note: `${successfulOrders.length} order sukses` },
+              { label: 'Total Pelanggan', value: totalCustomers, icon: Users, note: 'akun customer' },
+              { label: 'Total Order', value: orders.length, icon: ShoppingCart, note: `${pendingOrders.length} menunggu` },
+            ].map((stat) => {
+              const Icon = stat.icon
+              return (
+                <div key={stat.label} className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 shadow-lg">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold text-slate-500">{stat.label}</p>
+                    <Icon className="h-4 w-4 text-rose-300/80" strokeWidth={1.8} />
+                  </div>
+                  <p className="mt-1.5 truncate text-base font-black text-white md:text-lg">{stat.value}</p>
+                  <p className="mt-0.5 text-[9px] text-slate-600">{stat.note}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,.8fr)]">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">TRANSAKSI</p><h3 className="mt-0.5 text-sm font-black text-white">Order Terbaru</h3></div>
+                <button type="button" onClick={() => changeTab('orders')} className="text-[10px] font-bold text-rose-300">Lihat semua →</button>
+              </div>
+              <div className="space-y-1.5">
+                {orders.slice(0, 5).map((o) => (
+                  <div key={o.id} className="flex items-center gap-2 rounded-xl border border-white/[.06] bg-white/[.02] px-2.5 py-2">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-400/10"><ShoppingCart className="h-3.5 w-3.5 text-rose-300" /></div>
+                    <div className="min-w-0 flex-1"><p className="truncate text-[10px] font-bold text-white">{o.order_code}</p><p className="truncate text-[9px] text-slate-600">{o.profiles?.username || o.profiles?.name || '-'} · {o.games?.name || '-'}</p></div>
+                    <div className="text-right"><p className="text-[10px] font-bold text-white">Rp {Number(o.total || 0).toLocaleString('id-ID')}</p><span className="text-[8px] text-slate-500">{o.status}</span></div>
+                  </div>
+                ))}
+                {!orders.length && <p className="py-8 text-center text-xs text-slate-600">Belum ada order.</p>}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
+              <div className="mb-3"><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">ANALISIS</p><h3 className="mt-0.5 text-sm font-black text-white">Status Order</h3></div>
+              <div className="flex items-center gap-4">
+                <div className="relative h-28 w-28 shrink-0 rounded-full p-[9px]" style={{ background: `conic-gradient(${donutStops.join(', ')})` }}>
+                  <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-slate-950"><span className="text-xl font-black text-white">{orders.length}</span><span className="text-[8px] text-slate-600">TOTAL ORDER</span></div>
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  {statusSegments.map((segment) => { const Icon = segment.icon; return <div key={segment.label} className="flex items-center justify-between gap-2 text-[9px]"><span className="flex min-w-0 items-center gap-1.5 text-slate-400"><Icon className={`h-3.5 w-3.5 ${segment.cls}`} />{segment.label}</span><b className="text-white">{segment.value}</b></div> })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
+              <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">KATALOG</p><h3 className="mt-0.5 text-sm font-black text-white">Game Populer</h3></div><button type="button" onClick={() => changeTab('games')} className="text-[10px] font-bold text-rose-300">Kelola →</button></div>
+              <div className="grid grid-cols-3 gap-2">
+                {games.filter((g) => g.popular).slice(0, 6).map((g) => <div key={g.id} className="overflow-hidden rounded-xl border border-white/[.07] bg-white/[.02]"><div className="aspect-[1.5] bg-slate-900">{g.logo_url ? <img src={g.logo_url} alt={g.name} className="h-full w-full object-cover" /> : null}</div><p className="truncate px-2 py-1.5 text-[9px] font-bold text-white">{g.name}</p></div>)}
+                {!games.some((g) => g.popular) && <p className="col-span-3 py-6 text-center text-[10px] text-slate-600">Belum ada game Popular.</p>}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
+              <div className="mb-3"><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">AKTIVITAS</p><h3 className="mt-0.5 text-sm font-black text-white">Ringkasan Cepat</h3></div>
+              <div className="grid grid-cols-2 gap-2">
+                {[['Produk aktif', activeProducts, Package], ['Game aktif', games.filter((g) => g.is_active !== false).length, Gamepad2], ['Deposit masuk', deposits.length, WalletCards], ['Wallet transaksi', walletTx.length, Wallet]].map(([label, value, Icon]) => <div key={String(label)} className="rounded-xl border border-white/[.06] bg-white/[.02] p-2.5"><Icon className="h-4 w-4 text-rose-300" /><p className="mt-2 text-sm font-black text-white">{value as any}</p><p className="text-[9px] text-slate-600">{label as string}</p></div>)}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {tab === 'orders' && (
         <div className="mt-7 space-y-3">
-          {adminVisible(orders).map((o) => (
+          {orders.map((o) => (
             <div
               key={o.id}
-              className="glass rounded-2xl p-5"
+              className="glass rounded-xl p-3.5 md:p-4"
             >
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
@@ -2515,7 +2505,7 @@ async function deleteVoucher(v: any) {
 
       {tab === 'deposits' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-xl p-3.5 md:p-4">
             <h2 className="text-xl font-black">
               Deposit Member — Perlu Diproses
             </h2>
@@ -2527,10 +2517,16 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {adminVisible(deposits.filter((d) => d.status === 'PENDING')).map((d) => (
+          {deposits
+            .filter(
+              (d) =>
+                d.status ===
+                'PENDING'
+            )
+            .map((d) => (
               <div
                 key={d.id}
-                className="glass rounded-2xl p-5"
+                className="glass rounded-xl p-3.5 md:p-4"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -2634,7 +2630,7 @@ async function deleteVoucher(v: any) {
 
       {tab === 'deposit-history' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-xl p-3.5 md:p-4">
             <h2 className="text-xl font-black">
               Riwayat Deposit
             </h2>
@@ -2645,10 +2641,10 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {adminVisible(deposits).map((d) => (
+          {deposits.map((d) => (
             <div
               key={d.id}
-              className="glass rounded-2xl p-4"
+              className="glass rounded-xl p-3 md:p-3.5"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -2721,7 +2717,7 @@ async function deleteVoucher(v: any) {
 
       {tab === 'wallet-history' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-xl p-3.5 md:p-4">
             <h2 className="text-xl font-black">
               Riwayat Wallet
             </h2>
@@ -2732,10 +2728,10 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {adminVisible(walletTx).map((tx) => (
+          {walletTx.map((tx) => (
             <div
               key={tx.id}
-              className="glass rounded-2xl p-4"
+              className="glass rounded-xl p-3 md:p-3.5"
             >
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -2879,7 +2875,7 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {adminVisible(categories).map((c) => (
+            {categories.map((c) => (
               <div
                 key={c.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -2959,7 +2955,7 @@ async function deleteVoucher(v: any) {
                 {
                   ...gameForm,
                   is_active: true,
-                  popular: Boolean(gameForm.popular),
+                  popular: false,
                   category_id:
                     gameForm.category_id ||
                     null,
@@ -2977,7 +2973,6 @@ async function deleteVoucher(v: any) {
                       categories[0]
                         ?.id ||
                       '',
-                    popular: false,
                   })
               )
             }}
@@ -3041,11 +3036,6 @@ async function deleteVoucher(v: any) {
                 )
               )}
             </select>
-
-            <label className="flex items-center justify-between rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-3 py-3">
-              <span><span className="block text-sm font-bold">Game Populer</span><span className="text-xs text-slate-500">Tampilkan langsung di Home.</span></span>
-              <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={Boolean(gameForm.popular)} onChange={(e)=>setGameForm({...gameForm,popular:e.target.checked})}/>
-            </label>
 
             <textarea
               className="input min-h-24"
@@ -3179,10 +3169,6 @@ async function deleteVoucher(v: any) {
                     >
                       Edit
                     </button>
-                  )}
-
-                  {['owner', 'admin'].includes(role) && (
-                    <button onClick={async () => { const { error } = await s.from('games').update({ popular: !g.popular }).eq('id', g.id); setMsg(error?.message || `${g.name}: Game Populer ${!g.popular ? 'ON' : 'OFF'}.`); if (!error) load() }} className={`btn text-xs ${g.popular ? 'btn-primary' : 'btn-muted'}`}><CircleCheck size={14}/> Popular {g.popular ? 'ON' : 'OFF'}</button>
                   )}
 
                   <button
@@ -3339,7 +3325,7 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {adminVisible(products).map((p) => (
+            {products.map((p) => (
               <div
                 key={p.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -3483,10 +3469,10 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {adminVisible(methods).map((m) => (
+            {methods.map((m) => (
               <div
                 key={m.id}
-                className="glass rounded-2xl p-4"
+                className="glass rounded-xl p-3 md:p-3.5"
               >
                 <div className="flex justify-between">
                   <div>
@@ -3800,7 +3786,7 @@ async function deleteVoucher(v: any) {
             </form>
 
             <div className="space-y-3">
-              <div className="glass rounded-2xl p-5">
+              <div className="glass rounded-xl p-3.5 md:p-4">
                 <h2 className="text-xl font-black">
                   Daftar Voucher
                 </h2>
@@ -3811,7 +3797,7 @@ async function deleteVoucher(v: any) {
                 </p>
               </div>
 
-              {adminVisible(vouchers).map((v) => {
+              {vouchers.map((v) => {
                 const used =
                   Number(
                     v.usage_count || 0
@@ -3839,7 +3825,7 @@ async function deleteVoucher(v: any) {
                 return (
                   <div
                     key={v.id}
-                    className="glass rounded-2xl p-5"
+                    className="glass rounded-xl p-3.5 md:p-4"
                   >
                     <div className="flex flex-col gap-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -4010,7 +3996,7 @@ async function deleteVoucher(v: any) {
               RIWAYAT PENGGUNAAN VOUCHER
           ================================================= */}
 
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-xl p-3.5 md:p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-purple-300">
@@ -4038,7 +4024,7 @@ async function deleteVoucher(v: any) {
           </div>
 
           <div className="space-y-3">
-            {adminVisible(voucherUsages).map((vu) => {
+            {voucherUsages.map((vu) => {
               const user =
                 vu.profiles
 
@@ -4172,7 +4158,7 @@ async function deleteVoucher(v: any) {
             </p>
 
             <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              <div className="glass rounded-2xl p-5">
+              <div className="glass rounded-xl p-3.5 md:p-4">
                 <label className="block text-xs font-bold text-slate-300">
                   Tipe konten
                   <select
@@ -4275,7 +4261,7 @@ async function deleteVoucher(v: any) {
                 </button>
               </div>
 
-              <div className="glass rounded-2xl p-5">
+              <div className="glass rounded-xl p-3.5 md:p-4">
                 <p className="text-xs font-black uppercase tracking-widest text-pink-300">
                   👁 PREVIEW
                 </p>
@@ -4517,11 +4503,11 @@ async function deleteVoucher(v: any) {
                 </span>
               </div>
 
-              {adminVisible(broadcasts).map(
+              {broadcasts.map(
                 (b) => (
                   <div
                     key={b.id}
-                    className="glass rounded-2xl p-4"
+                    className="glass rounded-xl p-3 md:p-3.5"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
@@ -4895,7 +4881,7 @@ async function deleteVoucher(v: any) {
 
       {tab === 'users' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-2xl p-5">
+          <div className="glass rounded-xl p-3.5 md:p-4">
             <h2 className="text-xl font-black">
               Customer & Wallet
             </h2>
@@ -4907,7 +4893,7 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {adminVisible(users).map((u) => {
+          {users.map((u) => {
             const balance =
               Number(
                 wallets.find(
@@ -4921,7 +4907,7 @@ async function deleteVoucher(v: any) {
             return (
               <div
                 key={u.id}
-                className="glass rounded-2xl p-4"
+                className="glass rounded-xl p-3 md:p-3.5"
               >
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div>
@@ -5102,7 +5088,7 @@ async function deleteVoucher(v: any) {
               <p className="mt-1 text-sm text-slate-500">Hanya ulasan dari order berstatus SUCCESS yang bisa masuk. Ulasan tampil di Home setelah disetujui.</p>
             </div>
             <div className="divide-y divide-white/10">
-              {adminVisible(customerReviews).map((review) => (
+              {customerReviews.map((review) => (
                 <div key={review.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -5442,10 +5428,6 @@ async function deleteVoucher(v: any) {
                       </option>
                     ))}
                   </select>
-                  <label className="flex items-center justify-between rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-3 py-3">
-                    <span><span className="block text-sm font-bold">Game Populer</span><span className="text-xs text-slate-500">Tampilkan game ini di Home.</span></span>
-                    <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={Boolean(editForm.popular)} onChange={(e)=>setEditForm({...editForm,popular:e.target.checked})}/>
-                  </label>
                   <textarea
                     className="input min-h-24"
                     placeholder="Deskripsi"
