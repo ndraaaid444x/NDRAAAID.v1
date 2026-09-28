@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { Megaphone, ShoppingCart, WalletCards, Download, Wallet, FolderTree, Gamepad2, Package, CreditCard, Ticket, Radio, Images, Users, Star, MessageSquare, Settings, Search, ListFilter, X, CircleCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
@@ -47,6 +48,11 @@ export default function Admin() {
   const [tab, setTab] = useState('orders')
 
   function changeTab(nextTab: string) {
+    setAdminSearch('')
+    setAdminStatus('all')
+    setAdminCategory('all')
+    setAdminGame('all')
+    setAdminPopular('all')
     sessionStorage.setItem('admin_active_tab', nextTab)
     window.location.reload()
   }
@@ -59,6 +65,11 @@ export default function Admin() {
 
   const [role, setRole] = useState('')
   const [msg, setMsg] = useState('')
+  const [adminSearch, setAdminSearch] = useState('')
+  const [adminStatus, setAdminStatus] = useState('all')
+  const [adminCategory, setAdminCategory] = useState('all')
+  const [adminGame, setAdminGame] = useState('all')
+  const [adminPopular, setAdminPopular] = useState('all')
 
   const [editType, setEditType] = useState<'category' | 'game' | 'product' | null>(null)
   const [editId, setEditId] = useState('')
@@ -121,6 +132,7 @@ export default function Admin() {
     logo_url: '',
     banner_url: '',
     category_id: '',
+    popular: false,
   })
 
   const [prodForm, setProdForm] = useState({
@@ -215,7 +227,7 @@ export default function Admin() {
       s
         .from('orders')
         .select(
-          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(name),profiles(username,name)'
+          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(id,name,category_id,game_categories(id,name)),profiles(username,name)'
         )
         .order('created_at', { ascending: false })
         .limit(200),
@@ -233,7 +245,7 @@ export default function Admin() {
 
       s
         .from('game_products')
-        .select('*,games(name)')
+        .select('*,games(id,name,category_id,game_categories(id,name))')
         .order('created_at', { ascending: false }),
 
       s
@@ -662,6 +674,7 @@ s
         category_id: row.category_id || '',
         logo_url: row.logo_url || '',
         banner_url: row.banner_url || '',
+        popular: Boolean(row.popular),
       })
       return
     }
@@ -723,6 +736,7 @@ s
         category_id: editForm.category_id || null,
         logo_url: String(editForm.logo_url || '').trim() || null,
         banner_url: String(editForm.banner_url || '').trim() || null,
+        popular: Boolean(editForm.popular),
       }
 
       if (!payload.name || !payload.slug) {
@@ -2070,7 +2084,7 @@ async function deleteVoucher(v: any) {
     load()
   }
 
-  const filteredMedia =
+  const filteredMediaAll =
     mediaAssets.filter(
       (a) =>
         a.name
@@ -2083,6 +2097,26 @@ async function deleteVoucher(v: any) {
           a.category ===
             mediaCategory)
     )
+  const filteredMedia = (mediaSearch.trim() || mediaCategory !== 'all') ? filteredMediaAll : filteredMediaAll.slice(0, 3)
+
+  const filterActive = Boolean(adminSearch.trim() || adminStatus !== 'all' || adminCategory !== 'all' || adminGame !== 'all' || adminPopular !== 'all')
+
+  function adminVisible(items: any[]) {
+    const q = adminSearch.trim().toLowerCase()
+    const filtered = items.filter((item: any) => {
+      const text = [item?.name,item?.username,item?.email,item?.order_code,item?.deposit_code,item?.voucher_code,item?.code,item?.sku,item?.profiles?.name,item?.profiles?.username,item?.profiles?.email,item?.games?.name,item?.game_categories?.name,item?.reason,item?.type,item?.title,item?.message,item?.reviewer_display,item?.review_text,item?.description].filter(Boolean).join(' ').toLowerCase()
+      const status = String(item?.status || '').toLowerCase()
+      const category = String(item?.category_id || item?.game_categories?.id || '')
+      const game = String(item?.game_id || item?.games?.id || '')
+      const popular = item?.popular ? 'on' : 'off'
+      return (!q || text.includes(q)) && (adminStatus === 'all' || status === adminStatus) && (adminCategory === 'all' || category === adminCategory) && (adminGame === 'all' || game === adminGame) && (adminPopular === 'all' || popular === adminPopular)
+    })
+    return filterActive ? filtered : filtered.slice(0, 3)
+  }
+
+  const filterLabels: Record<string,string> = {orders:'Cari order, member, atau game...',deposits:'Cari deposit, member, atau metode...','deposit-history':'Cari riwayat deposit...','wallet-history':'Cari member, tipe, atau alasan...',categories:'Cari kategori...',games:'Cari game...',products:'Cari produk, SKU, atau game...',payments:'Cari metode pembayaran...',vouchers:'Cari kode voucher...',promotions:'Cari promo...',broadcasts:'Cari broadcast...',users:'Cari member, username, atau email...',reviews:'Cari ulasan atau nama member...'}
+  const showAdminFilters = ['orders','deposits','deposit-history','wallet-history','categories','games','products','payments','vouchers','promotions','broadcasts','users','reviews'].includes(tab)
+  function resetAdminFilters(){setAdminSearch('');setAdminStatus('all');setAdminCategory('all');setAdminGame('all');setAdminPopular('all')}
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,.08),transparent_32%),radial-gradient(circle_at_top_right,rgba(168,85,247,.08),transparent_28%)]">
@@ -2091,8 +2125,8 @@ async function deleteVoucher(v: any) {
           <div className="sticky top-5 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
             <div className="border-b border-white/10 p-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-xl shadow-[0_0_25px_rgba(34,211,238,.12)]">
-                  ⚡
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 shadow-[0_0_25px_rgba(34,211,238,.12)]">
+                  <Gamepad2 size={21} strokeWidth={1.8} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">
@@ -2114,42 +2148,42 @@ async function deleteVoucher(v: any) {
                 {
                   title: 'PROMOSI',
                   items: [
-                    ['promotions', '📢', 'Banner Promo'],
+                    ['promotions', 'Megaphone', 'Banner Promo'],
                   ],
                 },
                 {
                   title: 'OPERASIONAL',
                   items: [
-                    ['orders', '🧾', 'Order'],
-                    ['deposits', '💳', 'Deposit'],
-                    ['deposit-history', '📥', 'Riwayat Deposit'],
-                    ['wallet-history', '💰', 'Riwayat Wallet'],
+                    ['orders', 'ShoppingCart', 'Order'],
+                    ['deposits', 'WalletCards', 'Deposit'],
+                    ['deposit-history', 'Download', 'Riwayat Deposit'],
+                    ['wallet-history', 'Wallet', 'Riwayat Wallet'],
                   ],
                 },
                 {
                   title: 'KATALOG',
                   items: [
-                    ['categories', '🗂️', 'Kategori'],
-                    ['games', '🎮', 'Games'],
-                    ['products', '💎', 'Produk'],
+                    ['categories', 'FolderTree', 'Kategori'],
+                    ['games', 'Gamepad2', 'Games'],
+                    ['products', 'Package', 'Produk'],
                   ],
                 },
                 {
                   title: 'SISTEM',
                   items: [
-                    ['payments', '🏦', 'Pembayaran'],
-                    ['vouchers', '🎟️', 'Voucher'],
-                    ['broadcasts', '📡', 'Live Broadcast'],
-                    ['media', '🖼️', 'Media Manager'],
+                    ['payments', 'CreditCard', 'Pembayaran'],
+                    ['vouchers', 'Ticket', 'Voucher'],
+                    ['broadcasts', 'Radio', 'Live Broadcast'],
+                    ['media', 'Images', 'Media Manager'],
                   ],
                 },
                 {
                   title: 'MANAGEMENT',
                   items: [
-                    ['users', '👥', 'Member & Wallet'],
-                    ['reviews', '⭐', 'Ulasan & Running Text'],
-                    ['chat', '💬', 'Live Chat'],
-                    ['settings', '⚙️', 'Pengaturan'],
+                    ['users', 'Users', 'Member & Wallet'],
+                    ['reviews', 'Star', 'Ulasan & Running Text'],
+                    ['chat', 'MessageSquare', 'Live Chat'],
+                    ['settings', 'Settings', 'Pengaturan'],
                   ],
                 },
               ].map((group) => (
@@ -2182,7 +2216,7 @@ async function deleteVoucher(v: any) {
                               : 'border border-transparent text-slate-400 hover:bg-white/[.04] hover:text-white'
                           }`}
                         >
-                          <span className="w-5 text-center">{item[1]}</span>
+                          <span className="flex w-5 items-center justify-center">{(() => { const I = ({Megaphone,ShoppingCart,WalletCards,Download,Wallet,FolderTree,Gamepad2,Package,CreditCard,Ticket,Radio,Images,Users,Star,MessageSquare,Settings} as any)[item[1]]; return I ? <I size={17} strokeWidth={1.8} /> : null })()}</span>
                           <span className="font-semibold">{item[2]}</span>
                           {tab === item[0] && (
                             <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.9)]" />
@@ -2232,22 +2266,22 @@ async function deleteVoucher(v: any) {
             <div className="border-t border-white/10 p-3 lg:hidden">
          <div className="grid grid-cols-3 gap-3">
                 {[
-                  ['orders', '🧾 Order'],
-                  ['deposits', '💳 Deposit'],
-                  ['deposit-history', '📥 Riwayat'],
-                  ['wallet-history', '💰 Wallet'],
-                  ['categories', '🗂️ Kategori'],
-                  ['games', '🎮 Games'],
-                  ['products', '💎 Produk'],
-                  ['payments', '🏦 Bayar'],
-                  ['vouchers', '🎟️ Voucher'],
-                  ['promotions', '📢 Promo'],
-                  ['broadcasts', '📡 Broadcast'],
-                  ['media', '🖼️ Media'],
-                  ['users', '👥 Member'],
-                  ['reviews', '⭐ Ulasan'],
-                  ['chat', '💬 Chat'],
-                  ['settings', '⚙️ Setting'],
+                  ['orders', 'ShoppingCart', 'Order'],
+                  ['deposits', 'WalletCards', 'Deposit'],
+                  ['deposit-history', 'Download', 'Riwayat'],
+                  ['wallet-history', 'Wallet', 'Wallet'],
+                  ['categories', 'FolderTree', 'Kategori'],
+                  ['games', 'Gamepad2', 'Games'],
+                  ['products', 'Package', 'Produk'],
+                  ['payments', 'CreditCard', 'Bayar'],
+                  ['vouchers', 'Ticket', 'Voucher'],
+                  ['promotions', 'Megaphone', 'Promo'],
+                  ['broadcasts', 'Radio', 'Broadcast'],
+                  ['media', 'Images', 'Media'],
+                  ['users', 'Users', 'Member'],
+                  ['reviews', 'Star', 'Ulasan'],
+                  ['chat', 'MessageSquare', 'Chat'],
+                  ['settings', 'Settings', 'Setting'],
                 ]
                   .filter(
                     (item) =>
@@ -2272,7 +2306,7 @@ async function deleteVoucher(v: any) {
                           : 'border-white/10 bg-white/[.03] text-slate-400'
                       }`}
                     >
-                      {item[1]}
+                      <span className="flex items-center justify-center gap-2">{(() => { const map:any={ShoppingCart,WalletCards,Download,Wallet,FolderTree,Gamepad2,Package,CreditCard,Ticket,Megaphone,Radio,Images,Users,Star,MessageSquare,Settings}; const I=map[item[1]]; return I ? <I size={16} strokeWidth={1.8}/> : null })()}<span>{item[2]}</span></span>
                     </button>
                   ))}
               </div>
@@ -2282,6 +2316,20 @@ async function deleteVoucher(v: any) {
       {msg && (
         <div className="mt-5 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-3 text-sm text-cyan-200">
           {msg}
+        </div>
+      )}
+
+      {showAdminFilters && (
+        <div className="mt-5 glass rounded-2xl p-3 sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-0 flex-1"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><input className="input pl-9" value={adminSearch} onChange={(e)=>setAdminSearch(e.target.value)} placeholder={filterLabels[tab] || 'Cari data...'} /></div>
+            {['orders','deposits','deposit-history','wallet-history','vouchers','broadcasts'].includes(tab) && <select className="input lg:max-w-44" value={adminStatus} onChange={(e)=>setAdminStatus(e.target.value)}><option value="all">Semua Status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="success">Success</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option></select>}
+            {['games','products'].includes(tab) && <select className="input lg:max-w-44" value={adminCategory} onChange={(e)=>setAdminCategory(e.target.value)}><option value="all">Semua Kategori</option>{categories.map((c)=><option key={c.id} value={c.id}>{c.name}</option>)}</select>}
+            {tab === 'products' && <select className="input lg:max-w-44" value={adminGame} onChange={(e)=>setAdminGame(e.target.value)}><option value="all">Semua Game</option>{games.map((g)=><option key={g.id} value={g.id}>{g.name}</option>)}</select>}
+            {tab === 'games' && <select className="input lg:max-w-40" value={adminPopular} onChange={(e)=>setAdminPopular(e.target.value)}><option value="all">Popular: Semua</option><option value="on">Popular ON</option><option value="off">Popular OFF</option></select>}
+            <button type="button" onClick={resetAdminFilters} className="btn btn-muted shrink-0 text-xs"><X size={14}/> Reset</button>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500"><ListFilter size={13}/> Tanpa filter hanya 3 item. Gunakan filter untuk melihat semua hasil yang sesuai.</div>
         </div>
       )}
 
@@ -2334,7 +2382,7 @@ async function deleteVoucher(v: any) {
 
       {tab === 'orders' && (
         <div className="mt-7 space-y-3">
-          {orders.map((o) => (
+          {adminVisible(orders).map((o) => (
             <div
               key={o.id}
               className="glass rounded-2xl p-5"
@@ -2479,13 +2527,7 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {deposits
-            .filter(
-              (d) =>
-                d.status ===
-                'PENDING'
-            )
-            .map((d) => (
+          {adminVisible(deposits.filter((d) => d.status === 'PENDING')).map((d) => (
               <div
                 key={d.id}
                 className="glass rounded-2xl p-5"
@@ -2603,7 +2645,7 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {deposits.map((d) => (
+          {adminVisible(deposits).map((d) => (
             <div
               key={d.id}
               className="glass rounded-2xl p-4"
@@ -2690,7 +2732,7 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {walletTx.map((tx) => (
+          {adminVisible(walletTx).map((tx) => (
             <div
               key={tx.id}
               className="glass rounded-2xl p-4"
@@ -2837,7 +2879,7 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {categories.map((c) => (
+            {adminVisible(categories).map((c) => (
               <div
                 key={c.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -2917,7 +2959,7 @@ async function deleteVoucher(v: any) {
                 {
                   ...gameForm,
                   is_active: true,
-                  popular: false,
+                  popular: Boolean(gameForm.popular),
                   category_id:
                     gameForm.category_id ||
                     null,
@@ -2935,6 +2977,7 @@ async function deleteVoucher(v: any) {
                       categories[0]
                         ?.id ||
                       '',
+                    popular: false,
                   })
               )
             }}
@@ -2998,6 +3041,11 @@ async function deleteVoucher(v: any) {
                 )
               )}
             </select>
+
+            <label className="flex items-center justify-between rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-3 py-3">
+              <span><span className="block text-sm font-bold">Game Populer</span><span className="text-xs text-slate-500">Tampilkan langsung di Home.</span></span>
+              <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={Boolean(gameForm.popular)} onChange={(e)=>setGameForm({...gameForm,popular:e.target.checked})}/>
+            </label>
 
             <textarea
               className="input min-h-24"
@@ -3131,6 +3179,10 @@ async function deleteVoucher(v: any) {
                     >
                       Edit
                     </button>
+                  )}
+
+                  {['owner', 'admin'].includes(role) && (
+                    <button onClick={async () => { const { error } = await s.from('games').update({ popular: !g.popular }).eq('id', g.id); setMsg(error?.message || `${g.name}: Game Populer ${!g.popular ? 'ON' : 'OFF'}.`); if (!error) load() }} className={`btn text-xs ${g.popular ? 'btn-primary' : 'btn-muted'}`}><CircleCheck size={14}/> Popular {g.popular ? 'ON' : 'OFF'}</button>
                   )}
 
                   <button
@@ -3287,7 +3339,7 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {products.map((p) => (
+            {adminVisible(products).map((p) => (
               <div
                 key={p.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -3431,7 +3483,7 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            {methods.map((m) => (
+            {adminVisible(methods).map((m) => (
               <div
                 key={m.id}
                 className="glass rounded-2xl p-4"
@@ -3759,7 +3811,7 @@ async function deleteVoucher(v: any) {
                 </p>
               </div>
 
-              {vouchers.map((v) => {
+              {adminVisible(vouchers).map((v) => {
                 const used =
                   Number(
                     v.usage_count || 0
@@ -3986,7 +4038,7 @@ async function deleteVoucher(v: any) {
           </div>
 
           <div className="space-y-3">
-            {voucherUsages.map((vu) => {
+            {adminVisible(voucherUsages).map((vu) => {
               const user =
                 vu.profiles
 
@@ -4465,7 +4517,7 @@ async function deleteVoucher(v: any) {
                 </span>
               </div>
 
-              {broadcasts.map(
+              {adminVisible(broadcasts).map(
                 (b) => (
                   <div
                     key={b.id}
@@ -4855,7 +4907,7 @@ async function deleteVoucher(v: any) {
             </p>
           </div>
 
-          {users.map((u) => {
+          {adminVisible(users).map((u) => {
             const balance =
               Number(
                 wallets.find(
@@ -5050,7 +5102,7 @@ async function deleteVoucher(v: any) {
               <p className="mt-1 text-sm text-slate-500">Hanya ulasan dari order berstatus SUCCESS yang bisa masuk. Ulasan tampil di Home setelah disetujui.</p>
             </div>
             <div className="divide-y divide-white/10">
-              {customerReviews.map((review) => (
+              {adminVisible(customerReviews).map((review) => (
                 <div key={review.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -5390,6 +5442,10 @@ async function deleteVoucher(v: any) {
                       </option>
                     ))}
                   </select>
+                  <label className="flex items-center justify-between rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-3 py-3">
+                    <span><span className="block text-sm font-bold">Game Populer</span><span className="text-xs text-slate-500">Tampilkan game ini di Home.</span></span>
+                    <input type="checkbox" className="h-4 w-4 accent-cyan-400" checked={Boolean(editForm.popular)} onChange={(e)=>setEditForm({...editForm,popular:e.target.checked})}/>
+                  </label>
                   <textarea
                     className="input min-h-24"
                     placeholder="Deskripsi"
