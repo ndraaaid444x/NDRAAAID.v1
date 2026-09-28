@@ -3,7 +3,6 @@
 import {
   ChangeEvent,
   FormEvent,
-  PointerEvent,
   useEffect,
   useRef,
   useState,
@@ -142,12 +141,6 @@ export default function Admin() {
     sessionStorage.setItem('admin_active_tab', nextTab)
     window.location.reload()
   }
-
-  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
-  const isDraggingMenu = useRef(false)
-  const dragStartX = useRef(0)
-  const dragStartScrollLeft = useRef(0)
-  const dragMoved = useRef(false)
 
   const [role, setRole] = useState('')
   const [msg, setMsg] = useState('')
@@ -453,50 +446,6 @@ s
     }
   }
 
-  function startMenuDrag(e: PointerEvent<HTMLDivElement>) {
-    const el = mobileMenuRef.current
-    if (!el) return
-
-    isDraggingMenu.current = true
-    dragMoved.current = false
-    dragStartX.current = e.clientX
-    dragStartScrollLeft.current = el.scrollLeft
-
-    el.setPointerCapture(e.pointerId)
-  }
-
-  function moveMenuDrag(e: PointerEvent<HTMLDivElement>) {
-    const el = mobileMenuRef.current
-    if (!el || !isDraggingMenu.current) return
-
-    const dx = e.clientX - dragStartX.current
-
-    if (Math.abs(dx) > 4) {
-      dragMoved.current = true
-    }
-
-    el.scrollLeft =
-      dragStartScrollLeft.current - dx
-  }
-
-  function endMenuDrag(e: PointerEvent<HTMLDivElement>) {
-    const el = mobileMenuRef.current
-
-    if (
-      el &&
-      el.hasPointerCapture(e.pointerId)
-    ) {
-      el.releasePointerCapture(e.pointerId)
-    }
-
-    isDraggingMenu.current = false
-
-    if (dragMoved.current) {
-      setTimeout(() => {
-        dragMoved.current = false
-      }, 0)
-    }
- }
   useEffect(() => {
     const savedTab = sessionStorage.getItem('admin_active_tab')
     if (savedTab && tabs.includes(savedTab)) {
@@ -2205,12 +2154,10 @@ async function deleteVoucher(v: any) {
       <button
         type="button"
         key={item[0]}
-        onPointerDown={() => changeTab(item[0])}
         onClick={() => changeTab(item[0])}
-        style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
         className={`group flex items-center transition ${
           mobile
-            ? `min-w-max rounded-xl border px-3 py-2 text-[11px] font-semibold ${tab === item[0] ? 'border-rose-400/30 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`
+            ? `min-w-max touch-manipulation rounded-xl border px-3 py-2 text-[11px] font-semibold ${tab === item[0] ? 'border-rose-400/30 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`
             : `w-full gap-3 rounded-xl px-3 py-2.5 text-left text-sm ${tab === item[0] ? 'border border-rose-400/20 bg-rose-400/10 text-rose-200' : 'border border-transparent text-slate-400 hover:bg-white/[.04] hover:text-white'}`
         }`}
       >
@@ -2275,7 +2222,9 @@ async function deleteVoucher(v: any) {
               </div>
             </div>
             <div className="border-t border-white/10 p-2.5 lg:hidden">
-              <div ref={mobileMenuRef} onPointerDown={startMenuDrag} onPointerMove={moveMenuDrag} onPointerUp={endMenuDrag} onPointerCancel={endMenuDrag} className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div
+                className="flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 touch-pan-x [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+              >
                 {adminMenuGroups.flatMap((group) => group.items).filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))).map((item) => menuButton(item, true))}
               </div>
             </div>
