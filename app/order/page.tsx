@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
 const statusSlug: Record<string, string> = {
@@ -17,23 +17,25 @@ const statusSlug: Record<string, string> = {
 
 export default function OrderEntryPage() {
   const router = useRouter()
-  const params = useSearchParams()
-  const id = params.get('id') || ''
+  const [id, setId] = useState('')
+
+  useEffect(() => {
+    setId(new URLSearchParams(window.location.search).get('id') || '')
+  }, [])
 
   useEffect(() => {
     let cancelled = false
 
     ;(async () => {
-      if (!id) {
-        router.replace('/orders')
-        return
-      }
+      if (!id) return
 
       const s = supabaseBrowser()
 
       const {
         data: { user },
       } = await s.auth.getUser()
+
+      if (cancelled) return
 
       if (!user) {
         router.replace(`/login?next=/order/?id=${encodeURIComponent(id)}`)
