@@ -175,7 +175,7 @@ export default function SiteHeader() {
     maximumFractionDigits: 0,
   }).format(balance)
 
-  const isAdmin = ['owner', 'admin'].includes(profile?.role)
+  const isAdmin = ['owner', 'admin', 'customer_service'].includes(profile?.role)
 
   const displayName =
     profile?.name ||
@@ -511,6 +511,20 @@ export default function SiteHeader() {
               {user && <Link href="/deposit" onClick={() => setMobile(false)} className="flex items-center justify-between rounded-lg border border-white/[.06] bg-white/[.018] px-3 py-2.5"><span className="flex items-center gap-2.5 text-xs font-bold text-slate-300"><Wallet size={15} className="text-red-400" />Deposit Saldo</span><span className="text-[9px] text-slate-600">Top up saldo</span></Link>}
               <Link href="/terms" onClick={() => setMobile(false)} className="flex items-center justify-between rounded-lg border border-white/[.06] bg-white/[.018] px-3 py-2.5"><span className="flex items-center gap-2.5 text-xs font-bold text-slate-300"><CircleHelp size={15} className="text-red-400" />Bantuan</span><span className="text-[9px] text-slate-600">Pusat bantuan</span></Link>
             </div>
+
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setMobile(false)}
+                className="mt-2 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/[.05] px-3 py-2.5"
+              >
+                <span className="flex items-center gap-2.5 text-xs font-black text-red-400">
+                  <ShieldCheck size={15} />
+                  Admin Panel
+                </span>
+                <span className="text-[9px] text-red-500/60">Pengurus</span>
+              </Link>
+            )}
 
             {user && (
               <div className="mt-2 flex items-center justify-end">
