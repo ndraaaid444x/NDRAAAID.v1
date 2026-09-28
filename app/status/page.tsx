@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import PaymentProof from '@/components/payment-proof'
@@ -35,7 +35,7 @@ const labels: Record<string, string> = Object.fromEntries(
   Object.entries(statusInfo).map(([key, value]) => [key, value.label])
 )
 
-export default function OrderStatusPage() {
+function OrderStatusContent() {
   const router = useRouter()
   const params = useParams<{ status: string }>()
   const searchParams = useSearchParams()
@@ -436,3 +436,16 @@ export default function OrderStatusPage() {
   )
 }
 
+export default function OrderStatusPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-2xl px-4 py-12 text-center text-slate-400">
+          Memuat transaksi...
+        </main>
+      }
+    >
+      <OrderStatusContent />
+    </Suspense>
+  )
+}
