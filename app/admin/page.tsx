@@ -35,6 +35,11 @@ import {
   CheckCircle2,
   Clock3,
   XCircle,
+  Star,
+  Eye,
+  EyeOff,
+  Plus,
+  Minus,
   type LucideIcon,
 } from 'lucide-react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
@@ -54,6 +59,8 @@ const tabs = [
   'categories',
   'games',
   'products',
+  'home-popular',
+  'home-categories',
   'payments',
   'vouchers',
   'promotions',
@@ -80,6 +87,8 @@ const adminIcons: Record<string, LucideIcon> = {
   categories: Tags,
   games: Gamepad2,
   products: Package,
+  'home-popular': Star,
+  'home-categories': LayoutDashboard,
   payments: CreditCard,
   vouchers: Ticket,
   promotions: Megaphone,
@@ -133,6 +142,13 @@ const adminMenuGroups: readonly AdminMenuGroup[] = [
       ['categories', 'Kategori'],
       ['games', 'Games'],
       ['products', 'Produk'],
+    ],
+  },
+  {
+    title: 'HOME',
+    items: [
+      ['home-popular', 'Game Populer'],
+      ['home-categories', 'Kategori Home'],
     ],
   },
   {
@@ -210,6 +226,12 @@ export default function Admin() {
   const [productStatusFilter, setProductStatusFilter] = useState('')
   const [productPopularFilter, setProductPopularFilter] = useState('')
   const [productPriceSort, setProductPriceSort] = useState('')
+
+  const [homePopularSearch, setHomePopularSearch] = useState('')
+  const [homePopularCategoryFilter, setHomePopularCategoryFilter] = useState('')
+  const [homePopularStatusFilter, setHomePopularStatusFilter] = useState('')
+  const [homeCategorySearch, setHomeCategorySearch] = useState('')
+  const [homeCategoryStatusFilter, setHomeCategoryStatusFilter] = useState('')
 
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentKindFilter, setPaymentKindFilter] = useState('')
@@ -405,6 +427,21 @@ export default function Admin() {
   })
 
   const paymentFilterActive = Boolean(paymentSearch || paymentKindFilter || paymentStatusFilter)
+  const filteredHomePopularGames = games.filter((g) => {
+    const q = homePopularSearch.trim().toLowerCase()
+    const matchesSearch = !q || [g.name, g.slug, g.game_categories?.name].some((v) => String(v || '').toLowerCase().includes(q))
+    const matchesCategory = !homePopularCategoryFilter || g.category_id === homePopularCategoryFilter
+    const matchesStatus = !homePopularStatusFilter || (homePopularStatusFilter === 'active' ? g.is_active !== false : g.is_active === false)
+    return matchesSearch && matchesCategory && matchesStatus
+  })
+
+  const filteredHomeCategories = categories.filter((c) => {
+    const q = homeCategorySearch.trim().toLowerCase()
+    const matchesSearch = !q || [c.name, c.slug].some((v) => String(v || '').toLowerCase().includes(q))
+    const matchesStatus = !homeCategoryStatusFilter || (homeCategoryStatusFilter === 'visible' ? c.show_on_home !== false : c.show_on_home === false)
+    return matchesSearch && matchesStatus
+  })
+
   const filteredMethods = methods.filter((m) => {
     const q = paymentSearch.trim().toLowerCase()
     return (!q || [m.name, m.kind, m.account_name, m.account_number].some((v) => String(v || '').toLowerCase().includes(q))) &&
@@ -927,6 +964,47 @@ s
     )
 
     load()
+  }
+
+
+  async function togglePopular(game: any) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat mengatur Game Populer.')
+      return
+    }
+
+    const next = !Boolean(game.popular)
+    const currentPopularCount = games.filter((g) => Boolean(g.popular)).length
+    if (next && currentPopularCount >= 9) {
+      setMsg('Maksimal 9 game untuk Game Populer. Keluarkan salah satu game terlebih dahulu.')
+      return
+    }
+
+    const { error } = await s.from('games').update({ popular: next }).eq('id', game.id)
+    if (error) {
+      setMsg(`Gagal mengubah Game Populer: ${error.message}`)
+      return
+    }
+
+    setGames((current) => current.map((g) => g.id === game.id ? { ...g, popular: next } : g))
+    setMsg(next ? `${game.name} ditambahkan ke Game Populer.` : `${game.name} dikeluarkan dari Game Populer.`)
+  }
+
+  async function toggleHomeCategory(category: any) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat mengatur kategori Home.')
+      return
+    }
+
+    const next = category.show_on_home === false
+    const { error } = await s.from('game_categories').update({ show_on_home: next }).eq('id', category.id)
+    if (error) {
+      setMsg(`Gagal mengubah kategori Home: ${error.message}`)
+      return
+    }
+
+    setCategories((current) => current.map((c) => c.id === category.id ? { ...c, show_on_home: next } : c))
+    setMsg(next ? `${category.name} ditambahkan ke Home.` : `${category.name} dihapus dari Home.`)
   }
 
 
@@ -2280,6 +2358,7 @@ async function deleteVoucher(v: any) {
         categoryForm.description.trim() ||
         null,
       is_active: true,
+      show_on_home: true,
     }
 
     const { error } =
@@ -2469,8 +2548,9 @@ async function deleteVoucher(v: any) {
           </header>
 
       {msg && (
-        <div className="mt-5 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-3 text-sm text-cyan-200">
-          {msg}
+        <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-lg border border-cyan-400/15 bg-cyan-400/[.06] px-2.5 py-1.5 text-[10px] font-semibold text-cyan-200">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+          <span className="truncate">{msg}</span>
         </div>
       )}
 
@@ -3188,27 +3268,10 @@ async function deleteVoucher(v: any) {
 
                 <div className="flex gap-2">
                   {['owner', 'admin'].includes(role) && (
-                    <button
-                      onClick={() => openEdit('category', c)}
-                      className="btn btn-primary text-xs"
-                    >
-                      Edit
-                    </button>
+                    <button type="button" onClick={() => openEdit('category', c)} className="btn btn-muted !h-8 !w-8 !p-0" title="Edit kategori" aria-label="Edit kategori"><Pencil className="h-3.5 w-3.5" /></button>
                   )}
 
-                  <button
-                    onClick={() =>
-                      toggle(
-                        'game_categories',
-                        c.id
-                      )
-                    }
-                    className="btn btn-muted text-xs"
-                  >
-                    {c.is_active
-                      ? 'Nonaktifkan'
-                      : 'Aktifkan'}
-                  </button>
+                  <button type="button" onClick={() => toggle('game_categories', c.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={c.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={c.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${c.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
 
                   {role ===
                     'owner' && (
@@ -3459,27 +3522,10 @@ async function deleteVoucher(v: any) {
 
                 <div className="flex flex-wrap gap-2">
                   {['owner', 'admin'].includes(role) && (
-                    <button
-                      onClick={() => openEdit('game', g)}
-                      className="btn btn-primary text-xs"
-                    >
-                      Edit
-                    </button>
+                    <button type="button" onClick={() => openEdit('game', g)} className="btn btn-muted !h-8 !w-8 !p-0" title="Edit game" aria-label="Edit game"><Pencil className="h-3.5 w-3.5" /></button>
                   )}
 
-                  <button
-                    onClick={() =>
-                      toggle(
-                        'games',
-                        g.id
-                      )
-                    }
-                    className="btn btn-muted text-xs"
-                  >
-                    {g.is_active
-                      ? 'Nonaktifkan'
-                      : 'Aktifkan'}
-                  </button>
+                  <button type="button" onClick={() => toggle('games', g.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={g.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={g.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${g.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
                 </div>
               </div>
             ))}
@@ -3625,7 +3671,6 @@ async function deleteVoucher(v: any) {
                         </button>
                         <button type="button" onClick={() => deleteProduct(p)} className="btn btn-muted !px-2 !py-1.5 text-red-300 hover:border-red-400/30 hover:bg-red-500/10" title="Hapus produk/nominal" aria-label="Hapus produk/nominal">
                           <Trash2 className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline text-[10px] font-bold">Hapus</span>
                         </button>
                       </>
                     )}
@@ -3639,6 +3684,73 @@ async function deleteVoucher(v: any) {
           </div>
         </section>
       )}
+
+
+      {/* =====================================================
+          HOME - GAME POPULER
+      ===================================================== */}
+
+      {tab === 'home-popular' ? (
+        <section className="mt-7 space-y-3">
+          <div className="glass rounded-xl p-3.5 md:p-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[.18em] text-rose-400">HOME</p>
+                <h2 className="mt-0.5 text-lg font-black text-white">Game Populer</h2>
+                <p className="mt-1 text-[11px] text-slate-500">Pilih maksimal 9 game. Game tetap berada di kategori normalnya.</p>
+              </div>
+              <div className="rounded-lg border border-rose-400/15 bg-rose-400/[.05] px-2.5 py-1.5 text-[10px] font-black text-rose-200">{games.filter((g) => g.popular).length} / 9 dipilih</div>
+            </div>
+            <AdminFilterShell active={Boolean(homePopularSearch || homePopularCategoryFilter || homePopularStatusFilter)} onReset={() => { setHomePopularSearch(''); setHomePopularCategoryFilter(''); setHomePopularStatusFilter('') }}>
+              <input className="input text-xs" placeholder="Cari game..." value={homePopularSearch} onChange={(e) => setHomePopularSearch(e.target.value)} />
+              <select className="input text-xs" value={homePopularCategoryFilter} onChange={(e) => setHomePopularCategoryFilter(e.target.value)}><option value="">Semua Kategori</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+              <select className="input text-xs" value={homePopularStatusFilter} onChange={(e) => setHomePopularStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
+              <div className="flex items-center rounded-lg border border-white/[.06] bg-white/[.02] px-3 text-[10px] text-slate-500">Klik ★ untuk menambah/mengeluarkan.</div>
+            </AdminFilterShell>
+          </div>
+
+          {limitAdminItems(filteredHomePopularGames, Boolean(homePopularSearch || homePopularCategoryFilter || homePopularStatusFilter)).map((g) => (
+            <div key={g.id} className="glass flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
+              <div className="flex min-w-0 items-center gap-2.5">
+                {g.logo_url ? <img src={g.logo_url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" /> : <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-900" />}
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-bold text-white">{g.name}</span>{g.popular && <span className="rounded-full bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">POPULER</span>}</div>
+                  <p className="truncate text-[10px] text-slate-500">{g.game_categories?.name || 'Tanpa kategori'} · {g.is_active === false ? 'Nonaktif' : 'Aktif'}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => togglePopular(g)} className="btn btn-muted !h-8 !w-8 !shrink-0 !p-0" title={g.popular ? 'Keluarkan dari Game Populer' : 'Tambahkan ke Game Populer'} aria-label={g.popular ? 'Keluarkan dari Game Populer' : 'Tambahkan ke Game Populer'}>
+                <Star className={`h-4 w-4 ${g.popular ? 'fill-amber-300 text-amber-300' : 'text-slate-500'}`} />
+              </button>
+            </div>
+          ))}
+        </section>
+      ) : tab === 'home-categories' ? (
+        <section className="mt-7 space-y-3">
+          <div className="glass rounded-xl p-3.5 md:p-4">
+            <p className="text-[9px] font-black uppercase tracking-[.18em] text-rose-400">HOME</p>
+            <h2 className="mt-0.5 text-lg font-black text-white">Kategori Home</h2>
+            <p className="mt-1 text-[11px] text-slate-500">Tentukan kategori katalog mana yang tampil sebagai tab di Home. Menghapus dari Home tidak menghapus game.</p>
+            <AdminFilterShell active={Boolean(homeCategorySearch || homeCategoryStatusFilter)} onReset={() => { setHomeCategorySearch(''); setHomeCategoryStatusFilter('') }}>
+              <input className="input text-xs" placeholder="Cari kategori..." value={homeCategorySearch} onChange={(e) => setHomeCategorySearch(e.target.value)} />
+              <select className="input text-xs" value={homeCategoryStatusFilter} onChange={(e) => setHomeCategoryStatusFilter(e.target.value)}><option value="">Semua</option><option value="visible">Tampil di Home</option><option value="hidden">Tidak tampil</option></select>
+            </AdminFilterShell>
+          </div>
+          {limitAdminItems(filteredHomeCategories, Boolean(homeCategorySearch || homeCategoryStatusFilter)).map((c) => (
+            <div key={c.id} className="glass flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-bold text-white">{c.name}</span>
+                  <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-black ${c.show_on_home !== false ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-400/10 text-slate-500'}`}>{c.show_on_home !== false ? 'HOME' : 'HIDDEN'}</span>
+                </div>
+                <p className="text-[10px] text-slate-500">{games.filter((g) => g.category_id === c.id).length} game · /{c.slug}</p>
+              </div>
+              <button type="button" onClick={() => toggleHomeCategory(c)} className="btn btn-muted !h-8 !w-8 !shrink-0 !p-0" title={c.show_on_home !== false ? 'Hapus dari Home' : 'Tambahkan ke Home'} aria-label={c.show_on_home !== false ? 'Hapus dari Home' : 'Tambahkan ke Home'}>
+                {c.show_on_home !== false ? <EyeOff className="h-4 w-4 text-slate-400" /> : <Eye className="h-4 w-4 text-emerald-300" />}
+              </button>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       {/* =====================================================
           PAYMENT METHODS
@@ -3744,19 +3856,7 @@ async function deleteVoucher(v: any) {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() =>
-                      toggle(
-                        'payment_methods',
-                        m.id
-                      )
-                    }
-                    className="btn btn-muted text-xs"
-                  >
-                    {m.is_active
-                      ? 'Nonaktifkan'
-                      : 'Aktifkan'}
-                  </button>
+                  <button type="button" onClick={() => toggle('payment_methods', m.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={m.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={m.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${m.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
                 </div>
               </div>
             ))}
@@ -4804,26 +4904,8 @@ async function deleteVoucher(v: any) {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() =>
-                            toggle(
-                              'broadcasts',
-                              b.id
-                            )
-                          }
-                          className="btn btn-muted text-xs"
-                        >
-                          {b.is_active
-                            ? 'Matikan'
-                            : 'Aktifkan'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteBroadcast(b)}
-                          className="btn btn-muted text-xs text-red-300"
-                        >
-                          Hapus
-                        </button>
+                        <button type="button" onClick={() => toggle('broadcasts', b.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={b.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={b.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${b.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
+                        <button type="button" onClick={() => deleteBroadcast(b)} className="btn btn-muted !h-8 !w-8 !p-0 text-red-300" title="Hapus broadcast" aria-label="Hapus broadcast"><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
                   </div>
@@ -5263,12 +5345,8 @@ async function deleteVoucher(v: any) {
                     <p className="mt-1 text-[10px] text-slate-600">Order: {review.order_id}</p>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    <button type="button" onClick={() => moderateCustomerReview(review, !review.is_approved)} className="btn btn-muted text-xs">
-                      {review.is_approved ? 'Sembunyikan' : 'Tampilkan'}
-                    </button>
-                    <button type="button" onClick={() => deleteCustomerReview(review)} className="btn btn-muted text-xs text-red-300">
-                      Hapus
-                    </button>
+                    <button type="button" onClick={() => moderateCustomerReview(review, !review.is_approved)} className="btn btn-muted !h-8 !w-8 !p-0" title={review.is_approved ? 'Sembunyikan' : 'Tampilkan'} aria-label={review.is_approved ? 'Sembunyikan' : 'Tampilkan'}>{review.is_approved ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5 text-emerald-300" />}</button>
+                    <button type="button" onClick={() => deleteCustomerReview(review)} className="btn btn-muted !h-8 !w-8 !p-0 text-red-300" title="Hapus ulasan" aria-label="Hapus ulasan"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 </div>
               ))}
