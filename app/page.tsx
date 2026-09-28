@@ -276,7 +276,10 @@ export default function Home() {
 
       try {
         const params = new URLSearchParams()
-        params.set('select', 'id,name,slug,sort_order,show_on_home,is_active')
+        // Kategori katalog utama Home harus selalu tersedia.
+        // Jangan bergantung pada kolom show_on_home agar tab tidak hilang
+        // ketika migrasi/flag Home belum tersinkron.
+        params.set('select', 'id,name,slug,sort_order,is_active')
         params.set('is_active', 'eq.true')
         params.set('order', 'sort_order.asc,name.asc')
 
@@ -292,12 +295,22 @@ export default function Home() {
 
         if (!response.ok) throw new Error(await response.text())
         const data = await response.json()
-        const baseSlugs = new Set(['mobile-games', 'pc-games', 'voucher-digital', 'console'])
-        const visible = Array.isArray(data)
-          ? data.filter((category: any) => baseSlugs.has(category.slug) || category.show_on_home === true)
-          : []
-        visible.sort((a: any, b: any) => Number(a.sort_order || 0) - Number(b.sort_order || 0) || String(a.name || '').localeCompare(String(b.name || '')))
-        if (mounted) setHomeCategories(visible)
+        const rows = Array.isArray(data) ? data : []
+
+        // Empat kategori utama selalu ditampilkan di Home bersama Game Populer.
+        // Game yang ditandai populer tetap berada di kategori asalnya.
+        const mainSlugs = [
+          'mobile-games',
+          'pc-games',
+          'voucher-digital',
+          'console',
+        ]
+
+        const mainCategories = mainSlugs
+          .map((slug) => rows.find((category: any) => category.slug === slug))
+          .filter(Boolean)
+
+        if (mounted) setHomeCategories(mainCategories)
       } catch (error) {
         console.error('Gagal memuat kategori Home:', error)
         if (mounted) setHomeCategories([])
