@@ -9,11 +9,15 @@ import {
   Radio,
   ExternalLink,
   Sparkles,
+  Smartphone,
+  Monitor,
+  Ticket,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 export default function Home() {
   const [games, setGames] = useState<any[]>([])
+  const [homeCategory, setHomeCategory] = useState('popular')
   const [loadingGames, setLoadingGames] = useState(true)
   const [gameError, setGameError] = useState('')
 
@@ -142,7 +146,7 @@ export default function Home() {
       try {
         const url =
           `${supabaseUrl}/rest/v1/games` +
-          `?select=*` +
+          `?select=*,game_categories(slug,name)` +
           `&is_active=eq.true` +
           `&order=name.asc` +
           `&limit=50`
@@ -840,24 +844,25 @@ export default function Home() {
           GAME POPULER
       ===================================================== */}
 
-      <section className="mx-auto max-w-7xl px-4 py-16">
-        <div className="flex items-end justify-between">
+      <section className="mx-auto max-w-7xl px-4 py-12 md:py-16">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm font-bold text-cyan-300">
-              DISCOVER
-            </p>
-
-            <h2 className="mt-1 text-3xl font-black">
-              Game Populer
-            </h2>
+            <h2 className="text-2xl font-black tracking-tight md:text-3xl">GAME POPULER</h2>
+            <p className="mt-1 text-xs font-medium text-slate-500">Produk</p>
           </div>
-
-          <Link
-            href="/games/"
-            className="text-sm font-bold text-slate-300"
-          >
-            Lihat semua →
-          </Link>
+          <Link href="/games/" className="text-xs font-bold text-slate-300 transition hover:text-cyan-300">Lihat semua →</Link>
+        </div>
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Kategori produk">
+          {[
+            { key: 'popular', label: 'Game Populer', icon: Sparkles },
+            { key: 'mobile-games', label: 'Game Mobile', icon: Smartphone },
+            { key: 'pc-games', label: 'PC Game', icon: Monitor },
+            { key: 'voucher-digital', label: 'Digital', icon: Ticket },
+          ].map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button" onClick={() => setHomeCategory(key)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition ${homeCategory === key ? 'border-cyan-400/35 bg-cyan-400/10 text-cyan-200' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-white/20 hover:text-white'}`}>
+              <Icon size={15} strokeWidth={2} /> {label}
+            </button>
+          ))}
         </div>
 
         {loadingGames && (
@@ -908,18 +913,19 @@ export default function Home() {
         {!loadingGames &&
           !gameError &&
           games.length > 0 && (
-            <div className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              {games
-                .slice(0, 10)
-                .map((g) => (
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
+              {(homeCategory === 'popular'
+                ? ['mobile-games', 'pc-games', 'voucher-digital'].flatMap((category) => games.filter((g) => g.popular === true && g.game_categories?.slug === category).slice(0, 3)).slice(0, 9)
+                : games.filter((g) => g.game_categories?.slug === homeCategory).slice(0, 9)
+              ).map((g) => (
                   <Link
                     key={g.id}
                     href={`/game/?slug=${encodeURIComponent(
                       g.slug
                     )}`}
-                    className="glass group overflow-hidden rounded-2xl p-4 transition hover:-translate-y-1 hover:border-purple-400/40"
+                    className="glass group overflow-hidden rounded-xl p-2.5 transition hover:-translate-y-1 hover:border-cyan-400/30 sm:p-3"
                   >
-                    <div className="flex aspect-square items-center justify-center rounded-xl bg-slate-900 text-4xl">
+                    <div className="flex aspect-square items-center justify-center rounded-lg bg-slate-900 text-3xl sm:text-4xl">
                       {g.logo_url ? (
                         <img
                           src={g.logo_url}
@@ -927,11 +933,11 @@ export default function Home() {
                           className="h-full w-full rounded-xl object-cover"
                         />
                       ) : (
-                        '🎮'
+                        '—'
                       )}
                     </div>
 
-                    <h3 className="mt-3 font-bold">
+                    <h3 className="mt-2 truncate text-sm font-bold sm:text-base">
                       {g.name}
                     </h3>
 
