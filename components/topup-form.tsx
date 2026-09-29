@@ -4,6 +4,23 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
+const PAYMENT_CATEGORIES = [
+  { value: 'QRIS', label: 'QRIS' },
+  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+  { value: 'E_WALLET', label: 'E-Wallet' },
+  { value: 'VIRTUAL_ACCOUNT', label: 'Virtual Account' },
+  { value: 'WALLET', label: 'Saldo Akun' },
+]
+
+function normalizeKind(kind: unknown) {
+  const value = String(kind ?? '').trim().toUpperCase()
+  if (value === 'BANK TRANSFER' || value === 'BANK_TRANSFER') return 'BANK_TRANSFER'
+  if (value === 'E-WALLET' || value === 'E_WALLET' || value === 'EWALLET') return 'E_WALLET'
+  if (value === 'VIRTUAL ACCOUNT' || value === 'VIRTUAL_ACCOUNT') return 'VIRTUAL_ACCOUNT'
+  if (value === 'SALDO AKUN' || value === 'WALLET' || value === 'SALDO') return 'WALLET'
+  return value
+}
+
 export default function TopupForm({
   game,
   fields,
@@ -19,7 +36,7 @@ export default function TopupForm({
   const [methods, setMethods] = useState<any[]>([])
   const [method, setMethod] = useState<any>()
   const [paymentCategory, setPaymentCategory] = useState('')
-  const [walletBalance, setWalletBalance] = useState<number>(0)
+  const [walletBalance, setWalletBalance] = useState(0)
   const [walletLoading, setWalletLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -27,134 +44,157 @@ export default function TopupForm({
   const router = useRouter()
 
   useEffect(() => {
-    const loadData = async () => {
-      const s = supabaseBrowser()
+    let cancelled = false
 
-      const { data: paymentMethods } = await s
-        .from('payment_methods')
-        .select('*')
-        .eq('is_active', true)
-        .order('name')
+    async function loadData() {
+      try {
+        const s = supabaseBrowser()
 
-      setMethods(paymentMethods || [])
+        const { data: paymentMethods, error: methodsError } = await s
+          .from('payment_methods')
+          .select('*')
+          .eq('is_active', true)
+          .order('name')
 
-      if (paymentMethods?.[0]) {
-        setMethod(paymentMethods[0])
-        setPaymentCategory(normalizeKind(paymentMethods[0].kind))
+        if (cancelled) return
+
+        if (methodsError) {
+          setError(methodsError.message)
+          setMethods([])
+          setMethod(undefined)
+          setPaymentCategory('')
+        } else {
+          const activeMethods = Array.isArray(paymentMethods) ? paymentMethods : []
+          setMethods(activeMethods)
+
+          const first = activeMethods[0]
+          if (first) {
+            setMethod(first)
+            setPaymentCategory(normalizeKind(first.kind))
+          } else {
+            setMethod(undefined)
+            setPaymentCategory('')
+          }
+        }
+
+        const {
+          data: { user },
+        } = await s.auth.getUser()
+
+        if (cancelled || !user) return
+
+        setWalletLoading(true)
+        const { data: wallet, error: walletError } = await s
+          .from('wallets')
+          .select('balance,reserved_balance')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (cancelled) return
+
+        if (walletError) {
+          setWalletBalance(0)
+        } else if (wallet) {
+          const balance = Number(wallet.balance || 0)
+          const reserved = Number(wallet.reserved_balance || 0)
+          setWalletBalance(Math.max(0, balance - reserved))
+        } else {
+          setWalletBalance(0)
+        }
+      } catch (err: any) {
+        if (!cancelled) setError(err?.message || 'Gagal memuat pembayaran.')
+      } finally {
+        if (!cancelled) setWalletLoading(false)
       }
-
-      const {
-        data: { user },
-      } = await s.auth.getUser()
-
-      if (!user) return
-
-      setWalletLoading(true)
-
-      const { data: wallet } = await s
-        .from('wallets')
-        .select('balance,reserved_balance')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (wallet) {
-        const balance = Number(wallet.balance || 0)
-        const reserved = Number(wallet.reserved_balance || 0)
-
-        setWalletBalance(Math.max(0, balance - reserved))
-      } else {
-        setWalletBalance(0)
-      }
-
-      setWalletLoading(false)
     }
 
     loadData()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  const availableCategories = PAYMENT_CATEGORIES.filter((category) =>
+    methods.some((m) => normalizeKind(m?.kind) === category.value)
+  )
+
+  const methodsInCategory = methods.filter(
+    (m) => normalizeKind(m?.kind) === paymentCategory
+  )
+
+  const isWallet = normalizeKind(method?.kind) === 'WALLET'
+
+  function chooseCategory(category: string) {
+    setError('')
+    setPaymentCategory(category)
+    const first = methods.find((m) => normalizeKind(m?.kind) === category)
+    setMethod(first)
+  }
 
   async function submit() {
     setError('')
 
     if (!selected) {
-      return setError('Pilih produk terlebih dahulu.')
+      setError('Pilih produk terlebih dahulu.')
+      return
     }
 
-    if (!method) {
-      return setError('Pilih metode pembayaran.')
+    if (!method?.id) {
+      setError('Pilih metode pembayaran.')
+      return
     }
 
-    for (const f of fields) {
-      if (f.required && !values[f.key]?.trim()) {
-        return setError(`Isi ${f.label}.`)
+    for (const f of Array.isArray(fields) ? fields : []) {
+      if (f.required && !String(values[f.key] || '').trim()) {
+        setError(`Isi ${f.label}.`)
+        return
       }
     }
 
     setLoading(true)
 
-    const s = supabaseBrowser()
+    try {
+      const s = supabaseBrowser()
+      const {
+        data: { user },
+      } = await s.auth.getUser()
 
-    const {
-      data: { user },
-    } = await s.auth.getUser()
+      if (!user) {
+        router.push('/login?next=' + encodeURIComponent(`/games/${game.slug}`))
+        return
+      }
 
-    if (!user) {
-      router.push(
-        '/login?next=' + encodeURIComponent(`/games/${game.slug}`)
-      )
-      return
-    }
-
-    const { data: orderId, error: e } = await s.rpc(
-      'create_manual_order',
-      {
+      const { data: orderId, error: rpcError } = await s.rpc('create_manual_order', {
         p_game_id: game.id,
         p_product_id: selected.id,
         p_customer_data: values,
         p_payment_method_id: method.id,
-        p_voucher_code: voucher || null,
-      }
-    )
+        p_voucher_code: voucher.trim() || null,
+      })
 
-    if (e || !orderId) {
-      if (e?.message?.includes('INSUFFICIENT_WALLET_BALANCE')) {
-        setError('Saldo akun tidak mencukupi untuk pembayaran ini.')
-      } else {
-        setError(e?.message || 'Gagal membuat order.')
+      if (rpcError) {
+        const message = String(rpcError.message || 'Gagal membuat order.')
+        setError(
+          message.includes('INSUFFICIENT_WALLET_BALANCE')
+            ? 'Saldo akun tidak mencukupi untuk pembayaran ini.'
+            : message
+        )
+        return
       }
 
+      if (!orderId) {
+        setError('Order tidak berhasil dibuat. Silakan coba lagi.')
+        return
+      }
+
+      router.push('/order/?id=' + encodeURIComponent(String(orderId)))
+    } catch (err: any) {
+      setError(err?.message || 'Terjadi kesalahan saat membuat order.')
+    } finally {
       setLoading(false)
-      return
     }
-
-    router.push('/order/?id=' + encodeURIComponent(orderId))
   }
-
-  const paymentCategories = [
-    { value: 'QRIS', label: 'QRIS' },
-    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
-    { value: 'E_WALLET', label: 'E-Wallet' },
-    { value: 'VIRTUAL_ACCOUNT', label: 'Virtual Account' },
-    { value: 'WALLET', label: 'Saldo Akun' },
-  ]
-
-  function normalizeKind(kind: any) {
-    const value = String(kind || '').trim().toUpperCase()
-    if (value === 'BANK TRANSFER' || value === 'BANK_TRANSFER') return 'BANK_TRANSFER'
-    if (value === 'E-WALLET' || value === 'E_WALLET' || value === 'EWALLET') return 'E_WALLET'
-    if (value === 'VIRTUAL ACCOUNT' || value === 'VIRTUAL_ACCOUNT') return 'VIRTUAL_ACCOUNT'
-    if (value === 'SALDO AKUN' || value === 'WALLET' || value === 'SALDO') return 'WALLET'
-    return value
-  }
-
-  const availableCategories = paymentCategories.filter((category) =>
-    methods.some((m) => normalizeKind(m.kind) === category.value)
-  )
-
-  const methodsInCategory = paymentCategory
-    ? methods.filter((m) => normalizeKind(m.kind) === paymentCategory)
-    : []
-
-  const isWallet = normalizeKind(method?.kind) === 'WALLET'
 
   const paymentDescription = isWallet
     ? 'Pembayaran akan diproses menggunakan saldo akun.'
@@ -163,27 +203,20 @@ export default function TopupForm({
       : 'Ikuti instruksi pembayaran dan unggah bukti jika diminta.'
 
   return (
-    <div className="space-y-8">
+    <div className="grid gap-8 md:grid-cols-[1fr_1.1fr]">
       <div>
-        <h2 className="text-xl font-black">1. Data Akun</h2>
+        <h2 className="text-xl font-black">1. Data akun</h2>
 
         <div className="mt-4 grid gap-4">
           {fields.map((f) => (
-            <label
-              key={f.id}
-              className="text-sm font-semibold"
-            >
+            <label key={f.id} className="text-sm font-semibold">
               {f.label}
-
               <input
                 className="input mt-2"
                 placeholder={f.placeholder || ''}
                 value={values[f.key] || ''}
                 onChange={(e) =>
-                  setValues((v) => ({
-                    ...v,
-                    [f.key]: e.target.value,
-                  }))
+                  setValues((current) => ({ ...current, [f.key]: e.target.value }))
                 }
               />
             </label>
@@ -192,128 +225,114 @@ export default function TopupForm({
       </div>
 
       <div>
-        <h2 className="text-xl font-black">2. Produk / Nominal</h2>
+        <h2 className="text-xl font-black">2. Pilih nominal</h2>
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
-          <div className="overflow-x-auto">
-            <table className="min-w-[680px] w-full text-left text-xs">
-              <thead className="border-b border-white/10 bg-white/[.025]">
-                <tr className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">
-                  <th className="px-4 py-3">Produk</th>
-                  <th className="px-4 py-3">SKU</th>
-                  <th className="px-4 py-3">Harga</th>
-                  <th className="px-4 py-3 text-right">Pilih</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[.06]">
-                {products.map((p) => {
-                  const active = selected?.id === p.id
-                  return (
-                    <tr
-                      key={p.id}
-                      className={`transition ${active ? 'bg-cyan-400/10' : 'hover:bg-white/[.025]'}`}
-                    >
-                      <td className="px-4 py-3 font-bold text-white">{p.name || p.nominal}</td>
-                      <td className="px-4 py-3 text-slate-500">{p.sku || '-'}</td>
-                      <td className="px-4 py-3 font-bold text-cyan-300">Rp {Number(p.price).toLocaleString('id-ID')}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelected(p)}
-                          className={`rounded-lg border px-3 py-1.5 text-[10px] font-black transition ${active ? 'border-cyan-400 bg-cyan-400/10 text-cyan-300' : 'border-white/10 bg-white/[.03] text-slate-300 hover:border-cyan-400/40'}`}
-                        >
-                          {active ? 'Terpilih' : 'Pilih'}
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {products.map((p) => {
+            const active = selected?.id === p.id
+            return (
+              <button
+                type="button"
+                key={p.id}
+                onClick={() => setSelected(p)}
+                className={`rounded-xl border p-2.5 text-left transition ${
+                  active
+                    ? 'border-cyan-400 bg-cyan-400/10 shadow-[0_0_25px_rgba(34,211,238,.12)]'
+                    : 'border-white/10 bg-slate-950/40 hover:border-white/20'
+                }`}
+              >
+                <div className="flex min-h-[3.25rem] items-center">
+                  <div className="line-clamp-2 text-xs font-bold leading-snug sm:text-sm">
+                    {p.name || p.nominal}
+                  </div>
+                </div>
+                <div className="mt-1.5 text-xs font-semibold text-cyan-300 sm:text-sm">
+                  Rp {Number(p.price).toLocaleString('id-ID')}
+                </div>
+                <div className="mt-1 truncate text-[10px] text-slate-500 sm:text-[11px]">
+                  {p.sku}
+                </div>
+              </button>
+            )
+          })}
         </div>
 
-        <div className="mt-6 space-y-4">
-          <label className="block text-sm font-semibold">
-            Kategori Pembayaran
+        <label className="mt-6 block text-sm font-semibold">
+          Kategori Pembayaran
+          <select
+            className="input mt-2"
+            value={paymentCategory}
+            onChange={(e) => chooseCategory(e.target.value)}
+          >
+            <option value="" disabled>Pilih kategori pembayaran</option>
+            {availableCategories.map((category) => (
+              <option key={category.value} value={category.value}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
+        {paymentCategory && methodsInCategory.length > 0 && (
+          <label className="mt-4 block text-sm font-semibold">
+            Metode Pembayaran
             <select
               className="input mt-2"
-              value={paymentCategory}
+              value={method?.id || ''}
               onChange={(e) => {
-                const category = e.target.value
-                setPaymentCategory(category)
-                const firstMethod = methods.find((x) => normalizeKind(x.kind) === category)
-                setMethod(firstMethod)
+                const next = methodsInCategory.find((m) => m.id === e.target.value)
+                setMethod(next)
               }}
             >
-              <option value="" disabled>Pilih kategori pembayaran</option>
-              {availableCategories.map((category) => (
-                <option key={category.value} value={category.value}>
-                  {category.label}
+              {methodsInCategory.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
                 </option>
               ))}
             </select>
           </label>
+        )}
 
-          {paymentCategory && methodsInCategory.length > 0 && (
-            <label className="block text-sm font-semibold">
-              Metode Pembayaran
+        {paymentCategory && methodsInCategory.length === 0 && (
+          <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-sm text-amber-200">
+            Belum ada metode pembayaran aktif untuk kategori ini.
+          </div>
+        )}
 
-              <select
-                className="input mt-2"
-                value={method?.id || ''}
-                onChange={(e) =>
-                  setMethod(methodsInCategory.find((x) => x.id === e.target.value))
-                }
-              >
-                {methodsInCategory.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+        {method && (
+          <div className="mt-3 rounded-2xl border border-cyan-400/10 bg-cyan-400/5 p-4 text-sm">
+            <b>{method.name || 'Metode Pembayaran'}</b>
 
-          {method && (
-            <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/5 p-4 text-sm">
-              <b>{method.name}</b>
-
-              {isWallet ? (
-                <>
-                  <p className="mt-2 text-slate-400">Saldo tersedia</p>
-                  <p className="mt-1 text-xl font-black text-cyan-300">
-                    {walletLoading ? 'Memuat...' : `Rp ${walletBalance.toLocaleString('id-ID')}`}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    Saldo akan dipotong otomatis setelah pesanan berhasil dibuat.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-1 text-slate-400">
-                    {method.account_name || ''}
-                    {method.account_number ? ` · ${method.account_number}` : ''}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {method.instruction || 'Ikuti instruksi pembayaran di halaman order.'}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+            {isWallet ? (
+              <>
+                <p className="mt-2 text-slate-400">Saldo tersedia</p>
+                <p className="mt-1 text-xl font-black text-cyan-300">
+                  {walletLoading ? 'Memuat...' : `Rp ${walletBalance.toLocaleString('id-ID')}`}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Saldo akan dipotong otomatis setelah pesanan berhasil dibuat.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-slate-400">
+                  {method.account_name || ''}
+                  {method.account_number ? ` · ${method.account_number}` : ''}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {method.instruction || 'Ikuti instruksi pembayaran di halaman order.'}
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         <label className="mt-4 block text-sm font-semibold">
           Voucher
-
           <input
             className="input mt-2"
             value={voucher}
-            onChange={(e) =>
-              setVoucher(e.target.value.toUpperCase())
-            }
+            onChange={(e) => setVoucher(e.target.value.toUpperCase())}
             placeholder="Opsional"
           />
         </label>
@@ -327,25 +346,18 @@ export default function TopupForm({
         <div className="mt-6 rounded-2xl bg-slate-950/70 p-5">
           <div className="flex justify-between text-sm text-slate-400">
             <span>Harga produk</span>
-
             <b className="text-xl text-white">
-              Rp{' '}
-              {selected
-                ? Number(selected.price).toLocaleString(
-                    'id-ID'
-                  )
-                : '0'}
+              Rp {selected ? Number(selected.price).toLocaleString('id-ID') : '0'}
             </b>
           </div>
 
           <button
+            type="button"
             disabled={loading}
             onClick={submit}
             className="btn btn-primary mt-5 w-full"
           >
-            {loading
-              ? 'Membuat order...'
-              : 'Buat Pesanan'}
+            {loading ? 'Membuat order...' : 'Buat Pesanan'}
           </button>
 
           <p className="mt-3 text-center text-xs text-slate-500">
