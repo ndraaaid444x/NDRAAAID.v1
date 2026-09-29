@@ -1,47 +1,7 @@
 'use client'
 
-import {
-  ChangeEvent,
-  FormEvent,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Activity,
-  Bell,
-  CircleDollarSign,
-  CreditCard,
-  Gamepad2,
-  History,
-  LayoutDashboard,
-  MessageSquare,
-  Package,
-  Radio,
-  Settings,
-  ShoppingCart,
-  Ticket,
-  Users,
-  Wallet,
-  WalletCards,
-  Image as ImageIcon,
-  Megaphone,
-  Tags,
-  Pencil,
-  Trash2,
-  Power,
-  CheckCircle2,
-  Clock3,
-  XCircle,
-  Star,
-  Eye,
-  EyeOff,
-  Plus,
-  Minus,
-  type LucideIcon,
-} from 'lucide-react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
 const transitions: Record<string, string[]> = {
@@ -51,7 +11,6 @@ const transitions: Record<string, string[]> = {
 }
 
 const tabs = [
-  'dashboard',
   'orders',
   'deposits',
   'deposit-history',
@@ -59,203 +18,30 @@ const tabs = [
   'categories',
   'games',
   'products',
-  'home-popular',
-  'home-categories',
   'payments',
   'vouchers',
   'promotions',
   'broadcasts',
   'media',
   'users',
-  'reviews',
   'settings',
   'chat',
 ]
 
 const mediaCategories = [
   ['games', '🎮 Logo Game'],
+  ['products', '💎 Gambar Produk'],
   ['promotions', '📢 Banner Promo'],
+  ['homepage', '🏠 Banner Homepage'],
   ['general', '📁 Media Lainnya'],
 ]
 
-const adminIcons: Record<string, LucideIcon> = {
-  dashboard: LayoutDashboard,
-  orders: ShoppingCart,
-  deposits: WalletCards,
-  'deposit-history': History,
-  'wallet-history': Wallet,
-  categories: Tags,
-  games: Gamepad2,
-  products: Package,
-  'home-popular': Star,
-  'home-categories': LayoutDashboard,
-  payments: CreditCard,
-  vouchers: Ticket,
-  promotions: Megaphone,
-  broadcasts: Radio,
-  media: ImageIcon,
-  users: Users,
-  reviews: MessageSquare,
-  chat: MessageSquare,
-  settings: Settings,
-}
-
-type AdminMenuItem = readonly [string, string]
-type AdminMenuGroup = { title: string; items: readonly AdminMenuItem[] }
-
-function AdminFilterShell({
-  active,
-  onReset,
-  children,
-}: {
-  active: boolean
-  onReset: () => void
-  children: ReactNode
-}) {
-  return (
-    <div className="mt-3 rounded-xl border border-white/[.07] bg-black/20 p-2.5">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
-        <button type="button" onClick={onReset} disabled={!active} className="btn btn-muted shrink-0 text-xs disabled:cursor-not-allowed disabled:opacity-40">Reset Filter</button>
-      </div>
-    </div>
-  )
-}
-
-const adminMenuGroups: readonly AdminMenuGroup[] = [
-  {
-    title: 'UTAMA',
-    items: [['dashboard', 'Dashboard']],
-  },
-  {
-    title: 'OPERASIONAL',
-    items: [
-      ['orders', 'Order'],
-      ['deposits', 'Deposit'],
-      ['deposit-history', 'Riwayat Deposit'],
-      ['wallet-history', 'Riwayat Wallet'],
-    ],
-  },
-  {
-    title: 'KATALOG',
-    items: [
-      ['categories', 'Kategori'],
-      ['games', 'Games'],
-      ['products', 'Produk'],
-    ],
-  },
-  {
-    title: 'HOME',
-    items: [
-      ['home-popular', 'Game Populer'],
-      ['home-categories', 'Kategori Home'],
-    ],
-  },
-  {
-    title: 'SISTEM',
-    items: [
-      ['payments', 'Pembayaran'],
-      ['vouchers', 'Voucher'],
-      ['promotions', 'Banner Promo'],
-      ['broadcasts', 'Live Broadcast'],
-      ['media', 'Media Manager'],
-    ],
-  },
-  {
-    title: 'MANAGEMENT',
-    items: [
-      ['users', 'Member & Wallet'],
-      ['reviews', 'Ulasan & Running Text'],
-      ['chat', 'Live Chat'],
-      ['settings', 'Pengaturan'],
-    ],
-  },
-] as const
-
 export default function Admin() {
-  const [tab, setTab] = useState('dashboard')
-  const liveRefreshBusy = useRef(false)
-
-  function changeTab(nextTab: string) {
-    // Perpindahan menu dilakukan dengan state saja.
-    // Jangan reload halaman karena akan mengembalikan scroll/posisi
-    // dan terasa seperti menu 'memantul' setiap kali disentuh.
-    sessionStorage.setItem('admin_active_tab', nextTab)
-    setTab(nextTab)
-  }
-
+  const [tab, setTab] = useState('orders')
   const [role, setRole] = useState('')
   const [msg, setMsg] = useState('')
 
-  const [editType, setEditType] = useState<'category' | 'game' | 'product' | null>(null)
-  const [editId, setEditId] = useState('')
-  const [editForm, setEditForm] = useState<any>({})
-
   const [orders, setOrders] = useState<any[]>([])
-  const [orderSearch, setOrderSearch] = useState('')
-  const [orderStatusFilter, setOrderStatusFilter] = useState('')
-  const [orderDateFilter, setOrderDateFilter] = useState('')
-  const [orderMemberFilter, setOrderMemberFilter] = useState('')
-  const [orderGameFilter, setOrderGameFilter] = useState('')
-
-  const [depositSearch, setDepositSearch] = useState('')
-  const [depositStatusFilter, setDepositStatusFilter] = useState('')
-  const [depositMethodFilter, setDepositMethodFilter] = useState('')
-  const [depositDateFilter, setDepositDateFilter] = useState('')
-
-  const [depositHistorySearch, setDepositHistorySearch] = useState('')
-  const [depositHistoryStatusFilter, setDepositHistoryStatusFilter] = useState('')
-  const [depositHistoryMethodFilter, setDepositHistoryMethodFilter] = useState('')
-  const [depositHistoryDateFilter, setDepositHistoryDateFilter] = useState('')
-
-  const [walletSearch, setWalletSearch] = useState('')
-  const [walletTypeFilter, setWalletTypeFilter] = useState('')
-  const [walletDateFilter, setWalletDateFilter] = useState('')
-
-  const [categorySearch, setCategorySearch] = useState('')
-  const [categoryStatusFilter, setCategoryStatusFilter] = useState('')
-
-  const [gameSearch, setGameSearch] = useState('')
-  const [gameCategoryFilter, setGameCategoryFilter] = useState('')
-  const [gameStatusFilter, setGameStatusFilter] = useState('')
-  const [gamePopularFilter, setGamePopularFilter] = useState('')
-
-  const [productSearch, setProductSearch] = useState('')
-  const [productGameFilter, setProductGameFilter] = useState('')
-  const [productCategoryFilter, setProductCategoryFilter] = useState('')
-  const [productStatusFilter, setProductStatusFilter] = useState('')
-  const [productPopularFilter, setProductPopularFilter] = useState('')
-  const [productPriceSort, setProductPriceSort] = useState('')
-
-  const [homePopularSearch, setHomePopularSearch] = useState('')
-  const [homePopularCategoryFilter, setHomePopularCategoryFilter] = useState('')
-  const [homePopularStatusFilter, setHomePopularStatusFilter] = useState('')
-  const [homeCategorySearch, setHomeCategorySearch] = useState('')
-  const [homeCategoryStatusFilter, setHomeCategoryStatusFilter] = useState('')
-
-  const [paymentSearch, setPaymentSearch] = useState('')
-  const [paymentKindFilter, setPaymentKindFilter] = useState('')
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState('')
-
-  const [voucherSearch, setVoucherSearch] = useState('')
-  const [voucherStatusFilter, setVoucherStatusFilter] = useState('')
-  const [voucherTypeFilter, setVoucherTypeFilter] = useState('')
-
-  const [voucherUsageSearch, setVoucherUsageSearch] = useState('')
-  const [voucherUsageDateFilter, setVoucherUsageDateFilter] = useState('')
-
-  const [broadcastSearch, setBroadcastSearch] = useState('')
-  const [broadcastStatusFilter, setBroadcastStatusFilter] = useState('')
-  const [broadcastTypeFilter, setBroadcastTypeFilter] = useState('')
-  const [broadcastDateFilter, setBroadcastDateFilter] = useState('')
-
-  const [userSearch, setUserSearch] = useState('')
-  const [userRoleFilter, setUserRoleFilter] = useState('')
-  const [userStatusFilter, setUserStatusFilter] = useState('')
-
-  const [reviewSearch, setReviewSearch] = useState('')
-  const [reviewRatingFilter, setReviewRatingFilter] = useState('')
-  const [reviewModerationFilter, setReviewModerationFilter] = useState('')
   const [games, setGames] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
@@ -270,12 +56,6 @@ export default function Admin() {
   const [deposits, setDeposits] = useState<any[]>([])
   const [walletTx, setWalletTx] = useState<any[]>([])
   const [rooms, setRooms] = useState<any[]>([])
-  const [homeRunningText, setHomeRunningText] = useState<any>({
-    text_content: '',
-    is_active: false,
-    speed_ms: 18000,
-  })
-  const [customerReviews, setCustomerReviews] = useState<any[]>([])
   const [activeRoom, setActiveRoom] = useState<any>()
   const [chatMessages, setChatMessages] = useState<any[]>([])
   const [chatText, setChatText] = useState('')
@@ -284,12 +64,17 @@ export default function Admin() {
   const [mediaSearch, setMediaSearch] = useState('')
   const [mediaUploading, setMediaUploading] = useState(false)
   const [mediaGameId, setMediaGameId] = useState('')
-  const [mediaPromoCustomText, setMediaPromoCustomText] = useState('')
-  const [mediaPromoTitle, setMediaPromoTitle] = useState('')
-  const [mediaPromoDescription, setMediaPromoDescription] = useState('')
-  const [mediaPromoCode, setMediaPromoCode] = useState('')
-  const [mediaPromoType, setMediaPromoType] = useState<'text' | 'image' | 'both'>('both')
-  const [pendingPromoImageUrl, setPendingPromoImageUrl] = useState('')
+  const [mediaProductGameId, setMediaProductGameId] = useState('')
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
+  const [mediaPromoId, setMediaPromoId] = useState('')
+  const [homepageSlot, setHomepageSlot] = useState('hero')
+
+  const homepageSlots = [
+    ['hero', 'Hero utama'],
+    ['promo', 'Banner promo'],
+    ['event', 'Banner event'],
+    ['secondary', 'Banner lainnya'],
+  ]
 
   const [site, setSite] = useState<any>({
     name: 'NDRAAAID',
@@ -358,140 +143,6 @@ export default function Admin() {
   const router = useRouter()
   const s = supabaseBrowser()
 
-  const dateMatches = (value: any, filter: string) =>
-    !filter || String(value || '').slice(0, 10) === filter
-
-  const limitAdminItems = <T,>(items: T[], active: boolean) =>
-    active ? items : items.slice(0, 3)
-
-  const depositFilterActive = Boolean(depositSearch || depositStatusFilter || depositMethodFilter || depositDateFilter)
-  const filteredPendingDeposits = deposits.filter((d) => {
-    const q = depositSearch.trim().toLowerCase()
-    const member = d.profiles?.name || d.profiles?.username || d.profiles?.email || ''
-    const method = d.payment_methods?.name || d.payment_methods?.kind || ''
-    return d.status === 'PENDING' &&
-      (!q || [d.deposit_code, member, method, d.status].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!depositStatusFilter || d.status === depositStatusFilter) &&
-      (!depositMethodFilter || d.payment_methods?.kind === depositMethodFilter || d.payment_methods?.name === depositMethodFilter) &&
-      dateMatches(d.created_at, depositDateFilter)
-  })
-
-  const depositHistoryFilterActive = Boolean(depositHistorySearch || depositHistoryStatusFilter || depositHistoryMethodFilter || depositHistoryDateFilter)
-  const filteredDepositHistory = deposits.filter((d) => {
-    const q = depositHistorySearch.trim().toLowerCase()
-    const member = d.profiles?.name || d.profiles?.username || d.profiles?.email || ''
-    const method = d.payment_methods?.name || d.payment_methods?.kind || ''
-    return (!q || [d.deposit_code, member, method, d.status].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!depositHistoryStatusFilter || d.status === depositHistoryStatusFilter) &&
-      (!depositHistoryMethodFilter || d.payment_methods?.kind === depositHistoryMethodFilter || d.payment_methods?.name === depositHistoryMethodFilter) &&
-      dateMatches(d.created_at, depositHistoryDateFilter)
-  })
-
-  const walletFilterActive = Boolean(walletSearch || walletTypeFilter || walletDateFilter)
-  const filteredWalletTx = walletTx.filter((tx) => {
-    const q = walletSearch.trim().toLowerCase()
-    const member = tx.profiles?.name || tx.profiles?.username || tx.profiles?.email || tx.user_id || ''
-    return (!q || [member, tx.type, tx.reason].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!walletTypeFilter || tx.type === walletTypeFilter) &&
-      dateMatches(tx.created_at, walletDateFilter)
-  })
-
-  const categoryFilterActive = Boolean(categorySearch || categoryStatusFilter)
-  const filteredCategories = categories.filter((c) => {
-    const q = categorySearch.trim().toLowerCase()
-    return (!q || [c.name, c.slug, c.description].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!categoryStatusFilter || (categoryStatusFilter === 'active' ? c.is_active !== false : c.is_active === false))
-  })
-
-  const gameFilterActive = Boolean(gameSearch || gameCategoryFilter || gameStatusFilter || gamePopularFilter)
-  const filteredGames = games.filter((g) => {
-    const q = gameSearch.trim().toLowerCase()
-    return (!q || [g.name, g.slug, g.description].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!gameCategoryFilter || g.category_id === gameCategoryFilter) &&
-      (!gameStatusFilter || (gameStatusFilter === 'active' ? g.is_active !== false : g.is_active === false)) &&
-      (!gamePopularFilter || (gamePopularFilter === 'popular' ? Boolean(g.popular) : !Boolean(g.popular)))
-  })
-
-  const productFilterActive = Boolean(productSearch || productGameFilter || productCategoryFilter || productStatusFilter || productPopularFilter || productPriceSort)
-  const filteredProducts = products.filter((p) => {
-    const q = productSearch.trim().toLowerCase()
-    const gameName = p.games?.name || ''
-    return (!q || [p.name, p.nominal, p.sku, gameName].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!productGameFilter || p.game_id === productGameFilter) &&
-      (!productCategoryFilter || p.games?.category_id === productCategoryFilter) &&
-      (!productStatusFilter || (productStatusFilter === 'active' ? p.is_active !== false : p.is_active === false)) &&
-      (!productPopularFilter || (productPopularFilter === 'popular' ? Boolean(p.games?.popular) : !Boolean(p.games?.popular)))
-  }).sort((a, b) => {
-    if (productPriceSort === 'asc') return Number(a.price || 0) - Number(b.price || 0)
-    if (productPriceSort === 'desc') return Number(b.price || 0) - Number(a.price || 0)
-    return 0
-  })
-
-  const paymentFilterActive = Boolean(paymentSearch || paymentKindFilter || paymentStatusFilter)
-  const filteredHomePopularGames = games.filter((g) => {
-    const q = homePopularSearch.trim().toLowerCase()
-    const matchesSearch = !q || [g.name, g.slug, g.game_categories?.name].some((v) => String(v || '').toLowerCase().includes(q))
-    const matchesCategory = !homePopularCategoryFilter || g.category_id === homePopularCategoryFilter
-    const matchesStatus = !homePopularStatusFilter || (homePopularStatusFilter === 'active' ? g.is_active !== false : g.is_active === false)
-    return matchesSearch && matchesCategory && matchesStatus
-  })
-
-  const filteredHomeCategories = categories.filter((c) => {
-    const q = homeCategorySearch.trim().toLowerCase()
-    const matchesSearch = !q || [c.name, c.slug].some((v) => String(v || '').toLowerCase().includes(q))
-    const matchesStatus = !homeCategoryStatusFilter || (homeCategoryStatusFilter === 'visible' ? c.show_on_home !== false : c.show_on_home === false)
-    return matchesSearch && matchesStatus
-  })
-
-  const filteredMethods = methods.filter((m) => {
-    const q = paymentSearch.trim().toLowerCase()
-    return (!q || [m.name, m.kind, m.account_name, m.account_number].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!paymentKindFilter || m.kind === paymentKindFilter) &&
-      (!paymentStatusFilter || (paymentStatusFilter === 'active' ? m.is_active !== false : m.is_active === false))
-  })
-
-  const voucherFilterActive = Boolean(voucherSearch || voucherStatusFilter || voucherTypeFilter)
-  const filteredVouchers = vouchers.filter((v) => {
-    const q = voucherSearch.trim().toLowerCase()
-    return (!q || [v.code, v.discount_type].some((x) => String(x || '').toLowerCase().includes(q))) &&
-      (!voucherStatusFilter || (voucherStatusFilter === 'active' ? v.is_active !== false : v.is_active === false)) &&
-      (!voucherTypeFilter || v.discount_type === voucherTypeFilter)
-  })
-
-  const voucherUsageFilterActive = Boolean(voucherUsageSearch || voucherUsageDateFilter)
-  const filteredVoucherUsages = voucherUsages.filter((vu) => {
-    const q = voucherUsageSearch.trim().toLowerCase()
-    const user = vu.profiles?.username || vu.profiles?.name || vu.profiles?.email || vu.user_id || ''
-    const order = vu.orders?.order_code || vu.order_id || ''
-    return (!q || [vu.voucher_code, user, order].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      dateMatches(vu.used_at, voucherUsageDateFilter)
-  })
-
-  const broadcastFilterActive = Boolean(broadcastSearch || broadcastStatusFilter || broadcastTypeFilter || broadcastDateFilter)
-  const filteredBroadcasts = broadcasts.filter((b) => {
-    const q = broadcastSearch.trim().toLowerCase()
-    return (!q || [b.title, b.message, b.type].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!broadcastStatusFilter || (broadcastStatusFilter === 'active' ? b.is_active !== false : b.is_active === false)) &&
-      (!broadcastTypeFilter || b.type === broadcastTypeFilter) &&
-      dateMatches(b.created_at, broadcastDateFilter)
-  })
-
-  const userFilterActive = Boolean(userSearch || userRoleFilter || userStatusFilter)
-  const filteredUsers = users.filter((u) => {
-    const q = userSearch.trim().toLowerCase()
-    return (!q || [u.name, u.username, u.email].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!userRoleFilter || u.role === userRoleFilter) &&
-      (!userStatusFilter || (userStatusFilter === 'active' ? !u.is_suspended : Boolean(u.is_suspended)))
-  })
-
-  const reviewFilterActive = Boolean(reviewSearch || reviewRatingFilter || reviewModerationFilter)
-  const filteredCustomerReviews = customerReviews.filter((review) => {
-    const q = reviewSearch.trim().toLowerCase()
-    return (!q || [review.reviewer_display, review.review_text, review.order_id].some((v) => String(v || '').toLowerCase().includes(q))) &&
-      (!reviewRatingFilter || Number(review.rating) === Number(reviewRatingFilter)) &&
-      (!reviewModerationFilter || (reviewModerationFilter === 'approved' ? Boolean(review.is_approved) : !Boolean(review.is_approved)))
-  })
-
   async function load() {
     const {
       data: { user },
@@ -532,13 +183,11 @@ export default function Admin() {
       { data: wtx },
       { data: cr },
       { data: st },
-      { data: rt },
-      { data: rv },
     ] = await Promise.all([
       s
         .from('orders')
         .select(
-          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(id,name),profiles(id,username,name,email)'
+          'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(name),profiles(username,name)'
         )
         .order('created_at', { ascending: false })
         .limit(200),
@@ -556,7 +205,7 @@ export default function Admin() {
 
       s
         .from('game_products')
-        .select('*,games(id,name,category_id,popular)')
+        .select('*,games(name)')
         .order('created_at', { ascending: false }),
 
       s
@@ -578,10 +227,8 @@ s
 
       s
         .from('promotions')
-        .select(
-          'id,name,custom_text,description,code,banner_url,content_type,is_active,starts_at,ends_at'
-        )
-        .order('is_active', { ascending: false }),
+        .select('*')
+        .order('created_at', { ascending: false }),
 
       s
         .from('broadcasts')
@@ -633,18 +280,6 @@ s
         .select('*')
         .eq('key', 'site')
         .maybeSingle(),
-
-      s
-        .from('home_running_text')
-        .select('id,text_content,is_active,speed_ms')
-        .eq('id', true)
-        .maybeSingle(),
-
-      s
-        .from('customer_reviews')
-        .select('id,order_id,user_id,reviewer_display,rating,review_text,is_approved,created_at,updated_at')
-        .order('created_at', { ascending: false })
-        .limit(200),
     ])
 
     setOrders(o || [])
@@ -662,8 +297,6 @@ s
     setUsers(u || [])
     setWallets(w || [])
     setRooms(cr || [])
-    setHomeRunningText(rt || { text_content: '', is_active: false, speed_ms: 18000 })
-    setCustomerReviews(rv || [])
 
     if (st?.value) {
       setSite(st.value)
@@ -684,139 +317,9 @@ s
     }
   }
 
-  async function refreshLiveData() {
-    if (liveRefreshBusy.current) return
-    liveRefreshBusy.current = true
-
-    try {
-      // Silent background refresh: hanya data operasional yang cepat berubah.
-      // Tidak mengubah tab, tidak reload halaman, dan tidak menyentuh form yang
-      // sedang diedit oleh admin.
-      const [
-        { data: latestOrders },
-        { data: latestDeposits },
-        { data: latestWalletTx },
-      ] = await Promise.all([
-        s
-          .from('orders')
-          .select(
-            'id,order_code,status,total,subtotal,discount,voucher_code,created_at,games(id,name),profiles(id,username,name,email)'
-          )
-          .order('created_at', { ascending: false })
-          .limit(200),
-        s
-          .from('member_deposits')
-          .select(`
-            *,
-            profiles:profiles!member_deposits_user_id_fkey(username,email,name),
-            payment_methods:payment_methods!member_deposits_payment_method_id_fkey(name,kind)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(200),
-        s
-          .from('wallet_transactions')
-          .select('*,profiles(username,email)')
-          .order('created_at', { ascending: false })
-          .limit(200),
-      ])
-
-      if (latestOrders) setOrders(latestOrders)
-      if (latestDeposits) setDeposits(latestDeposits)
-      if (latestWalletTx) setWalletTx(latestWalletTx)
-    } finally {
-      liveRefreshBusy.current = false
-    }
-  }
-
   useEffect(() => {
-    const savedTab = sessionStorage.getItem('admin_active_tab')
-    if (savedTab && tabs.includes(savedTab)) {
-      setTab(savedTab)
-      sessionStorage.removeItem('admin_active_tab')
-    }
-
     load()
-
-    // Auto-sync setiap 8 detik tanpa reload halaman.
-    // Admin tetap berada di menu, posisi scroll, filter, dan form tidak terganggu.
-    const interval = window.setInterval(() => {
-      refreshLiveData()
-    }, 8000)
-
-    return () => window.clearInterval(interval)
   }, [])
-
-  useEffect(() => {
-    const promo = promos[0]
-    if (!promo) return
-
-    setMediaPromoCustomText(promo.custom_text || '')
-    setMediaPromoTitle(promo.name || '')
-    setMediaPromoDescription(promo.description || '')
-    setMediaPromoCode(promo.code || '')
-    setMediaPromoType(
-      promo.content_type ||
-        (promo.banner_url
-          ? promo.description || promo.code
-            ? 'both'
-            : 'image'
-          : 'text')
-    )
-    setPendingPromoImageUrl(promo.banner_url || '')
-  }, [promos])
-
-  async function saveHomeRunningText() {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat mengatur Running Text.')
-      return
-    }
-
-    const payload = {
-      id: true,
-      text_content: String(homeRunningText.text_content || '').trim(),
-      is_active: Boolean(homeRunningText.is_active),
-      speed_ms: Math.max(8000, Math.min(60000, Number(homeRunningText.speed_ms || 18000))),
-    }
-
-    const { error } = await s
-      .from('home_running_text')
-      .upsert(payload, { onConflict: 'id' })
-
-    setMsg(error?.message || 'Running Text berhasil disimpan.')
-    if (!error) load()
-  }
-
-  async function moderateCustomerReview(review: any, approved: boolean) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat memoderasi ulasan.')
-      return
-    }
-
-    const { error } = await s
-      .from('customer_reviews')
-      .update({ is_approved: approved, updated_at: new Date().toISOString() })
-      .eq('id', review.id)
-
-    setMsg(error?.message || (approved ? 'Ulasan ditampilkan di Home.' : 'Ulasan disembunyikan dari Home.'))
-    if (!error) load()
-  }
-
-  async function deleteCustomerReview(review: any) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat menghapus ulasan.')
-      return
-    }
-
-    if (!confirm(`Hapus ulasan dari ${review.reviewer_display || 'pelanggan'}?`)) return
-
-    const { error } = await s
-      .from('customer_reviews')
-      .delete()
-      .eq('id', review.id)
-
-    setMsg(error?.message || 'Ulasan berhasil dihapus.')
-    if (!error) load()
-  }
 
   async function transition(o: any, n: string) {
     if (!confirm(`Ubah ${o.order_code} menjadi ${n}?`)) return
@@ -964,218 +467,6 @@ s
         'Status diperbarui.'
     )
 
-    load()
-  }
-
-
-  async function togglePopular(game: any) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat mengatur Game Populer.')
-      return
-    }
-
-    const next = !Boolean(game.popular)
-    const currentPopularCount = games.filter((g) => Boolean(g.popular)).length
-    if (next && currentPopularCount >= 9) {
-      setMsg('Maksimal 9 game untuk Game Populer. Keluarkan salah satu game terlebih dahulu.')
-      return
-    }
-
-    const { error } = await s.from('games').update({ popular: next }).eq('id', game.id)
-    if (error) {
-      setMsg(`Gagal mengubah Game Populer: ${error.message}`)
-      return
-    }
-
-    setGames((current) => current.map((g) => g.id === game.id ? { ...g, popular: next } : g))
-    setMsg(next ? `${game.name} ditambahkan ke Game Populer.` : `${game.name} dikeluarkan dari Game Populer.`)
-  }
-
-  async function toggleHomeCategory(category: any) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat mengatur kategori Home.')
-      return
-    }
-
-    const next = category.show_on_home === false
-    const { error } = await s.from('game_categories').update({ show_on_home: next }).eq('id', category.id)
-    if (error) {
-      setMsg(`Gagal mengubah kategori Home: ${error.message}`)
-      return
-    }
-
-    setCategories((current) => current.map((c) => c.id === category.id ? { ...c, show_on_home: next } : c))
-    setMsg(next ? `${category.name} ditambahkan ke Home.` : `${category.name} dihapus dari Home.`)
-  }
-
-
-  async function deleteProduct(product: any) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat menghapus produk.')
-      return
-    }
-
-    const label = product.name || product.nominal || product.sku || 'produk ini'
-    if (!confirm(`Hapus ${label}?\n\nProduk yang sudah terhubung dengan riwayat transaksi mungkin tidak dapat dihapus.`)) return
-
-    const { error } = await s
-      .from('game_products')
-      .delete()
-      .eq('id', product.id)
-
-    if (error) {
-      setMsg(`Produk tidak dapat dihapus. ${error.message}`)
-      return
-    }
-
-    // Hapus langsung dari state agar daftar Products segera berubah
-    // tanpa menunggu reload halaman.
-    setProducts((current) => current.filter((item) => item.id !== product.id))
-    setMsg(`Produk ${label} berhasil dihapus.`)
-    await load()
-  }
-
-  function openEdit(type: 'category' | 'game' | 'product', row: any) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat mengedit katalog.')
-      return
-    }
-
-    setEditType(type)
-    setEditId(row.id)
-
-    if (type === 'category') {
-      setEditForm({
-        name: row.name || '',
-        slug: row.slug || '',
-        description: row.description || '',
-      })
-      return
-    }
-
-    if (type === 'game') {
-      setEditForm({
-        name: row.name || '',
-        slug: row.slug || '',
-        description: row.description || '',
-        category_id: row.category_id || '',
-        logo_url: row.logo_url || '',
-        banner_url: row.banner_url || '',
-      })
-      return
-    }
-
-    setEditForm({
-      game_id: row.game_id || '',
-      name: row.name || '',
-      nominal: row.nominal ?? '',
-      sku: row.sku || '',
-      price: row.price ?? '',
-      image_url: row.image_url || '',
-    })
-  }
-
-  function closeEdit() {
-    setEditType(null)
-    setEditId('')
-    setEditForm({})
-  }
-
-  async function saveEdit() {
-    if (!editType || !editId) return
-
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat mengedit katalog.')
-      closeEdit()
-      return
-    }
-
-    let table = ''
-    let payload: any = {}
-
-    if (editType === 'category') {
-      table = 'game_categories'
-      payload = {
-        name: String(editForm.name || '').trim(),
-        slug: String(editForm.slug || '')
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '-'),
-        description: String(editForm.description || '').trim() || null,
-      }
-
-      if (!payload.name || !payload.slug) {
-        setMsg('Nama dan slug kategori wajib diisi.')
-        return
-      }
-    }
-
-    if (editType === 'game') {
-      table = 'games'
-      payload = {
-        name: String(editForm.name || '').trim(),
-        slug: String(editForm.slug || '')
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '-'),
-        description: String(editForm.description || '').trim() || null,
-        category_id: editForm.category_id || null,
-        logo_url: String(editForm.logo_url || '').trim() || null,
-        banner_url: String(editForm.banner_url || '').trim() || null,
-      }
-
-      if (!payload.name || !payload.slug) {
-        setMsg('Nama dan slug game wajib diisi.')
-        return
-      }
-    }
-
-    if (editType === 'product') {
-      table = 'game_products'
-
-      const price = Number(editForm.price)
-      if (!Number.isFinite(price) || price < 0) {
-        setMsg('Harga produk tidak valid.')
-        return
-      }
-
-      payload = {
-        game_id: editForm.game_id,
-        name: String(editForm.name || '').trim(),
-        nominal: String(editForm.nominal || '').trim(),
-        sku: String(editForm.sku || '').trim(),
-        price,
-        image_url: String(editForm.image_url || '').trim() || null,
-      }
-
-      if (
-        !payload.game_id ||
-        !payload.name ||
-        !payload.nominal ||
-        !payload.sku
-      ) {
-        setMsg('Game, nama, nominal, dan SKU wajib diisi.')
-        return
-      }
-    }
-
-    const { error } = await s
-      .from(table)
-      .update(payload)
-      .eq('id', editId)
-
-    setMsg(
-      error?.message ||
-        `${
-          editType === 'category'
-            ? 'Kategori'
-            : editType === 'game'
-              ? 'Game'
-              : 'Produk'
-        } berhasil diperbarui.`
-    )
-
-    if (!error) closeEdit()
     load()
   }
 
@@ -1507,70 +798,6 @@ async function deleteVoucher(v: any) {
     load()
   }
 
-  async function editUsername(u: any) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat mengubah username.')
-      return
-    }
-
-    const current = String(u.username || '')
-    const next = prompt(
-      `Username baru untuk ${u.email || u.name || 'member'}:`,
-      current
-    )
-
-    if (next === null) return
-
-    const username = next.trim()
-
-    if (username.length < 3 || username.length > 30) {
-      setMsg('Username harus 3-30 karakter.')
-      return
-    }
-
-    if (!/^[A-Za-z0-9._-]+$/.test(username)) {
-      setMsg('Username hanya boleh berisi huruf, angka, titik, garis bawah, dan tanda hubung.')
-      return
-    }
-
-    if (username === current) {
-      setMsg('Username tidak berubah.')
-      return
-    }
-
-    const { error } = await (s as any).rpc(
-      'admin_update_username',
-      {
-        p_user_id: u.id,
-        p_username: username,
-      }
-    )
-
-    if (error) {
-      const message = error.message || ''
-
-      if (message.includes('USERNAME_ALREADY_EXISTS')) {
-        setMsg('Username tersebut sudah digunakan member lain.')
-      } else if (message.includes('USERNAME_INVALID_LENGTH')) {
-        setMsg('Username harus 3-30 karakter.')
-      } else if (message.includes('USERNAME_INVALID_FORMAT')) {
-        setMsg(
-          'Username hanya boleh berisi huruf, angka, titik, garis bawah, dan tanda hubung.'
-        )
-      } else if (message.includes('FORBIDDEN')) {
-        setMsg('Kamu tidak memiliki izin untuk mengubah username.')
-      } else if (message.includes('USER_NOT_FOUND')) {
-        setMsg('Member tidak ditemukan.')
-      } else {
-        setMsg(message || 'Gagal mengubah username.')
-      }
-      return
-    }
-
-    setMsg(`Username berhasil diubah menjadi @${username}.`)
-    load()
-  }
-
   async function changeRole(u: any) {
     if (role !== 'owner') return
 
@@ -1610,8 +837,7 @@ async function deleteVoucher(v: any) {
     file: File,
     category: string,
     callback?: (url: string) => void | Promise<void>,
-    expectedRatio?: '1:1' | '16:9',
-    allowMotion = false
+    expectedRatio?: '1:1' | '16:9'
   ) {
     if (
       !['owner', 'admin'].includes(
@@ -1624,40 +850,26 @@ async function deleteVoucher(v: any) {
       return
     }
 
-    const imageTypes = [
+    const allowed = [
       'image/jpeg',
       'image/png',
       'image/webp',
       'image/gif',
     ]
-    const motionTypes = [
-      'video/mp4',
-      'video/webm',
-      'video/quicktime',
-      'video/x-m4v',
-    ]
-    const allowed = allowMotion
-      ? [...imageTypes, ...motionTypes]
-      : imageTypes
 
     if (!allowed.includes(file.type)) {
       setMsg(
-        allowMotion
-          ? 'Format harus JPG, PNG, WEBP, GIF, MP4, WEBM, atau MOV.'
-          : 'Format harus JPG, PNG, WEBP, atau GIF.'
+        'Format harus JPG, PNG, WEBP, atau GIF.'
       )
       return
     }
 
-    const maxSize = file.type.startsWith('video/')
-      ? 20 * 1024 * 1024
-      : 6 * 1024 * 1024
-
-    if (file.size > maxSize) {
+    if (
+      file.size >
+      6 * 1024 * 1024
+    ) {
       setMsg(
-        file.type.startsWith('video/')
-          ? 'Ukuran maksimal video 20 MB per file.'
-          : 'Ukuran maksimal 6 MB per file.'
+        'Ukuran maksimal 6 MB per file.'
       )
       return
     }
@@ -1665,7 +877,7 @@ async function deleteVoucher(v: any) {
     /*
      * Validasi rasio:
      * - Logo Game / Produk: 1:1
-     * - Banner Promo: 16:9
+     * - Banner Promo / Homepage: 16:9
      * - Media Lainnya: bebas
      *
      * expectedRatio dipakai untuk kasus khusus
@@ -1696,21 +908,28 @@ async function deleteVoucher(v: any) {
             width: number
             height: number
           }>((resolve, reject) => {
-            if (file.type.startsWith('video/')) {
-              const video = document.createElement('video')
-              video.preload = 'metadata'
-              video.onloadedmetadata = () => {
-                resolve({ width: video.videoWidth, height: video.videoHeight })
-              }
-              video.onerror = () => reject(new Error('Video tidak dapat dibaca.'))
-              video.src = objectUrl
-              return
+            const img =
+              new Image()
+
+            img.onload = () => {
+              resolve({
+                width:
+                  img.naturalWidth,
+                height:
+                  img.naturalHeight,
+              })
             }
 
-            const img = new Image()
-            img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
-            img.onerror = () => reject(new Error('Gambar tidak dapat dibaca.'))
-            img.src = objectUrl
+            img.onerror = () => {
+              reject(
+                new Error(
+                  'Gambar tidak dapat dibaca.'
+                )
+              )
+            }
+
+            img.src =
+              objectUrl
           })
 
         const targetRatio =
@@ -1750,7 +969,7 @@ async function deleteVoucher(v: any) {
         }
       } catch {
         setMsg(
-          'Media tidak dapat dibaca. Silakan gunakan file yang valid.'
+          'Gambar tidak dapat dibaca. Silakan gunakan file gambar yang valid.'
         )
 
         URL.revokeObjectURL(
@@ -1865,20 +1084,14 @@ async function deleteVoucher(v: any) {
       `Media berhasil diunggah ke kategori ${category}.`
     )
 
-    // Banner Promo memakai state preview sementara. Jangan reload data
-    // setelah upload, karena load() akan menimpa URL banner yang baru
-    // diunggah sebelum tombol Simpan Perubahan Banner Promo ditekan.
-    if (category !== 'promotions') {
-      load()
-    }
+    load()
   }
 
   async function uploadFromInput(
     e: ChangeEvent<HTMLInputElement>,
     category: string,
     callback?: (url: string) => void,
-    expectedRatio?: '1:1' | '16:9',
-    allowMotion = false
+    expectedRatio?: '1:1' | '16:9'
   ) {
     const file =
       e.target.files?.[0]
@@ -1889,8 +1102,7 @@ async function deleteVoucher(v: any) {
       file,
       category,
       callback,
-      expectedRatio,
-      allowMotion
+      expectedRatio
     )
 
     e.target.value = ''
@@ -1924,143 +1136,111 @@ async function deleteVoucher(v: any) {
     }
   }
 
-  async function savePromoContent() {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat membuat atau mengubah Banner Promo.')
+  async function applyProductMedia(url: string) {
+    if (!mediaProductGameId) {
+      setMsg('Pilih game produk terlebih dahulu.')
       return
     }
 
-    try {
-      const existing = promos[0] || null
-      const imageUrl = pendingPromoImageUrl || existing?.banner_url || ''
-      const wantsText = mediaPromoType === 'text' || mediaPromoType === 'both'
-      const wantsImage = mediaPromoType === 'image' || mediaPromoType === 'both'
+    const targetProducts = products.filter(
+      (p) =>
+        p.game_id === mediaProductGameId &&
+        selectedProductIds.includes(p.id)
+    )
 
-      if (wantsText && !mediaPromoTitle.trim()) {
-        setMsg('Isi judul promo untuk konten teks.')
-        return
-      }
+    if (!targetProducts.length) {
+      setMsg('Pilih minimal satu nominal produk.')
+      return
+    }
 
-      if (wantsImage && !imageUrl) {
-        setMsg('Pilih file gambar Banner Promo terlebih dahulu.')
-        return
-      }
-
-      const payload: any = {
-        is_active: existing ? Boolean(existing.is_active) : true,
-        content_type: mediaPromoType,
-        custom_text: mediaPromoCustomText.trim() || null,
-        name: wantsText
-          ? mediaPromoTitle.trim()
-          : (existing?.name || 'Banner Promo'),
-        description: wantsText
-          ? (mediaPromoDescription.trim() || null)
-          : null,
-        code: wantsText
-          ? (mediaPromoCode.trim() || null)
-          : null,
-        banner_url: wantsImage ? imageUrl : null,
-      }
-
-      let savedId = existing?.id || ''
-
-      if (existing) {
-        const { error } = await s
-          .from('promotions')
-          .update(payload)
-          .eq('id', existing.id)
-
-        if (error) {
-          setMsg(`Gagal menyimpan Banner Promo: ${error.message}`)
-          return
-        }
-      } else {
-        const { data, error } = await s
-          .from('promotions')
-          .insert(payload)
-          .select('id')
-          .single()
-
-        if (error) {
-          setMsg(`Gagal membuat Banner Promo: ${error.message}`)
-          return
-        }
-
-        savedId = data?.id || ''
-      }
-
-      // Hanya satu Banner Promo yang boleh aktif.
-      if (payload.is_active && savedId) {
-        const { error: deactivateError } = await s
-          .from('promotions')
-          .update({ is_active: false })
-          .eq('is_active', true)
-          .neq('id', savedId)
-
-        if (deactivateError) {
-          setMsg(`Banner tersimpan, tetapi promo lama gagal dinonaktifkan: ${deactivateError.message}`)
-          await load()
-          return
-        }
-      }
-
-      setPendingPromoImageUrl(payload.banner_url || '')
-      setMsg(
-        existing
-          ? 'Banner Promo berhasil diperbarui dan tersimpan.'
-          : 'Banner Promo berhasil dibuat dan langsung aktif di Home.'
+    const results = await Promise.all(
+      targetProducts.map((product) =>
+        s
+          .from('game_products')
+          .update({ image_url: url })
+          .eq('id', product.id)
       )
-      await load()
-    } catch (error: any) {
-      setMsg(`Gagal menyimpan Banner Promo: ${error?.message || 'Terjadi kesalahan yang tidak diketahui.'}`)
+    )
+
+    const error = results.find((x) => x.error)?.error
+
+    setMsg(
+      error?.message ||
+        `Satu gambar berhasil diterapkan ke ${targetProducts.length} nominal produk.`
+    )
+
+    if (!error) {
+      setSelectedProductIds([])
+      load()
     }
   }
 
-  async function preparePromoImage(url: string) {
-    setPendingPromoImageUrl(url)
-    setMsg('Gambar Banner Promo berhasil diunggah. Klik Simpan Perubahan Banner Promo untuk menerapkannya.')
-  }
-
-  async function toggleMainPromo() {
-    const promo = promos[0]
-    if (!promo) {
-      setMsg('Belum ada Banner Promo untuk diaktifkan/nonaktifkan.')
+  async function setPromoBannerFromMedia(url: string) {
+    if (!mediaPromoId) {
+      setMsg('Pilih promo terlebih dahulu.')
       return
     }
 
-    if (!promo.is_active) {
-      const { error: deactivateError } = await s
-        .from('promotions')
-        .update({ is_active: false })
-        .eq('is_active', true)
-        .neq('id', promo.id)
-
-      if (deactivateError) {
-        setMsg(deactivateError.message)
-        return
-      }
+    const promo = promos.find((x) => x.id === mediaPromoId)
+    if (!promo) {
+      setMsg('Promo tidak ditemukan.')
+      return
     }
 
     const { error } = await s
       .from('promotions')
-      .update({ is_active: !promo.is_active })
-      .eq('id', promo.id)
+      .update({ banner_url: url })
+      .eq('id', mediaPromoId)
 
     setMsg(
       error?.message ||
-        (promo.is_active
-          ? 'Banner Promo dinonaktifkan.'
-          : 'Banner Promo diaktifkan.')
+        `Banner promo ${promo.name} berhasil disinkronkan.`
     )
-    if (!error) load()
+
+    if (!error) {
+      setMediaPromoId('')
+      load()
+    }
+  }
+
+  async function setHomepageBannerFromMedia(url: string) {
+    const nextHomepage = {
+      ...(site.homepage_banners || {}),
+      [homepageSlot]: url,
+    }
+
+    const nextSite = {
+      ...site,
+      homepage_banners: nextHomepage,
+    }
+
+    const { error } = await s
+      .from('settings')
+      .upsert({
+        key: 'site',
+        value: nextSite,
+        updated_at: new Date().toISOString(),
+      })
+
+    setMsg(
+      error?.message ||
+        `Banner Homepage untuk ${
+          homepageSlots.find((x) => x[0] === homepageSlot)?.[1] ||
+          homepageSlot
+        } berhasil disimpan.`
+    )
+
+    if (!error) {
+      setSite(nextSite)
+      load()
+    }
   }
 
   async function uploadAndSync(
     e: ChangeEvent<HTMLInputElement>,
     category: string,
     sync: (url: string) => Promise<void>,
-    expectedRatio?: '1:1' | '16:9',
-    allowMotion = false
+    expectedRatio?: '1:1' | '16:9'
   ) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -2071,8 +1251,7 @@ async function deleteVoucher(v: any) {
       async (url) => {
         await sync(url)
       },
-      expectedRatio,
-      allowMotion
+      expectedRatio
     )
 
     e.target.value = ''
@@ -2127,25 +1306,6 @@ async function deleteVoucher(v: any) {
     setMsg(
       'URL media disalin.'
     )
-  }
-
-  async function deleteBroadcast(b: any) {
-    if (!['owner', 'admin'].includes(role)) {
-      setMsg('Hanya Owner/Admin yang dapat menghapus broadcast.')
-      return
-    }
-
-    if (!confirm(`Hapus broadcast "${b.title || 'tanpa judul'}"?`)) {
-      return
-    }
-
-    const { error } = await s
-      .from('broadcasts')
-      .delete()
-      .eq('id', b.id)
-
-    setMsg(error?.message || 'Broadcast berhasil dihapus.')
-    if (!error) load()
   }
 
   async function addBroadcast(
@@ -2361,7 +1521,6 @@ async function deleteVoucher(v: any) {
         categoryForm.description.trim() ||
         null,
       is_active: true,
-      show_on_home: true,
     }
 
     const { error } =
@@ -2445,291 +1604,237 @@ async function deleteVoucher(v: any) {
             mediaCategory)
     )
 
-  const successfulOrders = orders.filter((o) => o.status === 'SUCCESS')
-  const pendingOrders = orders.filter((o) => o.status === 'PENDING_PAYMENT')
-  const processingOrders = orders.filter((o) => o.status === 'PROCESSING')
-  const cancelledOrders = orders.filter((o) => ['CANCELLED', 'EXPIRED', 'FAILED'].includes(o.status))
-  const totalIncome = successfulOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
-  const totalCustomers = users.filter((u) => u.role === 'customer').length
-  const activeProducts = products.filter((p) => p.is_active !== false).length
-  const statusTotal = Math.max(orders.length, 1)
-  const statusSegments = [
-    { label: 'Selesai', value: successfulOrders.length, icon: CheckCircle2, cls: 'text-emerald-300', bg: 'bg-emerald-400' },
-    { label: 'Proses', value: processingOrders.length, icon: Clock3, cls: 'text-amber-300', bg: 'bg-amber-400' },
-    { label: 'Menunggu', value: pendingOrders.length, icon: Clock3, cls: 'text-cyan-300', bg: 'bg-cyan-400' },
-    { label: 'Gagal / Batal', value: cancelledOrders.length, icon: XCircle, cls: 'text-rose-300', bg: 'bg-rose-400' },
-  ]
-  const donutStops = (() => {
-    let current = 0
-    return statusSegments.map((segment) => {
-      const start = current
-      current += (segment.value / statusTotal) * 360
-      return `${segment.bg === 'bg-emerald-400' ? '#34d399' : segment.bg === 'bg-amber-400' ? '#fbbf24' : segment.bg === 'bg-cyan-400' ? '#22d3ee' : '#fb7185'} ${start}deg ${current}deg`
-    })
-  })()
-
-  const menuButton = (item: readonly [string, string], mobile = false) => {
-    const Icon = adminIcons[item[0]] || Activity
-    return (
-      <button
-        type="button"
-        key={item[0]}
-        onClick={() => changeTab(item[0])}
-        className={`group flex items-center transition ${
-          mobile
-            ? `min-w-max touch-manipulation rounded-xl border px-3 py-2 text-[11px] font-semibold ${tab === item[0] ? 'border-rose-400/30 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`
-            : `w-full gap-3 rounded-xl px-3 py-2.5 text-left text-sm ${tab === item[0] ? 'border border-rose-400/20 bg-rose-400/10 text-rose-200' : 'border border-transparent text-slate-400 hover:bg-white/[.04] hover:text-white'}`
-        }`}
-      >
-        <Icon className={mobile ? 'h-4 w-4 shrink-0' : 'h-[17px] w-[17px] shrink-0'} strokeWidth={1.8} />
-        <span>{item[1]}</span>
-        {!mobile && tab === item[0] && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,.9)]" />}
-      </button>
-    )
-  }
-
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,23,68,.07),transparent_30%),radial-gradient(circle_at_top_right,rgba(168,85,247,.06),transparent_25%)]">
-      <div className="mx-auto flex max-w-[1500px] gap-4 px-3 py-3 md:px-5 lg:py-5">
-        <aside className="hidden w-[224px] shrink-0 lg:block">
-          <div className="sticky top-4 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/90 shadow-xl backdrop-blur-xl">
-            <div className="border-b border-white/10 px-4 py-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-400/10">
-                  <Gamepad2 className="h-5 w-5 text-rose-300" />
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,.08),transparent_32%),radial-gradient(circle_at_top_right,rgba(168,85,247,.08),transparent_28%)]">
+      <div className="mx-auto flex max-w-[1500px] gap-5 px-3 py-4 md:px-5 lg:py-6">
+        <aside className="hidden w-64 shrink-0 lg:block">
+          <div className="sticky top-5 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl">
+            <div className="border-b border-white/10 p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-xl shadow-[0_0_25px_rgba(34,211,238,.12)]">
+                  ⚡
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[.22em] text-slate-500">Admin Panel</p>
-                  <h2 className="truncate text-sm font-black text-white">NDRAAAID<span className="text-rose-400">.v1</span></h2>
+                  <p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">
+                    Admin
+                  </p>
+                  <h2 className="truncate text-lg font-black text-white">
+                    NDRAAAID.v1
+                  </h2>
                 </div>
               </div>
-              <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-400/10 bg-emerald-400/[.04] px-2.5 py-1.5">
-                <span className="text-[10px] text-slate-500">Status</span>
-                <span className="text-[10px] font-bold text-emerald-300">● ONLINE</span>
+              <div className="mt-4 flex items-center justify-between rounded-2xl border border-emerald-400/10 bg-emerald-400/5 px-3 py-2">
+                <span className="text-[11px] text-slate-500">Mode</span>
+                <span className="text-[11px] font-bold text-emerald-300">● ONLINE</span>
               </div>
             </div>
-            <nav className="max-h-[calc(100vh-170px)] space-y-4 overflow-y-auto p-2.5">
-              {adminMenuGroups.map((group) => (
+
+            <nav className="max-h-[calc(100vh-190px)] space-y-5 overflow-y-auto p-3">
+              {[
+                {
+                  title: 'OPERASIONAL',
+                  items: [
+                    ['orders', '🧾', 'Order'],
+                    ['deposits', '💳', 'Deposit'],
+                    ['deposit-history', '📥', 'Riwayat Deposit'],
+                    ['wallet-history', '💰', 'Riwayat Wallet'],
+                  ],
+                },
+                {
+                  title: 'KATALOG',
+                  items: [
+                    ['categories', '🗂️', 'Kategori'],
+                    ['games', '🎮', 'Games'],
+                    ['products', '💎', 'Produk'],
+                    ['promotions', '📢', 'Promo'],
+                  ],
+                },
+                {
+                  title: 'SISTEM',
+                  items: [
+                    ['payments', '🏦', 'Pembayaran'],
+                    ['vouchers', '🎟️', 'Voucher'],
+                    ['broadcasts', '📡', 'Live Broadcast'],
+                    ['media', '🖼️', 'Media Manager'],
+                  ],
+                },
+                {
+                  title: 'MANAGEMENT',
+                  items: [
+                    ['users', '👥', 'Member & Wallet'],
+                    ['chat', '💬', 'Live Chat'],
+                    ['settings', '⚙️', 'Pengaturan'],
+                  ],
+                },
+              ].map((group) => (
                 <div key={group.title}>
-                  <p className="px-2 pb-1.5 text-[8px] font-black tracking-[.22em] text-slate-600">{group.title}</p>
-                  <div className="space-y-0.5">
+                  <p className="px-3 pb-2 text-[9px] font-black tracking-[.25em] text-slate-600">
+                    {group.title}
+                  </p>
+                  <div className="space-y-1">
                     {group.items
-                      .filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role)))
-                      .map((item) => menuButton(item))}
+                      .filter(
+                        (item) =>
+                          item[0] !== 'broadcasts' ||
+                          ['owner', 'admin'].includes(role)
+                      )
+                      .map((item) => (
+                        <button
+                          key={item[0]}
+                          onClick={() => setTab(item[0])}
+                          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                            tab === item[0]
+                              ? 'border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.08)]'
+                              : 'border border-transparent text-slate-400 hover:bg-white/[.04] hover:text-white'
+                          }`}
+                        >
+                          <span className="w-5 text-center">{item[1]}</span>
+                          <span className="font-semibold">{item[2]}</span>
+                          {tab === item[0] && (
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.9)]" />
+                          )}
+                        </button>
+                      ))}
                   </div>
                 </div>
               ))}
             </nav>
-            <div className="border-t border-white/10 px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5"><Users className="h-4 w-4 text-slate-400" /></div>
-                <div className="min-w-0"><p className="text-[10px] font-bold text-white">Admin</p><p className="text-[9px] text-slate-500">{role || 'Admin'}</p></div>
-              </div>
-            </div>
           </div>
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80 shadow-xl backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
-              <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[.2em] text-rose-400">CONTROL CENTER</p>
-                <h1 className="truncate text-lg font-black text-white md:text-xl">Admin <span className="text-rose-400">NDRAAAID.v1</span></h1>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <div className="hidden items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.025] px-2.5 py-1.5 sm:flex"><Bell className="h-3.5 w-3.5 text-slate-500" /><span className="text-[10px] text-slate-500">Panel</span></div>
-                <div className="rounded-lg border border-emerald-400/10 bg-emerald-400/[.04] px-2.5 py-1.5"><span className="text-[10px] font-bold text-emerald-300">ONLINE</span></div>
+          <header className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 shadow-2xl shadow-purple-950/10 backdrop-blur-xl">
+            <div className="relative p-5 md:p-6">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
+              <div className="absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl" />
+              <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[9px] font-black tracking-[.22em] text-cyan-300">
+                      CONTROL CENTER
+                    </span>
+                    <span className="text-[10px] text-slate-600">v1</span>
+                  </div>
+                  <h1 className="mt-2 text-2xl font-black tracking-tight text-white md:text-3xl">
+                    NDRAAAID<span className="text-cyan-300">.v1</span>
+                  </h1>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Kelola toko, transaksi, katalog, media, dan member dalam satu panel.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-2xl border border-white/10 bg-white/[.03] px-4 py-2.5">
+                    <p className="text-[9px] uppercase tracking-widest text-slate-600">Role</p>
+                    <p className="text-sm font-bold text-white">{role || 'ADMIN'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 px-4 py-2.5">
+                    <p className="text-[9px] uppercase tracking-widest text-slate-600">Status</p>
+                    <p className="text-sm font-bold text-emerald-300">ONLINE</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="border-t border-white/10 p-2.5 lg:hidden">
-              <div
-                className="flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 touch-pan-x [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
-              >
-                {adminMenuGroups.flatMap((group) => group.items).filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))).map((item) => menuButton(item, true))}
+
+            <div className="border-t border-white/10 p-3 lg:hidden">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {[
+                  ['orders', '🧾 Order'],
+                  ['deposits', '💳 Deposit'],
+                  ['deposit-history', '📥 Riwayat'],
+                  ['wallet-history', '💰 Wallet'],
+                  ['categories', '🗂️ Kategori'],
+                  ['games', '🎮 Games'],
+                  ['products', '💎 Produk'],
+                  ['payments', '🏦 Bayar'],
+                  ['vouchers', '🎟️ Voucher'],
+                  ['promotions', '📢 Promo'],
+                  ['broadcasts', '📡 Broadcast'],
+                  ['media', '🖼️ Media'],
+                  ['users', '👥 Member'],
+                  ['chat', '💬 Chat'],
+                  ['settings', '⚙️ Setting'],
+                ]
+                  .filter(
+                    (item) =>
+                      item[0] !== 'broadcasts' ||
+                      ['owner', 'admin'].includes(role)
+                  )
+                  .map((item) => (
+                    <button
+                      key={item[0]}
+                      onClick={() => setTab(item[0])}
+                      className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                        tab === item[0]
+                          ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
+                          : 'border-white/10 bg-white/[.03] text-slate-400'
+                      }`}
+                    >
+                      {item[1]}
+                    </button>
+                  ))}
               </div>
             </div>
           </header>
 
       {msg && (
-        <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-lg border border-cyan-400/15 bg-cyan-400/[.06] px-2.5 py-1.5 text-[10px] font-semibold text-cyan-200">
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
-          <span className="truncate">{msg}</span>
+        <div className="mt-5 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-3 text-sm text-cyan-200">
+          {msg}
         </div>
       )}
+
+      <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          ['Total Order', orders.length],
+          [
+            'Pending',
+            orders.filter(
+              (x) =>
+                x.status ===
+                'PENDING_PAYMENT'
+            ).length,
+          ],
+          [
+            'Processing',
+            orders.filter(
+              (x) =>
+                x.status ===
+                'PROCESSING'
+            ).length,
+          ],
+          [
+            'Success',
+            orders.filter(
+              (x) =>
+                x.status ===
+                'SUCCESS'
+            ).length,
+          ],
+        ].map(([k, v]) => (
+          <div
+            key={String(k)}
+            className="glass rounded-2xl p-4"
+          >
+            <p className="text-xs text-slate-500">
+              {k}
+            </p>
+
+            <b className="mt-1 block text-2xl">
+              {v}
+            </b>
+          </div>
+        ))}
+      </div>
 
       {/* =====================================================
           ORDER / RIWAYAT
       ===================================================== */}
 
-      {tab === 'dashboard' && (
-        <section className="mt-5 space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/65 px-4 py-4 md:px-5">
-            <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[.2em] text-rose-400">OVERVIEW</p>
-                <h2 className="mt-1 text-xl font-black text-white md:text-2xl">Selamat datang, Admin</h2>
-                <p className="mt-1 text-xs text-slate-500">Ringkasan toko dibuat compact agar informasi penting tetap cepat terlihat.</p>
-              </div>
-              <div className="text-[10px] text-slate-600">Data dari panel saat ini</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-            {[
-              { label: 'Total Produk', value: products.length, icon: Package, note: `${activeProducts} aktif` },
-              { label: 'Income Masuk', value: `Rp ${totalIncome.toLocaleString('id-ID')}`, icon: CircleDollarSign, note: `${successfulOrders.length} order sukses` },
-              { label: 'Total Pelanggan', value: totalCustomers, icon: Users, note: 'akun customer' },
-              { label: 'Total Order', value: orders.length, icon: ShoppingCart, note: `${pendingOrders.length} menunggu` },
-            ].map((stat) => {
-              const Icon = stat.icon
-              return (
-                <div key={stat.label} className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 shadow-lg">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-semibold text-slate-500">{stat.label}</p>
-                    <Icon className="h-4 w-4 text-rose-300/80" strokeWidth={1.8} />
-                  </div>
-                  <p className="mt-1.5 truncate text-base font-black text-white md:text-lg">{stat.value}</p>
-                  <p className="mt-0.5 text-[9px] text-slate-600">{stat.note}</p>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,.8fr)]">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">TRANSAKSI</p><h3 className="mt-0.5 text-sm font-black text-white">Order Terbaru</h3></div>
-                <button type="button" onClick={() => changeTab('orders')} className="text-[10px] font-bold text-rose-300">Lihat semua →</button>
-              </div>
-              <div className="space-y-1.5">
-                {orders.slice(0, 5).map((o) => (
-                  <div key={o.id} className="flex items-center gap-2 rounded-xl border border-white/[.06] bg-white/[.02] px-2.5 py-2">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-400/10"><ShoppingCart className="h-3.5 w-3.5 text-rose-300" /></div>
-                    <div className="min-w-0 flex-1"><p className="truncate text-[10px] font-bold text-white">{o.order_code}</p><p className="truncate text-[9px] text-slate-600">{o.profiles?.username || o.profiles?.name || '-'} · {o.games?.name || '-'}</p></div>
-                    <div className="text-right"><p className="text-[10px] font-bold text-white">Rp {Number(o.total || 0).toLocaleString('id-ID')}</p><span className="text-[8px] text-slate-500">{o.status}</span></div>
-                  </div>
-                ))}
-                {!orders.length && <p className="py-8 text-center text-xs text-slate-600">Belum ada order.</p>}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
-              <div className="mb-3"><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">ANALISIS</p><h3 className="mt-0.5 text-sm font-black text-white">Status Order</h3></div>
-              <div className="flex items-center gap-4">
-                <div className="relative h-28 w-28 shrink-0 rounded-full p-[9px]" style={{ background: `conic-gradient(${donutStops.join(', ')})` }}>
-                  <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-slate-950"><span className="text-xl font-black text-white">{orders.length}</span><span className="text-[8px] text-slate-600">TOTAL ORDER</span></div>
-                </div>
-                <div className="min-w-0 flex-1 space-y-2">
-                  {statusSegments.map((segment) => { const Icon = segment.icon; return <div key={segment.label} className="flex items-center justify-between gap-2 text-[9px]"><span className="flex min-w-0 items-center gap-1.5 text-slate-400"><Icon className={`h-3.5 w-3.5 ${segment.cls}`} />{segment.label}</span><b className="text-white">{segment.value}</b></div> })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
-              <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">KATALOG</p><h3 className="mt-0.5 text-sm font-black text-white">Game Populer</h3></div><button type="button" onClick={() => changeTab('games')} className="text-[10px] font-bold text-rose-300">Kelola →</button></div>
-              <div className="grid grid-cols-3 gap-2">
-                {games.filter((g) => g.popular).slice(0, 6).map((g) => <div key={g.id} className="overflow-hidden rounded-xl border border-white/[.07] bg-white/[.02]"><div className="aspect-[1.5] bg-slate-900">{g.logo_url ? <img src={g.logo_url} alt={g.name} className="h-full w-full object-cover" /> : null}</div><p className="truncate px-2 py-1.5 text-[9px] font-bold text-white">{g.name}</p></div>)}
-                {!games.some((g) => g.popular) && <p className="col-span-3 py-6 text-center text-[10px] text-slate-600">Belum ada game Popular.</p>}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-950/65 p-3.5 md:p-4">
-              <div className="mb-3"><p className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">AKTIVITAS</p><h3 className="mt-0.5 text-sm font-black text-white">Ringkasan Cepat</h3></div>
-              <div className="grid grid-cols-2 gap-2">
-                {([['Produk aktif', activeProducts, Package], ['Game aktif', games.filter((g) => g.is_active !== false).length, Gamepad2], ['Deposit masuk', deposits.length, WalletCards], ['Wallet transaksi', walletTx.length, Wallet]] as readonly [string, number, LucideIcon][]).map(([label, value, Icon]) => <div key={label} className="rounded-xl border border-white/[.06] bg-white/[.02] p-2.5"><Icon className="h-4 w-4 text-rose-300" /><p className="mt-2 text-sm font-black text-white">{value}</p><p className="text-[9px] text-slate-600">{label}</p></div>)}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
       {tab === 'orders' && (
-        <div className="mt-5 space-y-3">
-          <section className="glass rounded-xl p-3.5 md:p-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[.18em] text-rose-400">OPERASIONAL</p>
-                <h2 className="mt-0.5 text-lg font-black text-white">Order</h2>
-                <p className="mt-0.5 text-[10px] text-slate-500">Tanpa filter hanya 3 order terbaru yang ditampilkan.</p>
-              </div>
-              <p className="text-[10px] text-slate-600">{(() => {
-                const q = orderSearch.trim().toLowerCase()
-                const filtered = orders.filter((o) => {
-                  const member = o.profiles?.username || o.profiles?.name || o.profiles?.email || ''
-                  const game = o.games?.name || ''
-                  const matchesSearch = !q || [o.order_code, member, game, o.status].some((v) => String(v || '').toLowerCase().includes(q))
-                  const matchesStatus = !orderStatusFilter || o.status === orderStatusFilter
-                  const matchesMember = !orderMemberFilter || o.profiles?.id === orderMemberFilter
-                  const matchesGame = !orderGameFilter || o.games?.id === orderGameFilter
-                  const matchesDate = !orderDateFilter || String(o.created_at || '').slice(0, 10) === orderDateFilter
-                  return matchesSearch && matchesStatus && matchesMember && matchesGame && matchesDate
-                })
-                return (orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) ? `${filtered.length} hasil` : `${orders.length} total`
-              })()}</p>
-            </div>
-
-            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-              <label className="relative block">
-                <span className="sr-only">Cari order</span>
-                <input
-                  value={orderSearch}
-                  onChange={(e) => setOrderSearch(e.target.value)}
-                  placeholder="Cari ID order, member, atau game..."
-                  className="input w-full text-xs"
-                />
-              </label>
-              <select value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)} className="input text-xs">
-                <option value="">Semua Status</option>
-                <option value="PENDING_PAYMENT">Menunggu Pembayaran</option>
-                <option value="PAYMENT_RECEIVED">Pembayaran Diterima</option>
-                <option value="PROCESSING">Diproses</option>
-                <option value="SUCCESS">Selesai</option>
-                <option value="FAILED">Gagal</option>
-                <option value="CANCELLED">Dibatalkan</option>
-                <option value="EXPIRED">Kadaluarsa</option>
-              </select>
-              <select value={orderMemberFilter} onChange={(e) => setOrderMemberFilter(e.target.value)} className="input text-xs">
-                <option value="">Semua Member</option>
-                {users.map((u) => <option key={u.id} value={u.id}>{u.username || u.name || u.email}</option>)}
-              </select>
-              <select value={orderGameFilter} onChange={(e) => setOrderGameFilter(e.target.value)} className="input text-xs">
-                <option value="">Semua Game</option>
-                {games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-              <input
-                type="date"
-                value={orderDateFilter}
-                onChange={(e) => setOrderDateFilter(e.target.value)}
-                className="input text-xs"
-                aria-label="Filter tanggal order"
-              />
-              <button
-                type="button"
-                onClick={() => { setOrderSearch(''); setOrderStatusFilter(''); setOrderMemberFilter(''); setOrderGameFilter(''); setOrderDateFilter('') }}
-                disabled={!orderSearch && !orderStatusFilter && !orderMemberFilter && !orderGameFilter && !orderDateFilter}
-                className="btn btn-muted text-xs disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Reset
-              </button>
-            </div>
-          </section>
-
-          {orders
-            .filter((o) => {
-              const q = orderSearch.trim().toLowerCase()
-              const member = o.profiles?.username || o.profiles?.name || o.profiles?.email || ''
-              const game = o.games?.name || ''
-              const matchesSearch = !q || [o.order_code, member, game, o.status].some((v) => String(v || '').toLowerCase().includes(q))
-              const matchesStatus = !orderStatusFilter || o.status === orderStatusFilter
-              const matchesDate = !orderDateFilter || String(o.created_at || '').slice(0, 10) === orderDateFilter
-              return matchesSearch && matchesStatus && matchesDate
-            })
-            .slice((orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) ? undefined : 0, (orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) ? undefined : 3)
-            .map((o) => (
+        <div className="mt-7 space-y-3">
+          {orders.map((o) => (
             <div
               key={o.id}
-              className="glass rounded-xl p-3.5 md:p-4"
+              className="glass rounded-2xl p-5"
             >
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
@@ -2850,20 +1955,6 @@ async function deleteVoucher(v: any) {
               Belum ada order.
             </p>
           )}
-
-          {orders.length > 0 &&
-            (orderSearch || orderStatusFilter || orderMemberFilter || orderGameFilter || orderDateFilter) &&
-            !orders.some((o) => {
-              const q = orderSearch.trim().toLowerCase()
-              const member = o.profiles?.username || o.profiles?.name || o.profiles?.email || ''
-              const game = o.games?.name || ''
-              const matchesSearch = !q || [o.order_code, member, game, o.status].some((v) => String(v || '').toLowerCase().includes(q))
-              const matchesStatus = !orderStatusFilter || o.status === orderStatusFilter
-              const matchesDate = !orderDateFilter || String(o.created_at || '').slice(0, 10) === orderDateFilter
-              return matchesSearch && matchesStatus && matchesDate
-            }) && (
-              <p className="py-8 text-center text-xs text-slate-500">Tidak ada order yang sesuai dengan filter.</p>
-            )}
         </div>
       )}
 
@@ -2873,24 +1964,28 @@ async function deleteVoucher(v: any) {
 
       {tab === 'deposits' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-xl p-3.5 md:p-4">
+          <div className="glass rounded-2xl p-5">
             <h2 className="text-xl font-black">
               Deposit Member — Perlu Diproses
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">Setujui atau tolak bukti deposit. Persetujuan menambah saldo secara atomik dan hanya dapat dilakukan sekali.</p>
-            <AdminFilterShell active={depositFilterActive} onReset={() => { setDepositSearch(''); setDepositStatusFilter(''); setDepositMethodFilter(''); setDepositDateFilter('') }}>
-              <input className="input text-xs" placeholder="Cari ID deposit/member..." value={depositSearch} onChange={(e) => setDepositSearch(e.target.value)} />
-              <select className="input text-xs" value={depositStatusFilter} onChange={(e) => setDepositStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="PENDING">PENDING</option></select>
-              <select className="input text-xs" value={depositMethodFilter} onChange={(e) => setDepositMethodFilter(e.target.value)}><option value="">Semua Metode</option>{methods.map((m) => <option key={m.id} value={m.kind || m.name}>{m.name}</option>)}</select>
-              <input type="date" className="input text-xs" value={depositDateFilter} onChange={(e) => setDepositDateFilter(e.target.value)} />
-            </AdminFilterShell>
+            <p className="mt-1 text-sm text-slate-400">
+              Setujui atau tolak bukti deposit.
+              Persetujuan menambah saldo secara atomik
+              dan hanya dapat dilakukan sekali.
+            </p>
           </div>
 
-          {limitAdminItems(filteredPendingDeposits, depositFilterActive).map((d) => (
+          {deposits
+            .filter(
+              (d) =>
+                d.status ===
+                'PENDING'
+            )
+            .map((d) => (
               <div
                 key={d.id}
-                className="glass rounded-xl p-3.5 md:p-4"
+                className="glass rounded-2xl p-5"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -2994,24 +2089,21 @@ async function deleteVoucher(v: any) {
 
       {tab === 'deposit-history' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-xl p-3.5 md:p-4">
+          <div className="glass rounded-2xl p-5">
             <h2 className="text-xl font-black">
               Riwayat Deposit
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">Seluruh pengajuan deposit member, termasuk APPROVED dan REJECTED.</p>
-            <AdminFilterShell active={depositHistoryFilterActive} onReset={() => { setDepositHistorySearch(''); setDepositHistoryStatusFilter(''); setDepositHistoryMethodFilter(''); setDepositHistoryDateFilter('') }}>
-              <input className="input text-xs" placeholder="Cari ID deposit/member..." value={depositHistorySearch} onChange={(e) => setDepositHistorySearch(e.target.value)} />
-              <select className="input text-xs" value={depositHistoryStatusFilter} onChange={(e) => setDepositHistoryStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select>
-              <select className="input text-xs" value={depositHistoryMethodFilter} onChange={(e) => setDepositHistoryMethodFilter(e.target.value)}><option value="">Semua Metode</option>{methods.map((m) => <option key={m.id} value={m.kind || m.name}>{m.name}</option>)}</select>
-              <input type="date" className="input text-xs" value={depositHistoryDateFilter} onChange={(e) => setDepositHistoryDateFilter(e.target.value)} />
-            </AdminFilterShell>
+            <p className="mt-1 text-sm text-slate-400">
+              Seluruh pengajuan deposit member,
+              termasuk APPROVED dan REJECTED.
+            </p>
           </div>
 
-          {limitAdminItems(filteredDepositHistory, depositHistoryFilterActive).map((d) => (
+          {deposits.map((d) => (
             <div
               key={d.id}
-              className="glass rounded-xl p-3 md:p-3.5"
+              className="glass rounded-2xl p-4"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -3084,23 +2176,21 @@ async function deleteVoucher(v: any) {
 
       {tab === 'wallet-history' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-xl p-3.5 md:p-4">
+          <div className="glass rounded-2xl p-5">
             <h2 className="text-xl font-black">
               Riwayat Wallet
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">Semua perubahan saldo member yang tercatat di ledger.</p>
-            <AdminFilterShell active={walletFilterActive} onReset={() => { setWalletSearch(''); setWalletTypeFilter(''); setWalletDateFilter('') }}>
-              <input className="input text-xs" placeholder="Cari member/reason..." value={walletSearch} onChange={(e) => setWalletSearch(e.target.value)} />
-              <select className="input text-xs" value={walletTypeFilter} onChange={(e) => setWalletTypeFilter(e.target.value)}><option value="">Semua Tipe</option>{Array.from(new Set(walletTx.map((x) => x.type).filter(Boolean))).map((x) => <option key={x} value={x}>{x}</option>)}</select>
-              <input type="date" className="input text-xs" value={walletDateFilter} onChange={(e) => setWalletDateFilter(e.target.value)} />
-            </AdminFilterShell>
+            <p className="mt-1 text-sm text-slate-400">
+              Semua perubahan saldo member yang
+              tercatat di ledger.
+            </p>
           </div>
 
-          {limitAdminItems(filteredWalletTx, walletFilterActive).map((tx) => (
+          {walletTx.map((tx) => (
             <div
               key={tx.id}
-              className="glass rounded-xl p-3 md:p-3.5"
+              className="glass rounded-2xl p-4"
             >
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -3244,11 +2334,7 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            <AdminFilterShell active={categoryFilterActive} onReset={() => { setCategorySearch(''); setCategoryStatusFilter('') }}>
-              <input className="input text-xs" placeholder="Cari kategori..." value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} />
-              <select className="input text-xs" value={categoryStatusFilter} onChange={(e) => setCategoryStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-            </AdminFilterShell>
-            {limitAdminItems(filteredCategories, categoryFilterActive).map((c) => (
+            {categories.map((c) => (
               <div
                 key={c.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -3270,11 +2356,19 @@ async function deleteVoucher(v: any) {
                 </div>
 
                 <div className="flex gap-2">
-                  {['owner', 'admin'].includes(role) && (
-                    <button type="button" onClick={() => openEdit('category', c)} className="btn btn-muted !h-8 !w-8 !p-0" title="Edit kategori" aria-label="Edit kategori"><Pencil className="h-3.5 w-3.5" /></button>
-                  )}
-
-                  <button type="button" onClick={() => toggle('game_categories', c.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={c.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={c.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${c.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
+                  <button
+                    onClick={() =>
+                      toggle(
+                        'game_categories',
+                        c.id
+                      )
+                    }
+                    className="btn btn-muted text-xs"
+                  >
+                    {c.is_active
+                      ? 'Nonaktifkan'
+                      : 'Aktifkan'}
+                  </button>
 
                   {role ===
                     'owner' && (
@@ -3488,13 +2582,7 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            <AdminFilterShell active={gameFilterActive} onReset={() => { setGameSearch(''); setGameCategoryFilter(''); setGameStatusFilter(''); setGamePopularFilter('') }}>
-              <input className="input text-xs" placeholder="Cari game..." value={gameSearch} onChange={(e) => setGameSearch(e.target.value)} />
-              <select className="input text-xs" value={gameCategoryFilter} onChange={(e) => setGameCategoryFilter(e.target.value)}><option value="">Semua Kategori</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-              <select className="input text-xs" value={gameStatusFilter} onChange={(e) => setGameStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-              <select className="input text-xs" value={gamePopularFilter} onChange={(e) => setGamePopularFilter(e.target.value)}><option value="">Popular: Semua</option><option value="popular">Popular</option><option value="normal">Bukan Popular</option></select>
-            </AdminFilterShell>
-            {limitAdminItems(filteredGames, gameFilterActive).map((g) => (
+            {games.map((g) => (
               <div
                 key={g.id}
                 className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
@@ -3523,13 +2611,19 @@ async function deleteVoucher(v: any) {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {['owner', 'admin'].includes(role) && (
-                    <button type="button" onClick={() => openEdit('game', g)} className="btn btn-muted !h-8 !w-8 !p-0" title="Edit game" aria-label="Edit game"><Pencil className="h-3.5 w-3.5" /></button>
-                  )}
-
-                  <button type="button" onClick={() => toggle('games', g.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={g.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={g.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${g.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
-                </div>
+                <button
+                  onClick={() =>
+                    toggle(
+                      'games',
+                      g.id
+                    )
+                  }
+                  className="btn btn-muted text-xs"
+                >
+                  {g.is_active
+                    ? 'Nonaktifkan'
+                    : 'Aktifkan'}
+                </button>
               </div>
             ))}
           </div>
@@ -3631,36 +2725,38 @@ async function deleteVoucher(v: any) {
             ))}
 
             <label className="block text-sm font-semibold">
-              Foto Produk (opsional)
+              Foto produk
+
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 className="input mt-2"
-                disabled={mediaUploading}
                 onChange={(e) =>
                   uploadFromInput(
                     e,
                     'products',
                     (url) =>
-                      setProdForm((v) => ({
-                        ...v,
-                        image_url: url,
-                      })),
-                    '1:1'
+                      setProdForm(
+                        (v) => ({
+                          ...v,
+                          image_url:
+                            url,
+                        })
+                      )
                   )
                 }
               />
-              {prodForm.image_url && (
-                <img
-                  src={prodForm.image_url}
-                  alt="Preview foto produk"
-                  className="mt-2 h-24 w-24 rounded-xl object-cover"
-                />
-              )}
-              <span className="mt-1 block text-xs font-normal text-slate-500">
-                JPG/PNG/WEBP/GIF · maksimal 6 MB · rasio 1:1.
-              </span>
             </label>
+
+            {prodForm.image_url && (
+              <img
+                src={
+                  prodForm.image_url
+                }
+                alt="Preview produk"
+                className="h-24 w-24 rounded-xl object-cover"
+              />
+            )}
 
             <button className="btn btn-primary">
               Tambah Produk
@@ -3668,126 +2764,55 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            <AdminFilterShell active={productFilterActive} onReset={() => { setProductSearch(''); setProductGameFilter(''); setProductCategoryFilter(''); setProductStatusFilter(''); setProductPopularFilter(''); setProductPriceSort('') }}>
-              <input className="input text-xs" placeholder="Cari produk/SKU..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
-              <select className="input text-xs" value={productGameFilter} onChange={(e) => setProductGameFilter(e.target.value)}><option value="">Semua Game</option>{games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
-              <select className="input text-xs" value={productCategoryFilter} onChange={(e) => setProductCategoryFilter(e.target.value)}><option value="">Semua Kategori</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-              <select className="input text-xs" value={productStatusFilter} onChange={(e) => setProductStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-              <select className="input text-xs" value={productPopularFilter} onChange={(e) => setProductPopularFilter(e.target.value)}><option value="">Game Popular: Semua</option><option value="popular">Game Popular</option><option value="normal">Bukan Popular</option></select>
-              <select className="input text-xs" value={productPriceSort} onChange={(e) => setProductPriceSort(e.target.value)}><option value="">Harga: Default</option><option value="asc">Harga terendah</option><option value="desc">Harga tertinggi</option></select>
-            </AdminFilterShell>
-            {limitAdminItems(filteredProducts, productFilterActive).map((p) => (
+            {products.map((p) => (
               <div
                 key={p.id}
-                className="glass rounded-xl border border-white/[.06] px-3 py-2.5"
+                className="glass flex items-center justify-between gap-3 rounded-2xl p-4"
               >
-                <div className="flex min-w-0 items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="truncate text-sm font-bold text-white">{p.name || p.nominal}</span>
-                      <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider ${p.is_active ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-400/10 text-slate-400'}`}>
-                        {p.is_active ? 'Aktif' : 'Nonaktif'}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
-                      <span>{p.games?.name || 'Game'}</span>
-                      <span>•</span>
-                      <span>{p.nominal || '-'}</span>
-                      <span>•</span>
-                      <span>{p.sku || '-'}</span>
-                      <span>•</span>
-                      <span className="font-semibold text-slate-300">Rp {Number(p.price || 0).toLocaleString('id-ID')}</span>
-                    </div>
-                  </div>
+                <div className="flex min-w-0 items-center gap-3">
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt=""
+                      className="h-12 w-12 rounded-xl object-cover"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded-xl bg-slate-900" />
+                  )}
 
-                  <div className="flex shrink-0 items-center gap-1">
-                    {['owner', 'admin'].includes(role) && (
-                      <>
-                        <button type="button" onClick={() => openEdit('product', p)} className="btn btn-muted !px-2 !py-1.5" title="Edit produk" aria-label="Edit produk">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button type="button" onClick={() => deleteProduct(p)} className="btn btn-muted !px-2 !py-1.5 text-red-300 hover:border-red-400/30 hover:bg-red-500/10" title="Hapus produk/nominal" aria-label="Hapus produk/nominal">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </>
-                    )}
-                    <button type="button" onClick={() => toggle('game_products', p.id)} className="btn btn-muted !px-2 !py-1.5" title={p.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={p.is_active ? 'Nonaktifkan' : 'Aktifkan'}>
-                      <Power className={`h-3.5 w-3.5 ${p.is_active ? 'text-emerald-300' : 'text-slate-500'}`} />
-                    </button>
+                  <div>
+                    <b>{p.name}</b>
+
+                    <p className="text-xs text-slate-500">
+                      {p.games?.name}{' '}
+                      · {p.sku} · Rp{' '}
+                      {Number(
+                        p.price
+                      ).toLocaleString(
+                        'id-ID'
+                      )}
+                    </p>
                   </div>
                 </div>
+
+                <button
+                  onClick={() =>
+                    toggle(
+                      'game_products',
+                      p.id
+                    )
+                  }
+                  className="btn btn-muted text-xs"
+                >
+                  {p.is_active
+                    ? 'Nonaktifkan'
+                    : 'Aktifkan'}
+                </button>
               </div>
             ))}
           </div>
         </section>
       )}
-
-
-      {/* =====================================================
-          HOME - GAME POPULER
-      ===================================================== */}
-
-      {tab === 'home-popular' ? (
-        <section className="mt-7 space-y-3">
-          <div className="glass rounded-xl p-3.5 md:p-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[.18em] text-rose-400">HOME</p>
-                <h2 className="mt-0.5 text-lg font-black text-white">Game Populer</h2>
-                <p className="mt-1 text-[11px] text-slate-500">Pilih maksimal 9 game. Game tetap berada di kategori normalnya.</p>
-              </div>
-              <div className="rounded-lg border border-rose-400/15 bg-rose-400/[.05] px-2.5 py-1.5 text-[10px] font-black text-rose-200">{games.filter((g) => g.popular).length} / 9 dipilih</div>
-            </div>
-            <AdminFilterShell active={Boolean(homePopularSearch || homePopularCategoryFilter || homePopularStatusFilter)} onReset={() => { setHomePopularSearch(''); setHomePopularCategoryFilter(''); setHomePopularStatusFilter('') }}>
-              <input className="input text-xs" placeholder="Cari game..." value={homePopularSearch} onChange={(e) => setHomePopularSearch(e.target.value)} />
-              <select className="input text-xs" value={homePopularCategoryFilter} onChange={(e) => setHomePopularCategoryFilter(e.target.value)}><option value="">Semua Kategori</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-              <select className="input text-xs" value={homePopularStatusFilter} onChange={(e) => setHomePopularStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-              <div className="flex items-center rounded-lg border border-white/[.06] bg-white/[.02] px-3 text-[10px] text-slate-500">Klik ★ untuk menambah/mengeluarkan.</div>
-            </AdminFilterShell>
-          </div>
-
-          {limitAdminItems(filteredHomePopularGames, Boolean(homePopularSearch || homePopularCategoryFilter || homePopularStatusFilter)).map((g) => (
-            <div key={g.id} className="glass flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2.5">
-                {g.logo_url ? <img src={g.logo_url} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" /> : <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-900" />}
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-bold text-white">{g.name}</span>{g.popular && <span className="rounded-full bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black text-amber-300">POPULER</span>}</div>
-                  <p className="truncate text-[10px] text-slate-500">{g.game_categories?.name || 'Tanpa kategori'} · {g.is_active === false ? 'Nonaktif' : 'Aktif'}</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => togglePopular(g)} className="btn btn-muted !h-8 !w-8 !shrink-0 !p-0" title={g.popular ? 'Keluarkan dari Game Populer' : 'Tambahkan ke Game Populer'} aria-label={g.popular ? 'Keluarkan dari Game Populer' : 'Tambahkan ke Game Populer'}>
-                <Star className={`h-4 w-4 ${g.popular ? 'fill-amber-300 text-amber-300' : 'text-slate-500'}`} />
-              </button>
-            </div>
-          ))}
-        </section>
-      ) : tab === 'home-categories' ? (
-        <section className="mt-7 space-y-3">
-          <div className="glass rounded-xl p-3.5 md:p-4">
-            <p className="text-[9px] font-black uppercase tracking-[.18em] text-rose-400">HOME</p>
-            <h2 className="mt-0.5 text-lg font-black text-white">Kategori Home</h2>
-            <p className="mt-1 text-[11px] text-slate-500">Tentukan kategori katalog mana yang tampil sebagai tab di Home. Menghapus dari Home tidak menghapus game.</p>
-            <AdminFilterShell active={Boolean(homeCategorySearch || homeCategoryStatusFilter)} onReset={() => { setHomeCategorySearch(''); setHomeCategoryStatusFilter('') }}>
-              <input className="input text-xs" placeholder="Cari kategori..." value={homeCategorySearch} onChange={(e) => setHomeCategorySearch(e.target.value)} />
-              <select className="input text-xs" value={homeCategoryStatusFilter} onChange={(e) => setHomeCategoryStatusFilter(e.target.value)}><option value="">Semua</option><option value="visible">Tampil di Home</option><option value="hidden">Tidak tampil</option></select>
-            </AdminFilterShell>
-          </div>
-          {limitAdminItems(filteredHomeCategories, Boolean(homeCategorySearch || homeCategoryStatusFilter)).map((c) => (
-            <div key={c.id} className="glass flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-bold text-white">{c.name}</span>
-                  <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-black ${c.show_on_home !== false ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-400/10 text-slate-500'}`}>{c.show_on_home !== false ? 'HOME' : 'HIDDEN'}</span>
-                </div>
-                <p className="text-[10px] text-slate-500">{games.filter((g) => g.category_id === c.id).length} game · /{c.slug}</p>
-              </div>
-              <button type="button" onClick={() => toggleHomeCategory(c)} className="btn btn-muted !h-8 !w-8 !shrink-0 !p-0" title={c.show_on_home !== false ? 'Hapus dari Home' : 'Tambahkan ke Home'} aria-label={c.show_on_home !== false ? 'Hapus dari Home' : 'Tambahkan ke Home'}>
-                {c.show_on_home !== false ? <EyeOff className="h-4 w-4 text-slate-400" /> : <Eye className="h-4 w-4 text-emerald-300" />}
-              </button>
-            </div>
-          ))}
-        </section>
-      ) : null}
 
       {/* =====================================================
           PAYMENT METHODS
@@ -3825,74 +2850,83 @@ async function deleteVoucher(v: any) {
               Payment Method
             </h2>
 
-            {[
-              ['name', 'Nama'],
-              ['kind', 'Jenis'],
-              [
-                'account_name',
-                'Nama rekening/e-wallet',
-              ],
-              [
-                'account_number',
-                'Nomor rekening/e-wallet',
-              ],
-              [
-                'qr_url',
-                'URL QRIS (opsional)',
-              ],
-              [
-                'instruction',
-                'Instruksi',
-              ],
-            ].map(([k, l]) =>
-              k === 'qr_url' ? (
-                <label key={k} className="block text-sm font-semibold">
-                  Foto QRIS (opsional)
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    className="input mt-2"
-                    disabled={mediaUploading}
-                    onChange={(e) =>
-                      uploadFromInput(
-                        e,
-                        'general',
-                        (url) =>
-                          setMethodForm((v) => ({
-                            ...v,
-                            qr_url: url,
-                          })),
-                        '1:1'
-                      )
-                    }
-                  />
-                  {methodForm.qr_url && (
-                    <img
-                      src={methodForm.qr_url}
-                      alt="Preview QRIS"
-                      className="mt-2 h-32 w-32 rounded-xl object-cover"
-                    />
-                  )}
-                  <span className="mt-1 block text-xs font-normal text-slate-500">
-                    JPG/PNG/WEBP/GIF · maksimal 6 MB · rasio 1:1.
-                  </span>
-                </label>
-              ) : (
-                <input
-                  key={k}
-                  className="input"
-                  placeholder={l}
-                  value={(methodForm as any)[k]}
-                  onChange={(e) =>
-                    setMethodForm({
-                      ...methodForm,
-                      [k]: e.target.value,
-                    })
-                  }
-                  required={k === 'name'}
-                />
-              )
-            )}
+            <input
+              className="input"
+              placeholder="Nama"
+              value={methodForm.name}
+              onChange={(e) =>
+                setMethodForm({
+                  ...methodForm,
+                  name: e.target.value,
+                })
+              }
+              required
+            />
+
+            <select
+              className="input"
+              value={methodForm.kind}
+              onChange={(e) =>
+                setMethodForm({
+                  ...methodForm,
+                  kind: e.target.value,
+                })
+              }
+            >
+              <option value="QRIS">QRIS</option>
+              <option value="BANK_TRANSFER">Bank Transfer</option>
+              <option value="E_WALLET">E-Wallet</option>
+              <option value="VIRTUAL_ACCOUNT">Virtual Account</option>
+              <option value="WALLET">Saldo Akun</option>
+            </select>
+
+            <input
+              className="input"
+              placeholder="Nama rekening/e-wallet"
+              value={methodForm.account_name}
+              onChange={(e) =>
+                setMethodForm({
+                  ...methodForm,
+                  account_name: e.target.value,
+                })
+              }
+            />
+
+            <input
+              className="input"
+              placeholder="Nomor rekening/e-wallet"
+              value={methodForm.account_number}
+              onChange={(e) =>
+                setMethodForm({
+                  ...methodForm,
+                  account_number: e.target.value,
+                })
+              }
+            />
+
+            <input
+              className="input"
+              placeholder="URL QRIS (opsional)"
+              value={methodForm.qr_url}
+              onChange={(e) =>
+                setMethodForm({
+                  ...methodForm,
+                  qr_url: e.target.value,
+                })
+              }
+            />
+
+            <input
+              className="input"
+              placeholder="Instruksi"
+              value={methodForm.instruction}
+              onChange={(e) =>
+                setMethodForm({
+                  ...methodForm,
+                  instruction: e.target.value,
+                })
+              }
+            />
 
             <button className="btn btn-primary">
               Tambah Metode
@@ -3900,15 +2934,10 @@ async function deleteVoucher(v: any) {
           </form>
 
           <div className="space-y-3">
-            <AdminFilterShell active={paymentFilterActive} onReset={() => { setPaymentSearch(''); setPaymentKindFilter(''); setPaymentStatusFilter('') }}>
-              <input className="input text-xs" placeholder="Cari metode..." value={paymentSearch} onChange={(e) => setPaymentSearch(e.target.value)} />
-              <select className="input text-xs" value={paymentKindFilter} onChange={(e) => setPaymentKindFilter(e.target.value)}><option value="">Semua Jenis</option>{Array.from(new Set(methods.map((m) => m.kind).filter(Boolean))).map((x) => <option key={x} value={x}>{x}</option>)}</select>
-              <select className="input text-xs" value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-            </AdminFilterShell>
-            {limitAdminItems(filteredMethods, paymentFilterActive).map((m) => (
+            {methods.map((m) => (
               <div
                 key={m.id}
-                className="glass rounded-xl p-3 md:p-3.5"
+                className="glass rounded-2xl p-4"
               >
                 <div className="flex justify-between">
                   <div>
@@ -3921,7 +2950,19 @@ async function deleteVoucher(v: any) {
                     </p>
                   </div>
 
-                  <button type="button" onClick={() => toggle('payment_methods', m.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={m.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={m.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${m.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
+                  <button
+                    onClick={() =>
+                      toggle(
+                        'payment_methods',
+                        m.id
+                      )
+                    }
+                    className="btn btn-muted text-xs"
+                  >
+                    {m.is_active
+                      ? 'Nonaktifkan'
+                      : 'Aktifkan'}
+                  </button>
                 </div>
               </div>
             ))}
@@ -4210,17 +3251,18 @@ async function deleteVoucher(v: any) {
             </form>
 
             <div className="space-y-3">
-              <div className="glass rounded-xl p-3.5 md:p-4">
-                <h2 className="text-xl font-black">Daftar Voucher</h2>
-                <p className="mt-1 text-sm text-slate-400">Owner/Admin dapat mengatur limit. Stok awal hanya dapat diubah Owner.</p>
-                <AdminFilterShell active={voucherFilterActive} onReset={() => { setVoucherSearch(''); setVoucherStatusFilter(''); setVoucherTypeFilter('') }}>
-                  <input className="input text-xs" placeholder="Cari kode voucher..." value={voucherSearch} onChange={(e) => setVoucherSearch(e.target.value)} />
-                  <select className="input text-xs" value={voucherStatusFilter} onChange={(e) => setVoucherStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-                  <select className="input text-xs" value={voucherTypeFilter} onChange={(e) => setVoucherTypeFilter(e.target.value)}><option value="">Semua Tipe</option><option value="PERCENT">Persen</option><option value="FIXED">Nominal</option></select>
-                </AdminFilterShell>
+              <div className="glass rounded-2xl p-5">
+                <h2 className="text-xl font-black">
+                  Daftar Voucher
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-400">
+                  Owner/Admin dapat mengatur limit.
+                  Stok awal hanya dapat diubah Owner.
+                </p>
               </div>
 
-              {limitAdminItems(filteredVouchers, voucherFilterActive).map((v) => {
+              {vouchers.map((v) => {
                 const used =
                   Number(
                     v.usage_count || 0
@@ -4248,7 +3290,7 @@ async function deleteVoucher(v: any) {
                 return (
                   <div
                     key={v.id}
-                    className="glass rounded-xl p-3.5 md:p-4"
+                    className="glass rounded-2xl p-5"
                   >
                     <div className="flex flex-col gap-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -4419,7 +3461,7 @@ async function deleteVoucher(v: any) {
               RIWAYAT PENGGUNAAN VOUCHER
           ================================================= */}
 
-          <div className="glass rounded-xl p-3.5 md:p-4">
+          <div className="glass rounded-2xl p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-purple-300">
@@ -4447,11 +3489,7 @@ async function deleteVoucher(v: any) {
           </div>
 
           <div className="space-y-3">
-            <AdminFilterShell active={voucherUsageFilterActive} onReset={() => { setVoucherUsageSearch(''); setVoucherUsageDateFilter('') }}>
-              <input className="input text-xs" placeholder="Cari kode/member/order..." value={voucherUsageSearch} onChange={(e) => setVoucherUsageSearch(e.target.value)} />
-              <input type="date" className="input text-xs" value={voucherUsageDateFilter} onChange={(e) => setVoucherUsageDateFilter(e.target.value)} />
-            </AdminFilterShell>
-            {limitAdminItems(filteredVoucherUsages, voucherUsageFilterActive).map((vu) => {
+            {voucherUsages.map((vu) => {
               const user =
                 vu.profiles
 
@@ -4571,174 +3609,157 @@ async function deleteVoucher(v: any) {
       ===================================================== */}
 
       {tab === 'promotions' && (
-        <section className="mt-7">
-          <div className="glass rounded-3xl p-6">
-            <p className="text-xs font-black uppercase tracking-widest text-red-300">
-              📢 Banner Promo Utama
-            </p>
-            <h2 className="mt-1 text-2xl font-black">
-              Kelola 1 Banner Promo
+        <section className="mt-7 grid gap-7 lg:grid-cols-[.8fr_1.2fr]">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+
+              add(
+                'promotions',
+                {
+                  ...promoForm,
+                  is_active: true,
+                },
+                () =>
+                  setPromoForm({
+                    name: '',
+                    description:
+                      '',
+                    banner_url:
+                      '',
+                    code: '',
+                  })
+              )
+            }}
+            className="glass space-y-3 rounded-2xl p-6"
+          >
+            <h2 className="text-xl font-black">
+              Promo & Banner
             </h2>
-            <p className="mt-1 max-w-3xl text-sm text-slate-500">
-              Satu Banner Promo utama untuk Home. Bisa berupa teks, gambar, atau teks + gambar.
-              Edit dan ubah statusnya dari sini tanpa membuat promo utama baru.
-            </p>
 
-            <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              <div className="glass rounded-xl p-3.5 md:p-4">
-                <label className="block text-xs font-bold text-slate-300">
-                  Tipe konten
-                  <select
-                    className="input mt-2"
-                    value={mediaPromoType}
-                    onChange={(e) =>
-                      setMediaPromoType(e.target.value as 'text' | 'image' | 'both')
+            <input
+              className="input"
+              placeholder="Nama promo"
+              value={
+                promoForm.name
+              }
+              onChange={(e) =>
+                setPromoForm({
+                  ...promoForm,
+                  name: e.target.value,
+                })
+              }
+              required
+            />
+
+            <textarea
+              className="input min-h-24"
+              placeholder="Deskripsi"
+              value={
+                promoForm.description
+              }
+              onChange={(e) =>
+                setPromoForm({
+                  ...promoForm,
+                  description:
+                    e.target.value,
+                })
+              }
+            />
+
+            <label className="block text-sm font-semibold">
+              Upload banner
+
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="input mt-2"
+                onChange={(e) =>
+                  uploadFromInput(
+                    e,
+                    'promotions',
+                    (url) =>
+                      setPromoForm(
+                        (v) => ({
+                          ...v,
+                          banner_url:
+                            url,
+                        })
+                      )
+                  )
+                }
+              />
+            </label>
+
+            {promoForm.banner_url && (
+              <img
+                src={
+                  promoForm.banner_url
+                }
+                alt=""
+                className="h-32 w-full rounded-xl object-cover"
+              />
+            )}
+
+            <input
+              className="input"
+              placeholder="Kode promo (opsional)"
+              value={
+                promoForm.code
+              }
+              onChange={(e) =>
+                setPromoForm({
+                  ...promoForm,
+                  code: e.target.value,
+                })
+              }
+            />
+
+            <button className="btn btn-primary">
+              Tambah Promo
+            </button>
+          </form>
+
+          <div className="space-y-3">
+            {promos.map((p) => (
+              <div
+                key={p.id}
+                className="glass overflow-hidden rounded-2xl"
+              >
+                {p.banner_url && (
+                  <img
+                    src={p.banner_url}
+                    alt=""
+                    className="h-32 w-full object-cover"
+                  />
+                )}
+
+                <div className="flex items-center justify-between gap-3 p-4">
+                  <div>
+                    <b>{p.name}</b>
+
+                    <p className="text-xs text-slate-500">
+                      {p.code ||
+                        'Tanpa kode'}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      toggle(
+                        'promotions',
+                        p.id
+                      )
                     }
+                    className="btn btn-muted text-xs"
                   >
-                    <option value="text">Teks saja</option>
-                    <option value="image">Gambar saja</option>
-                    <option value="both">Teks + gambar</option>
-                  </select>
-                </label>
-
-                {mediaPromoType !== 'image' && (
-                  <>
-                    <input
-                      className="input mt-3"
-                      placeholder="Custom Text di atas judul (opsional)"
-                      value={mediaPromoCustomText}
-                      onChange={(e) => setMediaPromoCustomText(e.target.value)}
-                    />
-                    <input
-                      className="input mt-3"
-                      placeholder="Judul / teks utama promo"
-                      value={mediaPromoTitle}
-                      onChange={(e) => setMediaPromoTitle(e.target.value)}
-                    />
-                    <textarea
-                      className="input mt-3 min-h-24"
-                      placeholder="Deskripsi promo (opsional)"
-                      value={mediaPromoDescription}
-                      onChange={(e) => setMediaPromoDescription(e.target.value)}
-                    />
-                    <input
-                      className="input mt-3"
-                      placeholder="Kode promo (opsional)"
-                      value={mediaPromoCode}
-                      onChange={(e) => setMediaPromoCode(e.target.value)}
-                    />
-                  </>
-                )}
-
-                {mediaPromoType !== 'text' && (
-                  <label className="mt-3 block text-xs font-bold text-slate-300">
-                    Gambar Banner Promo
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,video/x-m4v"
-                      className="input mt-2"
-                      disabled={mediaUploading}
-                      onChange={(e) =>
-                        uploadAndSync(e, 'promotions', preparePromoImage, '16:9', true)
-                      }
-                    />
-                    <span className="mt-1 block text-[10px] text-slate-500">
-                      JPG, PNG, WEBP, GIF · atau Live Photo yang diekspor sebagai video MOV/MP4 · gambar maks. 6 MB, video maks. 20 MB · rasio 16:9.
-                    </span>
-                  </label>
-                )}
-
-                {((pendingPromoImageUrl || promos[0]?.banner_url) && mediaPromoType !== 'text') && (
-                  /\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(pendingPromoImageUrl || promos[0]?.banner_url || '') ? (
-                    <video
-                      src={pendingPromoImageUrl || promos[0]?.banner_url}
-                      className="mt-4 h-40 w-full rounded-xl object-cover"
-                      autoPlay muted loop playsInline controls
-                    />
-                  ) : (
-                    <img
-                      src={pendingPromoImageUrl || promos[0]?.banner_url}
-                      alt="Preview Banner Promo"
-                      className="mt-4 h-40 w-full rounded-xl object-cover"
-                    />
-                  ))}
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${promos[0]?.is_active ? 'bg-green-400/10 text-green-300' : 'bg-slate-400/10 text-slate-400'}`}>
-                    {promos[0] ? (promos[0].is_active ? '🟢 Aktif' : '🔴 Nonaktif') : 'Belum dibuat'}
-                  </span>
-                  {promos[0] && (
-                    <button
-                      type="button"
-                      className="btn btn-muted text-xs"
-                      onClick={toggleMainPromo}
-                    >
-                      {promos[0].is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                    </button>
-                  )}
+                    {p.is_active
+                      ? 'Nonaktifkan'
+                      : 'Aktifkan'}
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  className="btn btn-primary mt-3 w-full"
-                  disabled={mediaUploading}
-                  onClick={savePromoContent}
-                >
-                  {promos[0] ? 'Simpan Perubahan Banner Promo' : 'Buat Banner Promo'}
-                </button>
               </div>
-
-              <div className="glass rounded-xl p-3.5 md:p-4">
-                <p className="text-xs font-black uppercase tracking-widest text-pink-300">
-                  👁 PREVIEW
-                </p>
-                <h3 className="mt-1 text-xl font-black">
-                  Tampilan Banner Promo di Home
-                </h3>
-
-                <div className="mt-5 overflow-hidden rounded-2xl border border-pink-400/20 bg-slate-950/70">
-                  {mediaPromoType !== 'text' && (pendingPromoImageUrl || promos[0]?.banner_url) && (
-                    /(\.mp4|\.webm|\.mov|\.m4v)(?:$|[?#])/i.test(pendingPromoImageUrl || promos[0]?.banner_url || '') ? (
-                      <video
-                        src={pendingPromoImageUrl || promos[0]?.banner_url}
-                        className="max-h-64 w-full object-cover"
-                        autoPlay muted loop playsInline controls
-                      />
-                    ) : (
-                      <img
-                        src={pendingPromoImageUrl || promos[0]?.banner_url}
-                        alt="Preview"
-                        className="max-h-64 w-full object-cover"
-                      />
-                    )
-                  )}
-                  {mediaPromoType !== 'image' && (
-                    <div className="p-5">
-                      <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">{mediaPromoCustomText}</p>
-                      <h4 className="mt-2 text-2xl font-black">
-                        {mediaPromoTitle || promos[0]?.name || 'Judul Promo'}
-                      </h4>
-                      {(mediaPromoDescription || promos[0]?.description) && (
-                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-400">
-                          {mediaPromoDescription || promos[0]?.description}
-                        </p>
-                      )}
-                      {(mediaPromoCode || promos[0]?.code) && (
-                        <div className="mt-4 inline-flex rounded-xl border border-pink-400/20 bg-pink-400/10 px-4 py-2">
-                          <span className="text-xs font-black uppercase tracking-wider text-pink-300">
-                            Kode: {mediaPromoCode || promos[0]?.code}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <p className="mt-3 text-xs text-slate-500">
-                  Jika status Nonaktif, Banner Promo tidak akan ditampilkan di Home.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </section>
       )}
@@ -4921,21 +3942,20 @@ async function deleteVoucher(v: any) {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black">Riwayat Broadcast</h2>
-                <span className="text-xs text-slate-500">Terbaru di atas</span>
-              </div>
-              <AdminFilterShell active={broadcastFilterActive} onReset={() => { setBroadcastSearch(''); setBroadcastStatusFilter(''); setBroadcastTypeFilter(''); setBroadcastDateFilter('') }}>
-                <input className="input text-xs" placeholder="Cari judul/pesan..." value={broadcastSearch} onChange={(e) => setBroadcastSearch(e.target.value)} />
-                <select className="input text-xs" value={broadcastStatusFilter} onChange={(e) => setBroadcastStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
-                <select className="input text-xs" value={broadcastTypeFilter} onChange={(e) => setBroadcastTypeFilter(e.target.value)}><option value="">Semua Tipe</option>{Array.from(new Set(broadcasts.map((b) => b.type).filter(Boolean))).map((x) => <option key={x} value={x}>{x}</option>)}</select>
-                <input type="date" className="input text-xs" value={broadcastDateFilter} onChange={(e) => setBroadcastDateFilter(e.target.value)} />
-              </AdminFilterShell>
+                <h2 className="text-xl font-black">
+                  Riwayat Broadcast
+                </h2>
 
-              {limitAdminItems(filteredBroadcasts, broadcastFilterActive).map(
+                <span className="text-xs text-slate-500">
+                  Terbaru di atas
+                </span>
+              </div>
+
+              {broadcasts.map(
                 (b) => (
                   <div
                     key={b.id}
-                    className="glass rounded-xl p-3 md:p-3.5"
+                    className="glass rounded-2xl p-4"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
@@ -4968,10 +3988,19 @@ async function deleteVoucher(v: any) {
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => toggle('broadcasts', b.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={b.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={b.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${b.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
-                        <button type="button" onClick={() => deleteBroadcast(b)} className="btn btn-muted !h-8 !w-8 !p-0 text-red-300" title="Hapus broadcast" aria-label="Hapus broadcast"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
+                      <button
+                        onClick={() =>
+                          toggle(
+                            'broadcasts',
+                            b.id
+                          )
+                        }
+                        className="btn btn-muted text-xs"
+                      >
+                        {b.is_active
+                          ? 'Matikan'
+                          : 'Aktifkan'}
+                      </button>
                     </div>
                   </div>
                 )
@@ -5092,24 +4121,196 @@ async function deleteVoucher(v: any) {
             </div>
 
             <div className="glass rounded-3xl p-5">
+              <p className="text-xs font-black uppercase tracking-widest text-purple-300">
+                💎 Gambar Produk
+              </p>
+              <h3 className="mt-1 text-lg font-black">
+                Satu gambar untuk banyak nominal
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Rasio 1:1 · pilih game lalu satu, beberapa, atau semua nominal.
+              </p>
+
+              <select
+                className="input mt-4"
+                value={mediaProductGameId}
+                onChange={(e) => {
+                  setMediaProductGameId(e.target.value)
+                  setSelectedProductIds([])
+                }}
+              >
+                <option value="">Pilih game</option>
+                {games.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+
+              {mediaProductGameId && (
+                <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-400">
+                      Nominal produk
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs font-bold text-cyan-300"
+                      onClick={() => {
+                        const ids = products
+                          .filter((p) => p.game_id === mediaProductGameId)
+                          .map((p) => p.id)
+                        setSelectedProductIds(
+                          selectedProductIds.length === ids.length ? [] : ids
+                        )
+                      }}
+                    >
+                      {selectedProductIds.length > 0 ? 'Batal pilih semua' : 'Pilih semua'}
+                    </button>
+                  </div>
+
+                  <div className="max-h-52 space-y-2 overflow-y-auto">
+                    {products
+                      .filter((p) => p.game_id === mediaProductGameId)
+                      .map((p) => (
+                        <label
+                          key={p.id}
+                          className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-2"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedProductIds.includes(p.id)}
+                            onChange={(e) =>
+                              setSelectedProductIds((current) =>
+                                e.target.checked
+                                  ? [...current, p.id]
+                                  : current.filter((id) => id !== p.id)
+                              )
+                            }
+                          />
+                          <span className="min-w-0 flex-1 text-sm">
+                            {p.name || p.nominal || p.sku || 'Produk'}
+                          </span>
+                          {p.image_url && (
+                            <span className="text-[10px] text-green-300">
+                              sudah ada gambar
+                            </span>
+                          )}
+                        </label>
+                      ))}
+
+                    {!products.some((p) => p.game_id === mediaProductGameId) && (
+                      <p className="py-3 text-center text-xs text-slate-500">
+                        Belum ada nominal untuk game ini.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
+                Upload & Terapkan ke {selectedProductIds.length || 0} produk
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={mediaUploading || !mediaProductGameId || !selectedProductIds.length}
+                  onChange={(e) =>
+                    uploadAndSync(
+                      e,
+                      'products',
+                      applyProductMedia,
+                      '1:1'
+                    )
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="glass rounded-3xl p-5">
               <p className="text-xs font-black uppercase tracking-widest text-red-300">
                 📢 Banner Promo
               </p>
               <h3 className="mt-1 text-lg font-black">
-                Kelola di menu Promo
+                Hubungkan banner ke promo
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                Banner Promo utama sekarang dikelola dari menu <b>Promo</b> agar edit, upload, preview, dan status aktif/nonaktif berada di satu tempat.
+                Rasio 16:9 · banner otomatis masuk ke promo yang dipilih.
               </p>
-              <button
-                type="button"
-                className="btn btn-primary mt-4 w-full"
-                onClick={() => changeTab('promotions')}
+
+              <select
+                className="input mt-4"
+                value={mediaPromoId}
+                onChange={(e) => setMediaPromoId(e.target.value)}
               >
-                Buka Pengaturan Banner Promo
-              </button>
+                <option value="">Pilih promo</option>
+                {promos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+
+              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
+                Upload & Pasang Banner Promo
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={mediaUploading || !mediaPromoId}
+                  onChange={(e) =>
+                    uploadAndSync(
+                      e,
+                      'promotions',
+                      setPromoBannerFromMedia,
+                      '16:9'
+                    )
+                  }
+                />
+              </label>
             </div>
 
+            <div className="glass rounded-3xl p-5">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-300">
+                🏠 Banner Homepage
+              </p>
+              <h3 className="mt-1 text-lg font-black">
+                Kelola slot banner Homepage
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Rasio 16:9 · tersimpan di Website Settings pada slot yang dipilih.
+              </p>
+
+              <select
+                className="input mt-4"
+                value={homepageSlot}
+                onChange={(e) => setHomepageSlot(e.target.value)}
+              >
+                {homepageSlots.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+
+              <label className="btn btn-muted mt-3 block cursor-pointer text-center">
+                Upload & Pasang Banner Homepage
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  disabled={mediaUploading}
+                  onChange={(e) =>
+                    uploadAndSync(
+                      e,
+                      'homepage',
+                      setHomepageBannerFromMedia,
+                      '16:9'
+                    )
+                  }
+                />
+              </label>
+            </div>
           </div>
 
           <div className="glass rounded-3xl p-5">
@@ -5129,7 +4330,7 @@ async function deleteVoucher(v: any) {
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            {limitAdminItems(filteredMedia, Boolean(mediaSearch || mediaCategory !== 'all')).map((a) => (
+            {filteredMedia.map((a) => (
               <div
                 key={a.id}
                 className="glass overflow-hidden rounded-2xl"
@@ -5184,17 +4385,19 @@ async function deleteVoucher(v: any) {
 
       {tab === 'users' && (
         <section className="mt-7 space-y-3">
-          <div className="glass rounded-xl p-3.5 md:p-4">
-            <h2 className="text-xl font-black">Customer & Wallet</h2>
-            <p className="mt-1 text-sm text-slate-400">Suspend/aktifkan, kelola role, dan Owner dapat menambah atau mengurangi saldo dengan alasan serta riwayat audit.</p>
-            <AdminFilterShell active={userFilterActive} onReset={() => { setUserSearch(''); setUserRoleFilter(''); setUserStatusFilter('') }}>
-              <input className="input text-xs" placeholder="Cari nama/username/email..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
-              <select className="input text-xs" value={userRoleFilter} onChange={(e) => setUserRoleFilter(e.target.value)}><option value="">Semua Role</option><option value="owner">Owner</option><option value="admin">Admin</option><option value="customer_service">Customer Service</option><option value="user">Member</option></select>
-              <select className="input text-xs" value={userStatusFilter} onChange={(e) => setUserStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="suspended">Suspended</option></select>
-            </AdminFilterShell>
+          <div className="glass rounded-2xl p-5">
+            <h2 className="text-xl font-black">
+              Customer & Wallet
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-400">
+              Suspend/aktifkan, kelola role, dan Owner
+              dapat menambah atau mengurangi saldo dengan
+              alasan serta riwayat audit.
+            </p>
           </div>
 
-          {limitAdminItems(filteredUsers, userFilterActive).map((u) => {
+          {users.map((u) => {
             const balance =
               Number(
                 wallets.find(
@@ -5208,7 +4411,7 @@ async function deleteVoucher(v: any) {
             return (
               <div
                 key={u.id}
-                className="glass rounded-xl p-3 md:p-3.5"
+                className="glass rounded-2xl p-4"
               >
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div>
@@ -5217,12 +4420,6 @@ async function deleteVoucher(v: any) {
                         u.username ||
                         'User'}
                     </b>
-
-                    {u.username && (
-                      <p className="text-xs text-cyan-300">
-                        @{u.username}
-                      </p>
-                    )}
 
                     <p className="text-xs text-slate-500">
                       {u.email} ·{' '}
@@ -5241,15 +4438,6 @@ async function deleteVoucher(v: any) {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {['owner', 'admin'].includes(role) && (
-                      <button
-                        onClick={() => editUsername(u)}
-                        className="btn btn-primary text-xs"
-                      >
-                        Ubah Username
-                      </button>
-                    )}
-
                     {role ===
                       'owner' && (
                       <>
@@ -5328,205 +4516,121 @@ async function deleteVoucher(v: any) {
       )}
 
       {/* =====================================================
-          ULASAN & RUNNING TEXT
-      ===================================================== */}
-
-      {tab === 'reviews' && (
-        <section className="mt-7 space-y-6">
-          <div className="glass overflow-hidden rounded-3xl">
-            <div className="border-b border-white/10 bg-gradient-to-r from-cyan-400/[.06] via-transparent to-fuchsia-500/[.06] p-6">
-              <p className="text-[9px] font-black uppercase tracking-[.25em] text-cyan-300">Homepage</p>
-              <h2 className="mt-2 text-2xl font-black text-white">Running Text</h2>
-              <p className="mt-1 text-sm text-slate-500">Teks berjalan bertema gaming yang tampil di bawah Banner Promo.</p>
-            </div>
-            <div className="grid gap-5 p-6 md:grid-cols-[1fr_220px]">
-              <label className="block">
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Teks Running Text</span>
-                <textarea
-                  className="input min-h-28 w-full resize-y"
-                  value={homeRunningText.text_content || ''}
-                  onChange={(e) => setHomeRunningText({ ...homeRunningText, text_content: e.target.value })}
-                  placeholder="⚡ TOP UP CEPAT • HARGA TERBAIK • EVENT SPESIAL • NDRAAAID.v1"
-                />
-              </label>
-              <div className="space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Status</span>
-                  <select
-                    className="input w-full"
-                    value={homeRunningText.is_active ? 'true' : 'false'}
-                    onChange={(e) => setHomeRunningText({ ...homeRunningText, is_active: e.target.value === 'true' })}
-                  >
-                    <option value="true">Aktif</option>
-                    <option value="false">Nonaktif</option>
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Kecepatan</span>
-                  <select
-                    className="input w-full"
-                    value={String(homeRunningText.speed_ms || 18000)}
-                    onChange={(e) => setHomeRunningText({ ...homeRunningText, speed_ms: Number(e.target.value) })}
-                  >
-                    <option value="12000">Cepat</option>
-                    <option value="18000">Normal</option>
-                    <option value="26000">Pelan</option>
-                  </select>
-                </label>
-              </div>
-              <div className="md:col-span-2 border-t border-white/10 pt-5">
-                <button type="button" onClick={saveHomeRunningText} className="btn btn-primary">
-                  Simpan Running Text
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass overflow-hidden rounded-3xl">
-            <div className="border-b border-white/10 p-6">
-              <p className="text-[9px] font-black uppercase tracking-[.25em] text-fuchsia-300">Moderasi</p>
-              <h2 className="mt-2 text-2xl font-black text-white">Ulasan Pelanggan</h2>
-              <p className="mt-1 text-sm text-slate-500">Hanya ulasan dari order berstatus SUCCESS yang bisa masuk. Ulasan tampil di Home setelah disetujui.</p>
-            </div>
-            <div className="divide-y divide-white/10">
-              <div className="p-5">
-                <AdminFilterShell active={reviewFilterActive} onReset={() => { setReviewSearch(''); setReviewRatingFilter(''); setReviewModerationFilter('') }}>
-                  <input className="input text-xs" placeholder="Cari pelanggan/review/order..." value={reviewSearch} onChange={(e) => setReviewSearch(e.target.value)} />
-                  <select className="input text-xs" value={reviewRatingFilter} onChange={(e) => setReviewRatingFilter(e.target.value)}><option value="">Semua Rating</option><option value="5">5 ★</option><option value="4">4 ★</option><option value="3">3 ★</option><option value="2">2 ★</option><option value="1">1 ★</option></select>
-                  <select className="input text-xs" value={reviewModerationFilter} onChange={(e) => setReviewModerationFilter(e.target.value)}><option value="">Semua Moderasi</option><option value="approved">Ditampilkan</option><option value="pending">Menunggu</option></select>
-                </AdminFilterShell>
-              </div>
-              {limitAdminItems(filteredCustomerReviews, reviewFilterActive).map((review) => (
-                <div key={review.id} className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-black text-white">{review.reviewer_display}</span>
-                      <span className="text-amber-300">{'★'.repeat(Number(review.rating || 0))}</span>
-                      <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${review.is_approved ? 'bg-emerald-400/10 text-emerald-300' : 'bg-amber-400/10 text-amber-300'}`}>
-                        {review.is_approved ? 'Ditampilkan' : 'Menunggu'}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">“{review.review_text}”</p>
-                    <p className="mt-1 text-[10px] text-slate-600">Order: {review.order_id}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <button type="button" onClick={() => moderateCustomerReview(review, !review.is_approved)} className="btn btn-muted !h-8 !w-8 !p-0" title={review.is_approved ? 'Sembunyikan' : 'Tampilkan'} aria-label={review.is_approved ? 'Sembunyikan' : 'Tampilkan'}>{review.is_approved ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5 text-emerald-300" />}</button>
-                    <button type="button" onClick={() => deleteCustomerReview(review)} className="btn btn-muted !h-8 !w-8 !p-0 text-red-300" title="Hapus ulasan" aria-label="Hapus ulasan"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </div>
-                </div>
-              ))}
-              {!customerReviews.length && (
-                <div className="p-10 text-center text-sm text-slate-500">Belum ada ulasan pelanggan.</div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* =====================================================
           SETTINGS
       ===================================================== */}
 
       {tab === 'settings' && (
-        <section className="mt-7 max-w-5xl">
-          <div className="glass overflow-hidden rounded-3xl">
-            <div className="border-b border-white/10 bg-gradient-to-r from-cyan-400/[.06] via-transparent to-purple-500/[.06] p-6 md:p-7">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] font-black tracking-[.2em] text-cyan-300">
-                      SYSTEM CONFIG
-                    </span>
-                    <span className="text-xs text-slate-600">ADMIN ONLY</span>
-                  </div>
-                  <h2 className="mt-2 text-2xl font-black text-white">
-                    Pengaturan Website
-                  </h2>
-                  <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-                    Atur identitas website dan kontak yang digunakan di seluruh halaman NDRAAAID.v1.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/5 px-4 py-3">
-                  <p className="text-[9px] uppercase tracking-[.2em] text-slate-600">Status</p>
-                  <p className="mt-1 text-sm font-black text-emerald-300">● ONLINE</p>
-                </div>
-              </div>
-            </div>
+        <form
+          onSubmit={saveSettings}
+          className="glass mt-7 max-w-2xl space-y-4 rounded-2xl p-6"
+        >
+          <h2 className="text-xl font-black">
+            Website Settings
+          </h2>
 
-            <form onSubmit={saveSettings} className="p-6 md:p-7">
-              <div className="grid gap-5 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Nama website</span>
-                  <input
-                    className="input w-full"
-                    value={site.name || ''}
-                    onChange={(e) => setSite({ ...site, name: e.target.value })}
-                    placeholder="NDRAAAID.v1"
-                  />
-                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Nama brand yang tampil di website.</span>
-                </label>
+          <label className="field">
+            Nama website
 
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Tagline</span>
-                  <input
-                    className="input w-full"
-                    value={site.tagline || ''}
-                    onChange={(e) => setSite({ ...site, tagline: e.target.value })}
-                    placeholder="Top Up Game Cepat, Aman & Terpercaya"
-                  />
-                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Teks pendek untuk identitas website.</span>
-                </label>
+            <input
+              value={
+                site.name || ''
+              }
+              onChange={(e) =>
+                setSite({
+                  ...site,
+                  name: e.target.value,
+                })
+              }
+            />
+          </label>
 
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">WhatsApp</span>
-                  <input
-                    className="input w-full"
-                    value={site.whatsapp || ''}
-                    onChange={(e) => setSite({ ...site, whatsapp: e.target.value })}
-                    placeholder="62812..."
-                    inputMode="numeric"
-                  />
-                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Gunakan format internasional, contoh 628123456789.</span>
-                </label>
+          <label className="field">
+            Tagline
 
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Instagram</span>
-                  <input
-                    className="input w-full"
-                    value={site.instagram || ''}
-                    onChange={(e) => setSite({ ...site, instagram: e.target.value })}
-                    placeholder="https://instagram.com/..."
-                  />
-                  <span className="mt-1.5 block text-[11px] leading-5 text-slate-600">Link Instagram yang akan digunakan website.</span>
-                </label>
-              </div>
+            <input
+              value={
+                site.tagline ||
+                ''
+              }
+              onChange={(e) =>
+                setSite({
+                  ...site,
+                  tagline:
+                    e.target.value,
+                })
+              }
+            />
+          </label>
 
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[.025] p-4 md:p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-bold text-white">Maintenance mode</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">Jika aktif, website dapat ditampilkan dalam mode pemeliharaan.</p>
-                  </div>
-                  <select
-                    className="input w-full sm:w-40"
-                    value={site.maintenance ? 'true' : 'false'}
-                    onChange={(e) => setSite({ ...site, maintenance: e.target.value === 'true' })}
-                  >
-                    <option value="false">Off</option>
-                    <option value="true">On</option>
-                  </select>
-                </div>
-              </div>
+          <label className="field">
+            WhatsApp
 
-              <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-slate-600">Perubahan tersimpan ke konfigurasi website.</p>
-                <button type="submit" className="btn btn-primary min-w-40">
-                  Simpan Pengaturan
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
+            <input
+              value={
+                site.whatsapp ||
+                ''
+              }
+              onChange={(e) =>
+                setSite({
+                  ...site,
+                  whatsapp:
+                    e.target.value,
+                })
+              }
+              placeholder="62812..."
+            />
+          </label>
+
+          <label className="field">
+            Instagram
+
+            <input
+              value={
+                site.instagram ||
+                ''
+              }
+              onChange={(e) =>
+                setSite({
+                  ...site,
+                  instagram:
+                    e.target.value,
+                })
+              }
+            />
+          </label>
+
+          <label className="field">
+            Maintenance mode
+
+            <select
+              value={
+                site.maintenance
+                  ? 'true'
+                  : 'false'
+              }
+              onChange={(e) =>
+                setSite({
+                  ...site,
+                  maintenance:
+                    e.target.value ===
+                    'true',
+                })
+              }
+            >
+              <option value="false">
+                Off
+              </option>
+
+              <option value="true">
+                On
+              </option>
+            </select>
+          </label>
+
+          <button className="btn btn-primary">
+            Simpan Settings
+          </button>
+        </form>
       )}
 
       {/* =====================================================
@@ -5622,330 +4726,6 @@ async function deleteVoucher(v: any) {
       )}
         </div>
       </div>
-
-      {editType && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-cyan-400/20 bg-slate-950 p-5 shadow-2xl shadow-cyan-950/30">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">
-                  EDIT CATALOG
-                </p>
-                <h2 className="mt-1 text-2xl font-black text-white">
-                  {editType === 'category'
-                    ? 'Edit Kategori'
-                    : editType === 'game'
-                      ? 'Edit Game'
-                      : 'Edit Produk / Nominal'}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Perubahan langsung diterapkan ke data website.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="rounded-xl border border-white/10 px-3 py-2 text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {editType === 'category' && (
-                <>
-                  <input
-                    className="input"
-                    placeholder="Nama kategori"
-                    value={editForm.name || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        name: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    className="input"
-                    placeholder="Slug"
-                    value={editForm.slug || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        slug: e.target.value,
-                      })
-                    }
-                  />
-                  <textarea
-                    className="input min-h-24"
-                    placeholder="Deskripsi"
-                    value={editForm.description || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        description: e.target.value,
-                      })
-                    }
-                  />
-                </>
-              )}
-
-              {editType === 'game' && (
-                <>
-                  <input
-                    className="input"
-                    placeholder="Nama game"
-                    value={editForm.name || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        name: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    className="input"
-                    placeholder="Slug"
-                    value={editForm.slug || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        slug: e.target.value,
-                      })
-                    }
-                  />
-                  <select
-                    className="input"
-                    value={editForm.category_id || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        category_id: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">Tanpa kategori</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <textarea
-                    className="input min-h-24"
-                    placeholder="Deskripsi"
-                    value={editForm.description || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        description: e.target.value,
-                      })
-                    }
-                  />
-                  <label className="block text-sm font-semibold">
-                    Logo game
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="input mt-2"
-                      onChange={(e) =>
-                        uploadFromInput(
-                          e,
-                          'games',
-                          (url) =>
-                            setEditForm((v) => ({
-                              ...v,
-                              logo_url: url,
-                            })),
-                          '1:1'
-                        )
-                      }
-                    />
-                  </label>
-
-                  {editForm.logo_url && (
-                    <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-3">
-                      <p className="mb-2 text-xs font-semibold text-slate-400">
-                        Preview logo game
-                      </p>
-                      <img
-                        src={editForm.logo_url}
-                        alt="Preview logo game"
-                        className="h-20 w-20 rounded-xl object-cover"
-                      />
-                    </div>
-                  )}
-
-                  <label className="block text-sm font-semibold">
-                    Banner game
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="input mt-2"
-                      onChange={(e) =>
-                        uploadFromInput(
-                          e,
-                          'games',
-                          (url) =>
-                            setEditForm((v) => ({
-                              ...v,
-                              banner_url: url,
-                            })),
-                          '16:9'
-                        )
-                      }
-                    />
-                  </label>
-
-                  {editForm.banner_url && (
-                    <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-3">
-                      <p className="mb-2 text-xs font-semibold text-slate-400">
-                        Preview banner game
-                      </p>
-                      <img
-                        src={editForm.banner_url}
-                        alt="Preview banner game"
-                        className="h-28 w-full rounded-xl object-cover"
-                      />
-                    </div>
-                  )}
-
-                  <p className="text-xs text-slate-500">
-                    Pilih file foto untuk mengganti logo atau banner. URL akan dibuat otomatis oleh Supabase Storage.
-                  </p>
-                </>
-              )}
-
-              {editType === 'product' && (
-                <>
-                  <select
-                    className="input"
-                    value={editForm.game_id || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        game_id: e.target.value,
-                      })
-                    }
-                  >
-                    {games.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    className="input"
-                    placeholder="Nama produk"
-                    value={editForm.name || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        name: e.target.value,
-                      })
-                    }
-                  />
-
-                  <input
-                    className="input"
-                    placeholder="Nominal"
-                    value={editForm.nominal || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        nominal: e.target.value,
-                      })
-                    }
-                  />
-
-                  <input
-                    className="input"
-                    placeholder="SKU"
-                    value={editForm.sku || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        sku: e.target.value,
-                      })
-                    }
-                  />
-
-                  <input
-                    type="number"
-                    min="0"
-                    className="input"
-                    placeholder="Harga"
-                    value={editForm.price ?? ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        price: e.target.value,
-                      })
-                    }
-                  />
-
-                  <label className="block text-sm font-semibold">
-                    Foto produk
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="input mt-2"
-                      onChange={(e) =>
-                        uploadFromInput(
-                          e,
-                          'products',
-                          (url) =>
-                            setEditForm((v) => ({
-                              ...v,
-                              image_url: url,
-                            })),
-                          '1:1'
-                        )
-                      }
-                    />
-                  </label>
-
-                  {editForm.image_url && (
-                    <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-3">
-                      <p className="mb-2 text-xs font-semibold text-slate-400">
-                        Preview foto produk
-                      </p>
-                      <img
-                        src={editForm.image_url}
-                        alt="Preview produk"
-                        className="h-24 w-24 rounded-xl object-cover"
-                      />
-                    </div>
-                  )}
-
-                  <p className="text-xs text-slate-500">
-                    Pilih foto untuk mengganti gambar produk. JPG, PNG, WEBP, atau GIF · maksimal 6 MB · rasio 1:1.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="btn btn-muted"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={saveEdit}
-                className="btn btn-primary"
-              >
-                Simpan Perubahan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }
