@@ -318,6 +318,7 @@ export default function Admin() {
     nominal: '',
     sku: '',
     price: '',
+    image_url: '',
   })
 
   const [methodForm, setMethodForm] = useState({
@@ -1070,6 +1071,7 @@ s
       nominal: row.nominal ?? '',
       sku: row.sku || '',
       price: row.price ?? '',
+      image_url: row.image_url || '',
     })
   }
 
@@ -1143,6 +1145,7 @@ s
         nominal: String(editForm.nominal || '').trim(),
         sku: String(editForm.sku || '').trim(),
         price,
+        image_url: String(editForm.image_url || '').trim() || null,
       }
 
       if (
@@ -3562,6 +3565,8 @@ async function deleteVoucher(v: any) {
                       sku: '',
                       price:
                         '',
+                      image_url:
+                        '',
                     })
                   )
               )
@@ -3624,6 +3629,38 @@ async function deleteVoucher(v: any) {
                 required
               />
             ))}
+
+            <label className="block text-sm font-semibold">
+              Foto Produk (opsional)
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="input mt-2"
+                disabled={mediaUploading}
+                onChange={(e) =>
+                  uploadFromInput(
+                    e,
+                    'products',
+                    (url) =>
+                      setProdForm((v) => ({
+                        ...v,
+                        image_url: url,
+                      })),
+                    '1:1'
+                  )
+                }
+              />
+              {prodForm.image_url && (
+                <img
+                  src={prodForm.image_url}
+                  alt="Preview foto produk"
+                  className="mt-2 h-24 w-24 rounded-xl object-cover"
+                />
+              )}
+              <span className="mt-1 block text-xs font-normal text-slate-500">
+                JPG/PNG/WEBP/GIF · maksimal 6 MB · rasio 1:1.
+              </span>
+            </label>
 
             <button className="btn btn-primary">
               Tambah Produk
@@ -3807,27 +3844,55 @@ async function deleteVoucher(v: any) {
                 'instruction',
                 'Instruksi',
               ],
-            ].map(([k, l]) => (
-              <input
-                key={k}
-                className="input"
-                placeholder={l}
-                value={
-                  (methodForm as any)[
-                    k
-                  ]
-                }
-                onChange={(e) =>
-                  setMethodForm({
-                    ...methodForm,
-                    [k]: e.target.value,
-                  })
-                }
-                required={
-                  k === 'name'
-                }
-              />
-            ))}
+            ].map(([k, l]) =>
+              k === 'qr_url' ? (
+                <label key={k} className="block text-sm font-semibold">
+                  Foto QRIS (opsional)
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="input mt-2"
+                    disabled={mediaUploading}
+                    onChange={(e) =>
+                      uploadFromInput(
+                        e,
+                        'general',
+                        (url) =>
+                          setMethodForm((v) => ({
+                            ...v,
+                            qr_url: url,
+                          })),
+                        '1:1'
+                      )
+                    }
+                  />
+                  {methodForm.qr_url && (
+                    <img
+                      src={methodForm.qr_url}
+                      alt="Preview QRIS"
+                      className="mt-2 h-32 w-32 rounded-xl object-cover"
+                    />
+                  )}
+                  <span className="mt-1 block text-xs font-normal text-slate-500">
+                    JPG/PNG/WEBP/GIF · maksimal 6 MB · rasio 1:1.
+                  </span>
+                </label>
+              ) : (
+                <input
+                  key={k}
+                  className="input"
+                  placeholder={l}
+                  value={(methodForm as any)[k]}
+                  onChange={(e) =>
+                    setMethodForm({
+                      ...methodForm,
+                      [k]: e.target.value,
+                    })
+                  }
+                  required={k === 'name'}
+                />
+              )
+            )}
 
             <button className="btn btn-primary">
               Tambah Metode
@@ -5678,28 +5743,77 @@ async function deleteVoucher(v: any) {
                       })
                     }
                   />
-                  <input
-                    className="input"
-                    placeholder="URL logo game"
-                    value={editForm.logo_url || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        logo_url: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    className="input"
-                    placeholder="URL banner game"
-                    value={editForm.banner_url || ''}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        banner_url: e.target.value,
-                      })
-                    }
-                  />
+                  <label className="block text-sm font-semibold">
+                    Logo game
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="input mt-2"
+                      onChange={(e) =>
+                        uploadFromInput(
+                          e,
+                          'games',
+                          (url) =>
+                            setEditForm((v) => ({
+                              ...v,
+                              logo_url: url,
+                            })),
+                          '1:1'
+                        )
+                      }
+                    />
+                  </label>
+
+                  {editForm.logo_url && (
+                    <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-3">
+                      <p className="mb-2 text-xs font-semibold text-slate-400">
+                        Preview logo game
+                      </p>
+                      <img
+                        src={editForm.logo_url}
+                        alt="Preview logo game"
+                        className="h-20 w-20 rounded-xl object-cover"
+                      />
+                    </div>
+                  )}
+
+                  <label className="block text-sm font-semibold">
+                    Banner game
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="input mt-2"
+                      onChange={(e) =>
+                        uploadFromInput(
+                          e,
+                          'games',
+                          (url) =>
+                            setEditForm((v) => ({
+                              ...v,
+                              banner_url: url,
+                            })),
+                          '16:9'
+                        )
+                      }
+                    />
+                  </label>
+
+                  {editForm.banner_url && (
+                    <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-3">
+                      <p className="mb-2 text-xs font-semibold text-slate-400">
+                        Preview banner game
+                      </p>
+                      <img
+                        src={editForm.banner_url}
+                        alt="Preview banner game"
+                        className="h-28 w-full rounded-xl object-cover"
+                      />
+                    </div>
+                  )}
+
+                  <p className="text-xs text-slate-500">
+                    Pilih file foto untuk mengganti logo atau banner. URL akan dibuat otomatis oleh Supabase Storage.
+                  </p>
                 </>
               )}
 
@@ -5771,6 +5885,44 @@ async function deleteVoucher(v: any) {
                       })
                     }
                   />
+
+                  <label className="block text-sm font-semibold">
+                    Foto produk
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="input mt-2"
+                      onChange={(e) =>
+                        uploadFromInput(
+                          e,
+                          'products',
+                          (url) =>
+                            setEditForm((v) => ({
+                              ...v,
+                              image_url: url,
+                            })),
+                          '1:1'
+                        )
+                      }
+                    />
+                  </label>
+
+                  {editForm.image_url && (
+                    <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-3">
+                      <p className="mb-2 text-xs font-semibold text-slate-400">
+                        Preview foto produk
+                      </p>
+                      <img
+                        src={editForm.image_url}
+                        alt="Preview produk"
+                        className="h-24 w-24 rounded-xl object-cover"
+                      />
+                    </div>
+                  )}
+
+                  <p className="text-xs text-slate-500">
+                    Pilih foto untuk mengganti gambar produk. JPG, PNG, WEBP, atau GIF · maksimal 6 MB · rasio 1:1.
+                  </p>
                 </>
               )}
             </div>
