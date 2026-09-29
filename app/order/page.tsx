@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 
@@ -15,7 +15,7 @@ const statusSlug: Record<string, string> = {
   REFUNDED: 'dikembalikan',
 }
 
-export default function OrderEntryPage() {
+function OrderEntryContent() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') || ''
@@ -68,9 +68,7 @@ export default function OrderEntryPage() {
 
       const slug = statusSlug[order.status] || 'menunggu-pembayaran'
 
-      router.replace(
-        `/order/${slug}?id=${encodeURIComponent(id)}`
-      )
+      router.replace(`/order/${slug}?id=${encodeURIComponent(id)}`)
     })()
 
     return () => {
@@ -82,5 +80,19 @@ export default function OrderEntryPage() {
     <main className="mx-auto max-w-2xl px-4 py-16 text-center text-slate-400">
       Memuat transaksi...
     </main>
+  )
+}
+
+export default function OrderEntryPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-2xl px-4 py-16 text-center text-slate-400">
+          Memuat transaksi...
+        </main>
+      }
+    >
+      <OrderEntryContent />
+    </Suspense>
   )
 }
