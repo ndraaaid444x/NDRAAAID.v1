@@ -5842,7 +5842,7 @@ async function deleteVoucher(v: any) {
                           e,
                           'games',
                           (url) =>
-                            setEditForm((v) => ({
+                            setEditForm((v: any) => ({
                               ...v,
                               logo_url: url,
                             })),
@@ -5876,7 +5876,7 @@ async function deleteVoucher(v: any) {
                           e,
                           'games',
                           (url) =>
-                            setEditForm((v) => ({
+                            setEditForm((v: any) => ({
                               ...v,
                               banner_url: url,
                             })),
@@ -5943,7 +5943,7 @@ async function deleteVoucher(v: any) {
                       accept="image/jpeg,image/png,image/webp,image/gif"
                       className="input mt-2"
                       disabled={mediaUploading}
-                      onChange={(e) => uploadFromInput(e, 'general', (url) => setEditForm((v) => ({ ...v, qr_url: url })), '1:1')}
+                      onChange={(e) => uploadFromInput(e, 'general', (url) => setEditForm((v: any) => ({ ...v, qr_url: url })), '1:1')}
                     />
                   </label>
                   {editForm.qr_url && <img src={editForm.qr_url} alt="Preview QRIS" className="h-32 w-32 rounded-xl object-cover" />}
@@ -6036,7 +6036,7 @@ async function deleteVoucher(v: any) {
                           e,
                           'products',
                           (url) =>
-                            setEditForm((v) => ({
+                            setEditForm((v: any) => ({
                               ...v,
                               image_url: url,
                             })),
