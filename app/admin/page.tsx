@@ -1377,7 +1377,7 @@ s
         !payload.nominal ||
         !payload.sku
       ) {
-        setMsg('Game, nama, nominal, dan SKU wajib diisi.')
+        setMsg('Game, nama, nominal, dan Kode Produk wajib diisi.')
         return
       }
     }
@@ -3838,7 +3838,7 @@ async function deleteVoucher(v: any) {
                 'nominal',
                 'Nominal',
               ],
-              ['sku', 'SKU'],
+              ['sku', 'Kode Produk'],
               ['price', 'Harga'],
             ].map(([k, l]) => (
               <input
@@ -3899,7 +3899,7 @@ async function deleteVoucher(v: any) {
 
           <div className="space-y-3">
             <AdminFilterShell active={productFilterActive} onReset={() => { setProductSearch(''); setProductGameFilter(''); setProductCategoryFilter(''); setProductStatusFilter(''); setProductPopularFilter(''); setProductPriceSort('') }}>
-              <input className="input text-xs" placeholder="Cari produk/SKU..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+              <input className="input text-xs" placeholder="Cari produk/Kode Produk..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
               <select className="input text-xs" value={productGameFilter} onChange={(e) => setProductGameFilter(e.target.value)}><option value="">Semua Game</option>{games.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
               <select className="input text-xs" value={productCategoryFilter} onChange={(e) => setProductCategoryFilter(e.target.value)}><option value="">Semua Kategori</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
               <select className="input text-xs" value={productStatusFilter} onChange={(e) => setProductStatusFilter(e.target.value)}><option value="">Semua Status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select>
@@ -6180,7 +6180,7 @@ async function deleteVoucher(v: any) {
 
                   <input
                     className="input"
-                    placeholder="SKU"
+                    placeholder="Kode Produk"
                     value={editForm.sku || ''}
                     onChange={(e) =>
                       setEditForm({

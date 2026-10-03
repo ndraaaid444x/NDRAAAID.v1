@@ -146,7 +146,7 @@ Admin Panel → `products` untuk menambah nominal/harga.
 Contoh:
 - Mobile Legends
 - 86 Diamonds
-- SKU `ML86`
+- Kode Produk `ML86`
 - Harga `20000`
 
 ## M. Tes transaksi

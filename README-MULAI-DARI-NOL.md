@@ -843,7 +843,7 @@ Contoh:
 
 ```text
 Nama: 86 Diamonds
-SKU: ML86
+Kode Produk: ML86
 Harga: 20000
 Game: Mobile Legends
 Status: Aktif

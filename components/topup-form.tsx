@@ -221,7 +221,7 @@ export default function TopupForm({
               </div>
 
               <div className="mt-1 truncate text-[10px] text-slate-500 sm:text-[11px]">
-                {p.sku}
+                {`Kode Produk: ${p.sku}`}
               </div>
             </button>
           ))}
