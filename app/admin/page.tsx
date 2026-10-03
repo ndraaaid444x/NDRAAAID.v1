@@ -172,6 +172,18 @@ const adminMenuGroups: readonly AdminMenuGroup[] = [
   },
 ] as const
 
+const GAME_FIELD_OPTIONS = [
+  { key: 'user_id', label: 'User ID', placeholder: 'Masukkan User ID' },
+  { key: 'server', label: 'Server ID', placeholder: 'Masukkan Server ID' },
+  { key: 'zone_id', label: 'Zone ID', placeholder: 'Masukkan Zone ID' },
+  { key: 'player_id', label: 'Player ID', placeholder: 'Masukkan Player ID' },
+  { key: 'uid', label: 'UID', placeholder: 'Masukkan UID' },
+  { key: 'riot_id', label: 'Riot ID', placeholder: 'Nama#Tag' },
+  { key: 'nickname', label: 'Nickname', placeholder: 'Masukkan Nickname' },
+  { key: 'phone', label: 'Nomor HP', placeholder: '08xxxxxxxxxx' },
+  { key: 'email', label: 'Email', placeholder: 'nama@email.com' },
+]
+
 export default function Admin() {
   const [tab, setTab] = useState('dashboard')
   const liveRefreshBusy = useRef(false)
@@ -311,6 +323,9 @@ export default function Admin() {
     banner_url: '',
     category_id: '',
   })
+
+  const [selectedGameFields, setSelectedGameFields] = useState<string[]>(['user_id'])
+  const [customGameField, setCustomGameField] = useState({ key: '', label: '', placeholder: '' })
 
   const [prodForm, setProdForm] = useState({
     game_id: '',
@@ -927,6 +942,80 @@ s
 
     if (!error) reset()
 
+    load()
+  }
+
+  async function addGameWithFields(e: FormEvent) {
+    e.preventDefault()
+    if (!['owner', 'admin'].includes(role)) return
+
+    const gamePayload = {
+      ...gameForm,
+      name: String(gameForm.name || '').trim(),
+      slug: String(gameForm.slug || '').trim().toLowerCase().replace(/\s+/g, '-'),
+      description: String(gameForm.description || '').trim() || null,
+      category_id: gameForm.category_id || null,
+      logo_url: String(gameForm.logo_url || '').trim() || null,
+      banner_url: String(gameForm.banner_url || '').trim() || null,
+      is_active: true,
+      popular: false,
+    }
+
+    if (!gamePayload.name || !gamePayload.slug) {
+      setMsg('Nama dan slug game wajib diisi.')
+      return
+    }
+
+    const { data: createdGame, error: gameError } = await s
+      .from('games')
+      .insert(gamePayload)
+      .select('id')
+      .single()
+
+    if (gameError || !createdGame) {
+      setMsg(gameError?.message || 'Game gagal ditambahkan.')
+      return
+    }
+
+    const fields = selectedGameFields.map((key, index) => {
+      const option = GAME_FIELD_OPTIONS.find((item) => item.key === key)!
+      return {
+        game_id: createdGame.id,
+        key: option.key,
+        label: option.label,
+        placeholder: option.placeholder,
+        required: true,
+        sort_order: index + 1,
+      }
+    })
+
+    const customKey = customGameField.key.trim().toLowerCase().replace(/\s+/g, '_')
+    const customLabel = customGameField.label.trim()
+    if (customKey && customLabel) {
+      fields.push({
+        game_id: createdGame.id,
+        key: customKey,
+        label: customLabel,
+        placeholder: customGameField.placeholder.trim() || null,
+        required: true,
+        sort_order: fields.length + 1,
+      } as any)
+    }
+
+    if (fields.length) {
+      const { error: fieldsError } = await s.from('game_fields').insert(fields)
+      if (fieldsError) {
+        setMsg(`Game berhasil dibuat, tetapi field gagal disimpan: ${fieldsError.message}`)
+      } else {
+        setMsg('Game dan field data akun berhasil ditambahkan.')
+      }
+    } else {
+      setMsg('Game berhasil ditambahkan tanpa field data akun.')
+    }
+
+    setGameForm({ name: '', slug: '', description: '', logo_url: '', banner_url: '', category_id: categories[0]?.id || '' })
+    setSelectedGameFields(['user_id'])
+    setCustomGameField({ key: '', label: '', placeholder: '' })
     load()
   }
 
@@ -3357,35 +3446,7 @@ async function deleteVoucher(v: any) {
       {tab === 'games' && (
         <section className="mt-7 grid gap-7 lg:grid-cols-[.8fr_1.2fr]">
           <form
-            onSubmit={(e) => {
-              e.preventDefault()
-
-              add(
-                'games',
-                {
-                  ...gameForm,
-                  is_active: true,
-                  popular: false,
-                  category_id:
-                    gameForm.category_id ||
-                    null,
-                },
-                () =>
-                  setGameForm({
-                    name: '',
-                    slug: '',
-                    description:
-                      '',
-                    logo_url: '',
-                    banner_url:
-                      '',
-                    category_id:
-                      categories[0]
-                        ?.id ||
-                      '',
-                  })
-              )
-            }}
+            onSubmit={addGameWithFields}
             className="glass space-y-3 rounded-2xl p-6"
           >
             <h2 className="text-xl font-black">
@@ -3461,6 +3522,36 @@ async function deleteVoucher(v: any) {
                 })
               }
             />
+
+            <div className="rounded-2xl border border-white/[.07] bg-slate-950/40 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black">Field Data Akun</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Pilih field yang akan tampil di halaman pembelian game ini.</p>
+                </div>
+                <span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[9px] font-bold text-cyan-300">PER GAME</span>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {GAME_FIELD_OPTIONS.map((field) => {
+                  const checked = selectedGameFields.includes(field.key)
+                  return (
+                    <label key={field.key} className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/[.06] bg-white/[.02] p-2.5 text-xs">
+                      <input type="checkbox" checked={checked} onChange={() => setSelectedGameFields((current) => checked ? current.filter((key) => key !== field.key) : [...current, field.key])} />
+                      <span>{field.label}</span>
+                    </label>
+                  )
+                })}
+              </div>
+              <div className="mt-4 grid gap-2">
+                <p className="text-xs font-bold text-slate-300">Field custom (opsional)</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <input className="input text-xs" placeholder="Key, mis. account_id" value={customGameField.key} onChange={(e) => setCustomGameField((v) => ({ ...v, key: e.target.value }))} />
+                  <input className="input text-xs" placeholder="Label, mis. Account ID" value={customGameField.label} onChange={(e) => setCustomGameField((v) => ({ ...v, label: e.target.value }))} />
+                  <input className="input text-xs" placeholder="Placeholder" value={customGameField.placeholder} onChange={(e) => setCustomGameField((v) => ({ ...v, placeholder: e.target.value }))} />
+                </div>
+                <p className="text-[10px] text-slate-500">Field custom otomatis menjadi wajib diisi. Kosongkan jika tidak digunakan.</p>
+              </div>
+            </div>
 
             <label className="block text-sm font-semibold">
               Logo game
