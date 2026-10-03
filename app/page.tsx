@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import {
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   ShieldCheck,
   Zap,
   Headphones,
@@ -45,6 +47,7 @@ export default function Home() {
   const [activeReview, setActiveReview] = useState(0)
 
   const broadcastStartX = useRef<number | null>(null)
+  const categoryScrollRef = useRef<HTMLDivElement | null>(null)
 
   /* =========================================================
      LOAD ACTIVE BANNER PROMO
@@ -276,9 +279,9 @@ export default function Home() {
 
       try {
         const params = new URLSearchParams()
-        // Kategori katalog utama Home harus selalu tersedia.
-        // Jangan bergantung pada kolom show_on_home agar tab tidak hilang
-        // ketika migrasi/flag Home belum tersinkron.
+        // Tampilkan SEMUA kategori aktif di Home.
+        // Kategori baru seperti E-DIGITAL otomatis ikut muncul tanpa perlu
+        // didaftarkan manual atau bergantung pada show_on_home.
         params.set('select', 'id,name,slug,sort_order,is_active')
         params.set('is_active', 'eq.true')
         params.set('order', 'sort_order.asc,name.asc')
@@ -297,20 +300,8 @@ export default function Home() {
         const data = await response.json()
         const rows = Array.isArray(data) ? data : []
 
-        // Empat kategori utama selalu ditampilkan di Home bersama Game Populer.
-        // Game yang ditandai populer tetap berada di kategori asalnya.
-        const mainSlugs = [
-          'mobile-games',
-          'pc-games',
-          'voucher-digital',
-          'console',
-        ]
-
-        const mainCategories = mainSlugs
-          .map((slug) => rows.find((category: any) => category.slug === slug))
-          .filter(Boolean)
-
-        if (mounted) setHomeCategories(mainCategories)
+        // Semua kategori aktif ditampilkan. Kategori baru otomatis ikut muncul.
+        if (mounted) setHomeCategories(rows)
       } catch (error) {
         console.error('Gagal memuat kategori Home:', error)
         if (mounted) setHomeCategories([])
@@ -940,27 +931,51 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="relative mt-4">
           <button
             type="button"
-            onClick={() => setSelectedHomeCategory('popular')}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition ${selectedHomeCategory === 'popular' ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`}
+            aria-label="Geser kategori ke kiri"
+            onClick={() => categoryScrollRef.current?.scrollBy({ left: -260, behavior: 'smooth' })}
+            className="absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-slate-950/90 p-2 text-slate-300 shadow-lg backdrop-blur transition hover:border-rose-400/40 hover:text-white md:flex"
           >
-            <Star className="h-3.5 w-3.5" />
-            Game Populer
+            <ChevronLeft className="h-4 w-4" />
           </button>
 
-          {homeCategories.map((category) => (
+          <div
+            ref={categoryScrollRef}
+            className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-0.5 pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:px-9"
+            style={{ touchAction: 'pan-x' }}
+          >
             <button
-              key={category.id}
               type="button"
-              onClick={() => setSelectedHomeCategory(category.id)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition ${selectedHomeCategory === category.id ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`}
+              onClick={() => setSelectedHomeCategory('popular')}
+              className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition ${selectedHomeCategory === 'popular' ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`}
             >
-              {category.slug === 'pc-games' ? <Monitor className="h-3.5 w-3.5" /> : category.slug === 'voucher-digital' ? <Ticket className="h-3.5 w-3.5" /> : category.slug === 'console' ? <Tv className="h-3.5 w-3.5" /> : <Gamepad2 className="h-3.5 w-3.5" />}
-              {homeCategoryLabel(category)}
+              <Star className="h-3.5 w-3.5" />
+              Game Populer
             </button>
-          ))}
+
+            {homeCategories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => setSelectedHomeCategory(category.id)}
+                className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition ${selectedHomeCategory === category.id ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`}
+              >
+                {category.slug === 'pc-games' ? <Monitor className="h-3.5 w-3.5" /> : category.slug === 'voucher-digital' ? <Ticket className="h-3.5 w-3.5" /> : category.slug === 'console' ? <Tv className="h-3.5 w-3.5" /> : <Gamepad2 className="h-3.5 w-3.5" />}
+                {homeCategoryLabel(category)}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            aria-label="Geser kategori ke kanan"
+            onClick={() => categoryScrollRef.current?.scrollBy({ left: 260, behavior: 'smooth' })}
+            className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-slate-950/90 p-2 text-slate-300 shadow-lg backdrop-blur transition hover:border-rose-400/40 hover:text-white md:flex"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
 
         {loadingGames && (

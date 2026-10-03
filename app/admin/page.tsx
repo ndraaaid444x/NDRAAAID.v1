@@ -1057,6 +1057,40 @@ s
   }
 
 
+  async function deleteGame(game: any) {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat menghapus game.')
+      return
+    }
+
+    const label = game?.name || 'Game'
+    if (!confirm(`Hapus game "${label}"?\n\nGame, field akun, dan produk/nominal yang masih terhubung dapat ikut terhapus. Riwayat transaksi yang memiliki referensi game dapat membuat penghapusan ditolak database.`)) return
+
+    // Hapus konfigurasi field dan produk milik game terlebih dahulu.
+    // Jika database masih memiliki riwayat transaksi yang mereferensikan data tersebut,
+    // operasi akan dihentikan dan data tidak dihapus sebagian.
+    const { error: fieldsError } = await s.from('game_fields').delete().eq('game_id', game.id)
+    if (fieldsError) {
+      setMsg(`Game tidak dapat dihapus. ${fieldsError.message}`)
+      return
+    }
+
+    const { error: productsError } = await s.from('game_products').delete().eq('game_id', game.id)
+    if (productsError) {
+      setMsg(`Game tidak dapat dihapus karena produk masih terhubung transaksi. ${productsError.message}`)
+      return
+    }
+
+    const { error: gameError } = await s.from('games').delete().eq('id', game.id)
+    if (gameError) {
+      setMsg(`Game tidak dapat dihapus. ${gameError.message}`)
+      return
+    }
+
+    setMsg(`Game ${label} berhasil dihapus.`)
+    load()
+  }
+
   async function togglePopular(game: any) {
     if (!['owner', 'admin'].includes(role)) {
       setMsg('Hanya Owner/Admin yang dapat mengatur Game Populer.')
@@ -1095,6 +1129,54 @@ s
 
     setCategories((current) => current.map((c) => c.id === category.id ? { ...c, show_on_home: next } : c))
     setMsg(next ? `${category.name} ditambahkan ke Home.` : `${category.name} dihapus dari Home.`)
+  }
+
+  async function resetHomeCategories() {
+    if (!['owner', 'admin'].includes(role)) {
+      setMsg('Hanya Owner/Admin yang dapat mereset kategori Home.')
+      return
+    }
+
+    if (!confirm('Reset kategori Home? Semua kategori tambahan akan disembunyikan. Game Populer dan game-nya tetap aman/tidak berubah. Kategori utama Mobile Games, PC Games, Voucher Digital, dan Console tetap tampil.')) return
+
+    const { error: hideError } = await s
+      .from('game_categories')
+      .update({ show_on_home: false })
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+
+    if (hideError) {
+      setMsg(`Gagal mereset kategori Home: ${hideError.message}`)
+      return
+    }
+
+    const mainSlugs = ['mobile-games', 'pc-games', 'voucher-digital', 'console']
+    const { data: mainCategories, error: mainError } = await s
+      .from('game_categories')
+      .select('id,slug')
+      .in('slug', mainSlugs)
+
+    if (mainError) {
+      setMsg(`Kategori sudah direset, tetapi kategori utama gagal dipulihkan: ${mainError.message}`)
+      load()
+      return
+    }
+
+    const mainIds = (mainCategories || []).map((c: any) => c.id).filter(Boolean)
+    if (mainIds.length) {
+      const { error } = await s
+        .from('game_categories')
+        .update({ show_on_home: true })
+        .in('id', mainIds)
+
+      if (error) {
+        setMsg(`Kategori sudah direset, tetapi kategori utama gagal dipulihkan: ${error.message}`)
+        load()
+        return
+      }
+    }
+
+    setMsg('Kategori Home berhasil direset. Game Populer tidak berubah.')
+    load()
   }
 
 
@@ -3674,6 +3756,9 @@ async function deleteVoucher(v: any) {
                   )}
 
                   <button type="button" onClick={() => toggle('games', g.id)} className="btn btn-muted !h-8 !w-8 !p-0" title={g.is_active ? 'Nonaktifkan' : 'Aktifkan'} aria-label={g.is_active ? 'Nonaktifkan' : 'Aktifkan'}><Power className={`h-3.5 w-3.5 ${g.is_active ? 'text-emerald-300' : 'text-slate-500'}`} /></button>
+                  {['owner', 'admin'].includes(role) && (
+                    <button type="button" onClick={() => deleteGame(g)} className="btn btn-muted !h-8 !w-8 !p-0 text-red-300 hover:border-red-400/30 hover:bg-red-500/10" title="Hapus game" aria-label="Hapus game"><Trash2 className="h-3.5 w-3.5" /></button>
+                  )}
                 </div>
               </div>
             ))}
@@ -3912,10 +3997,13 @@ async function deleteVoucher(v: any) {
             <p className="text-[9px] font-black uppercase tracking-[.18em] text-rose-400">HOME</p>
             <h2 className="mt-0.5 text-lg font-black text-white">Kategori Home</h2>
             <p className="mt-1 text-[11px] text-slate-500">Tentukan kategori katalog mana yang tampil sebagai tab di Home. Menghapus dari Home tidak menghapus game.</p>
-            <AdminFilterShell active={Boolean(homeCategorySearch || homeCategoryStatusFilter)} onReset={() => { setHomeCategorySearch(''); setHomeCategoryStatusFilter('') }}>
-              <input className="input text-xs" placeholder="Cari kategori..." value={homeCategorySearch} onChange={(e) => setHomeCategorySearch(e.target.value)} />
-              <select className="input text-xs" value={homeCategoryStatusFilter} onChange={(e) => setHomeCategoryStatusFilter(e.target.value)}><option value="">Semua</option><option value="visible">Tampil di Home</option><option value="hidden">Tidak tampil</option></select>
-            </AdminFilterShell>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <AdminFilterShell active={Boolean(homeCategorySearch || homeCategoryStatusFilter)} onReset={() => { setHomeCategorySearch(''); setHomeCategoryStatusFilter('') }}>
+                <input className="input text-xs" placeholder="Cari kategori..." value={homeCategorySearch} onChange={(e) => setHomeCategorySearch(e.target.value)} />
+                <select className="input text-xs" value={homeCategoryStatusFilter} onChange={(e) => setHomeCategoryStatusFilter(e.target.value)}><option value="">Semua</option><option value="visible">Tampil di Home</option><option value="hidden">Tidak tampil</option></select>
+              </AdminFilterShell>
+              <button type="button" onClick={resetHomeCategories} className="btn btn-muted shrink-0 text-[10px] font-black">Reset Kategori Home</button>
+            </div>
           </div>
           {limitAdminItems(filteredHomeCategories, Boolean(homeCategorySearch || homeCategoryStatusFilter)).map((c) => (
             <div key={c.id} className="glass flex items-center justify-between gap-3 rounded-xl px-3 py-2.5">
