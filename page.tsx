@@ -1,451 +1,1031 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { supabaseBrowser } from '@/lib/supabase-browser'
-import PaymentProof from '@/components/payment-proof'
+import Link from 'next/link'
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  Zap,
+  Headphones,
+  Radio,
+  ExternalLink,
+  Sparkles,
+  Gamepad2,
+  Monitor,
+  Ticket,
+  Tv,
+  Star,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
-const statusInfo: Record<string, { label: string; color: string; icon: string }> = {
-  PENDING_PAYMENT: { label: 'Menunggu Pembayaran', color: 'text-amber-300', icon: '⏳' },
-  PAYMENT_RECEIVED: { label: 'Pembayaran Diterima', color: 'text-cyan-300', icon: '✓' },
-  PROCESSING: { label: 'Sedang Diproses', color: 'text-purple-300', icon: '⚙️' },
-  SUCCESS: { label: 'Berhasil', color: 'text-emerald-300', icon: '✓' },
-  FAILED: { label: 'Gagal', color: 'text-rose-300', icon: '✕' },
-  CANCELLED: { label: 'Dibatalkan', color: 'text-slate-300', icon: '✕' },
-  EXPIRED: { label: 'Kedaluwarsa', color: 'text-orange-300', icon: '⌛' },
-  REFUNDED: { label: 'Dana Dikembalikan', color: 'text-blue-300', icon: '↩' },
+function homeCategoryLabel(category: any) {
+  if (category?.slug === 'mobile-games') return 'Game Mobile'
+  if (category?.slug === 'pc-games') return 'PC Game'
+  if (category?.slug === 'voucher-digital') return 'Voucher'
+  if (category?.slug === 'console') return 'Console'
+  return category?.name || 'Kategori'
 }
 
-const slugStatus: Record<string, string> = {
-  'menunggu-pembayaran': 'PENDING_PAYMENT',
-  'pembayaran-diterima': 'PAYMENT_RECEIVED',
-  'sedang-diproses': 'PROCESSING',
-  berhasil: 'SUCCESS',
-  gagal: 'FAILED',
-  dibatalkan: 'CANCELLED',
-  kedaluwarsa: 'EXPIRED',
-  dikembalikan: 'REFUNDED',
-}
+export default function Home() {
+  const [games, setGames] = useState<any[]>([])
+  const [loadingGames, setLoadingGames] = useState(true)
+  const [gameError, setGameError] = useState('')
+  const [homeCategories, setHomeCategories] = useState<any[]>([])
+  const [selectedHomeCategory, setSelectedHomeCategory] = useState('popular')
 
-const statusSlug: Record<string, string> = Object.fromEntries(
-  Object.entries(slugStatus).map(([slug, status]) => [status, slug])
-)
+  const [promo, setPromo] = useState<any | null>(null)
+  const [loadingPromo, setLoadingPromo] = useState(true)
+  const [promoError, setPromoError] = useState('')
 
-const labels: Record<string, string> = Object.fromEntries(
-  Object.entries(statusInfo).map(([key, value]) => [key, value.label])
-)
+  const [broadcasts, setBroadcasts] = useState<any[]>([])
+  const [loadingBroadcast, setLoadingBroadcast] = useState(true)
+  const [activeBroadcast, setActiveBroadcast] = useState(0)
 
-function OrderStatusContent() {
-  const router = useRouter()
-  const params = useParams<{ status: string }>()
-  const searchParams = useSearchParams()
-  const id = searchParams.get('id') || ''
-  const routeStatus = slugStatus[params.status || ''] || ''
+  const [runningText, setRunningText] = useState<any | null>(null)
+  const [reviews, setReviews] = useState<any[]>([])
+  const [activeReview, setActiveReview] = useState(0)
 
-  const [o, setO] = useState<any>(null)
-  const [payment, setPayment] = useState<any>(null)
-  const [paymentMethod, setPaymentMethod] = useState<any>(null)
-  const [history, setHistory] = useState<any[]>([])
-  const [proof, setProof] = useState<any>(null)
-  const [proofUrl, setProofUrl] = useState('')
-  const [loading, setLoading] = useState(true)
+  const broadcastStartX = useRef<number | null>(null)
+  const categoryScrollRef = useRef<HTMLDivElement | null>(null)
 
-  const load = useCallback(async (first = false) => {
-    if (!id) {
-      router.replace('/orders')
-      return
-    }
-
-    const s = supabaseBrowser()
-    const {
-      data: { user },
-    } = await s.auth.getUser()
-
-    if (!user) {
-      router.replace(`/login?next=/order/${encodeURIComponent(params.status || '')}?id=${encodeURIComponent(id)}`)
-      return
-    }
-
-    const { data: order } = await s
-      .from('orders')
-      .select('*,games(name),order_items(*)')
-      .eq('id', id)
-      .single()
-
-    if (!order) {
-      router.replace('/orders')
-      return
-    }
-
-    if (order.user_id !== user.id) {
-      const { data: profile } = await s
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!['owner', 'admin'].includes(profile?.role)) {
-        router.replace('/orders')
-        return
-      }
-    }
-
-    if (order.status !== routeStatus) {
-      router.replace(`/order/${statusSlug[order.status] || 'menunggu-pembayaran'}?id=${encodeURIComponent(id)}`)
-      return
-    }
-
-    const [{ data: paymentRow }, { data: hist }, { data: proofs }] = await Promise.all([
-      s.from('payments').select('*').eq('order_id', id).maybeSingle(),
-      s.from('order_status_history').select('*').eq('order_id', id).order('created_at'),
-      s.from('payment_proofs').select('*').eq('order_id', id).order('created_at', { ascending: false }).limit(1),
-    ])
-
-    let method = null
-    if (paymentRow?.payment_method_id) {
-      const { data } = await s
-        .from('payment_methods')
-        .select('*')
-        .eq('id', paymentRow.payment_method_id)
-        .maybeSingle()
-      method = data
-    }
-
-    const latestProof = proofs?.[0] || null
-    let signedUrl = ''
-    if (latestProof?.storage_path) {
-      const { data } = await s.storage.from('payment-proofs').createSignedUrl(latestProof.storage_path, 900)
-      signedUrl = data?.signedUrl || ''
-    }
-
-    setO(order)
-    setPayment(paymentRow)
-    setPaymentMethod(method)
-    setHistory(hist || [])
-    setProof(latestProof)
-    setProofUrl(signedUrl)
-    if (first) setLoading(false)
-  }, [id, params.status, routeStatus, router])
+  /* =========================================================
+     LOAD ACTIVE BANNER PROMO
+  ========================================================= */
 
   useEffect(() => {
-    load(true)
-    const timer = window.setInterval(() => load(false), 3000)
-    return () => window.clearInterval(timer)
-  }, [load])
+    let mounted = true
 
-  const paymentMethodIsQris = useMemo(
-    () =>
-      String(paymentMethod?.kind || '').trim().toUpperCase() === 'QRIS' ||
-      String(paymentMethod?.name || '').trim().toLowerCase().includes('qris'),
-    [paymentMethod]
-  )
+    async function loadPromo() {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  const customerEntries = useMemo(() => {
-    const data = o?.customer_data
-    if (!data || typeof data !== 'object' || Array.isArray(data)) return []
+      if (!supabaseUrl || !supabaseKey) {
+        if (mounted) {
+          setPromo(null)
+          setPromoError('Konfigurasi Supabase tidak ditemukan.')
+          setLoadingPromo(false)
+        }
+        return
+      }
 
-    const privateKeys = new Set([
-      'email',
-      'phone',
-      'whatsapp',
-      'wa',
-      'telephone',
-      'phone_number',
-      'whatsapp_number',
-    ])
+      try {
+        const params = new URLSearchParams()
+        params.set('select', 'id,name,custom_text,description,code,banner_url,content_type,is_active')
+        params.set('is_active', 'eq.true')
+        params.set('limit', '1')
 
-    const labelMap: Record<string, string> = {
-      id: 'ID',
-      user_id: 'User ID',
-      server: 'Server',
-      zone: 'Zone',
-      zone_id: 'Zone ID',
-      riot_id: 'Riot ID',
-      riotid: 'Riot ID',
-      tag: 'Tag',
-      name: 'Nama',
-      username: 'Username',
-      player_id: 'Player ID',
-      playerid: 'Player ID',
-      uid: 'UID',
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/promotions?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+              Accept: 'application/json',
+              'Cache-Control': 'no-cache, no-store, max-age=0',
+              Pragma: 'no-cache',
+            },
+            cache: 'no-store',
+          }
+        )
+
+        if (!response.ok) {
+          const message = await response.text()
+          throw new Error(`Promo HTTP ${response.status}: ${message}`)
+        }
+
+        const data = await response.json()
+        if (!mounted) return
+
+        setPromo(Array.isArray(data) && data.length ? data[0] : null)
+        setPromoError('')
+      } catch (error: any) {
+        console.error('Gagal memuat Banner Promo:', error)
+        if (mounted) {
+          setPromo(null)
+          setPromoError(error?.message || 'Banner Promo gagal dimuat.')
+        }
+      } finally {
+        if (mounted) setLoadingPromo(false)
+      }
     }
 
-    return Object.entries(data)
-      .filter(([key, value]) => {
-        const normalized = key.toLowerCase().replace(/[\s-]/g, '_')
-        return !privateKeys.has(normalized) && value !== null && value !== undefined && String(value).trim() !== ''
-      })
-      .map(([key, value]) => ({
-        key,
-        label:
-          labelMap[key.toLowerCase()] ||
-          key
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, (letter) => letter.toUpperCase()),
-        value:
-          typeof value === 'object'
-            ? JSON.stringify(value)
-            : String(value),
-      }))
-  }, [o])
+    loadPromo()
+    const interval = setInterval(loadPromo, 30000)
 
-  if (loading || !o) {
-    return (
-      <main className="mx-auto max-w-2xl px-4 py-12 text-center text-slate-400">
-        Memuat transaksi...
-      </main>
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  /* =========================================================
+     LOAD GAMES
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadGames() {
+      if (!mounted) return
+
+      setLoadingGames(true)
+      setGameError('')
+
+      const supabaseUrl =
+        process.env.NEXT_PUBLIC_SUPABASE_URL
+
+      const supabaseKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) {
+        if (mounted) {
+          setGames([])
+          setGameError(
+            'Konfigurasi Supabase tidak ditemukan.'
+          )
+          setLoadingGames(false)
+        }
+
+        return
+      }
+
+      const controller = new AbortController()
+
+      const timeout = setTimeout(() => {
+        controller.abort()
+      }, 8000)
+
+      try {
+        const url =
+          `${supabaseUrl}/rest/v1/games` +
+          `?select=*` +
+          `&is_active=eq.true` +
+          `&order=name.asc` +
+          `&limit=50`
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            Accept: 'application/json',
+            'Cache-Control':
+              'no-cache, no-store, max-age=0',
+            Pragma: 'no-cache',
+          },
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          const message = await response.text()
+
+          throw new Error(
+            `Supabase HTTP ${response.status}: ${message}`
+          )
+        }
+
+        const data = await response.json()
+
+        if (!mounted) return
+
+        if (!Array.isArray(data)) {
+          throw new Error(
+            'Format data game tidak valid.'
+          )
+        }
+
+        const uniqueGames = Array.from(
+          new Map(
+            data.map((game: any) => [
+              game.id,
+              game,
+            ])
+          ).values()
+        )
+
+        uniqueGames.sort(
+          (a: any, b: any) => {
+            const popularA =
+              a?.popular === true ? 1 : 0
+
+            const popularB =
+              b?.popular === true ? 1 : 0
+
+            if (popularA !== popularB) {
+              return popularB - popularA
+            }
+
+            return String(
+              a?.name || ''
+            ).localeCompare(
+              String(b?.name || ''),
+              'id'
+            )
+          }
+        )
+
+        setGames(uniqueGames)
+      } catch (error: any) {
+        if (!mounted) return
+
+        console.error(
+          'Gagal memuat game:',
+          error
+        )
+
+        setGames([])
+
+        if (error?.name === 'AbortError') {
+          setGameError(
+            'Server game tidak merespons dalam 8 detik. Silakan coba lagi.'
+          )
+        } else {
+          setGameError(
+            error?.message ||
+              'Terjadi kesalahan saat memuat game.'
+          )
+        }
+      } finally {
+        clearTimeout(timeout)
+
+        if (mounted) {
+          setLoadingGames(false)
+        }
+      }
+    }
+
+    loadGames()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  /* =========================================================
+     LOAD HOME CATEGORIES
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadHomeCategories() {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) return
+
+      try {
+        const params = new URLSearchParams()
+        // Tampilkan semua kategori aktif yang ditandai untuk Home.
+        // Kategori bawaan tetap muncul, sedangkan kategori baru dari Admin
+        // ikut muncul otomatis jika show_on_home = true.
+        params.set('select', 'id,name,slug,sort_order,is_active,show_on_home')
+        params.set('is_active', 'eq.true')
+        params.set('show_on_home', 'eq.true')
+        params.set('order', 'sort_order.asc,name.asc')
+
+        const response = await fetch(`${supabaseUrl}/rest/v1/game_categories?${params.toString()}`, {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            Accept: 'application/json',
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+          },
+          cache: 'no-store',
+        })
+
+        if (!response.ok) throw new Error(await response.text())
+        const data = await response.json()
+        const rows = Array.isArray(data) ? data : []
+
+        // Semua kategori aktif + show_on_home=true ditampilkan.
+        // Dengan begitu kategori baru yang dibuat Admin tidak perlu ditambahkan
+        // manual ke kode Home.
+        if (mounted) setHomeCategories(rows)
+      } catch (error) {
+        console.error('Gagal memuat kategori Home:', error)
+        if (mounted) setHomeCategories([])
+      }
+    }
+
+    loadHomeCategories()
+    const interval = setInterval(loadHomeCategories, 30000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  /* =========================================================
+     LOAD BROADCAST
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadBroadcasts() {
+      const supabaseUrl =
+        process.env.NEXT_PUBLIC_SUPABASE_URL
+
+      const supabaseKey =
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) {
+        if (mounted) {
+          setBroadcasts([])
+          setLoadingBroadcast(false)
+        }
+
+        return
+      }
+
+      try {
+        const now =
+          new Date().toISOString()
+
+        const params = new URLSearchParams()
+
+        params.set(
+          'select',
+          'id,title,message,type,starts_at,ends_at,link_url,link_label,is_active,created_at'
+        )
+
+        params.set(
+          'is_active',
+          'eq.true'
+        )
+
+        params.set(
+          'starts_at',
+          `lte.${now}`
+        )
+
+        params.set(
+          'ends_at',
+          `gt.${now}`
+        )
+
+        params.set(
+          'order',
+          'created_at.desc'
+        )
+
+        /*
+          Ambil lebih banyak data supaya broadcast
+          dengan link dan tanpa link tidak terpotong.
+        */
+        params.set(
+          'limit',
+          '50'
+        )
+
+        const response = await fetch(
+          `${supabaseUrl}/rest/v1/broadcasts?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+              Accept: 'application/json',
+              'Cache-Control':
+                'no-cache, no-store, max-age=0',
+              Pragma: 'no-cache',
+            },
+            cache: 'no-store',
+          }
+        )
+
+        if (!response.ok) {
+          const message =
+            await response.text()
+
+          throw new Error(
+            `Broadcast HTTP ${response.status}: ${message}`
+          )
+        }
+
+        const data =
+          await response.json()
+
+        if (!mounted) return
+
+        const nextBroadcasts =
+          Array.isArray(data)
+            ? data
+            : []
+
+        setBroadcasts(nextBroadcasts)
+
+        setActiveBroadcast(0)
+      } catch (error) {
+        console.error(
+          'Gagal memuat broadcast:',
+          error
+        )
+
+        if (mounted) {
+          setBroadcasts([])
+          setActiveBroadcast(0)
+        }
+      } finally {
+        if (mounted) {
+          setLoadingBroadcast(false)
+        }
+      }
+    }
+
+    loadBroadcasts()
+
+    const interval =
+      setInterval(
+        loadBroadcasts,
+        30000
+      )
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  /* =========================================================
+     FILTER BROADCAST
+
+     CYBER:
+     Hanya broadcast TANPA link.
+
+     LINK:
+     Hanya broadcast DENGAN link.
+  ========================================================= */
+
+  const cyberBroadcasts =
+    broadcasts.filter(
+      (broadcast) =>
+        !String(
+          broadcast?.link_url || ''
+        ).trim()
     )
+
+  const linkedBroadcasts =
+    broadcasts.filter(
+      (broadcast) =>
+        Boolean(
+          String(
+            broadcast?.link_url || ''
+          ).trim()
+        )
+    )
+
+  const currentBroadcast =
+    cyberBroadcasts.length > 0
+      ? cyberBroadcasts[
+          activeBroadcast %
+            cyberBroadcasts.length
+        ]
+      : null
+
+  const linkedBroadcast =
+    linkedBroadcasts.length > 0
+      ? linkedBroadcasts[0]
+      : null
+
+  /* =========================================================
+     AUTO SLIDER
+     Tetap 5 detik tanpa tulisan AUTO
+  ========================================================= */
+
+  useEffect(() => {
+    if (cyberBroadcasts.length <= 1) {
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setActiveBroadcast(
+        (current) =>
+          (current + 1) %
+          cyberBroadcasts.length
+      )
+    }, 5000)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [
+    activeBroadcast,
+    cyberBroadcasts.length,
+  ])
+
+  /* =========================================================
+     SWIPE / DRAG CYBER BROADCAST
+  ========================================================= */
+
+  function handleBroadcastPointerDown(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    if (cyberBroadcasts.length <= 1) {
+      return
+    }
+
+    broadcastStartX.current =
+      event.clientX
+
+    try {
+      event.currentTarget.setPointerCapture(
+        event.pointerId
+      )
+    } catch {}
   }
 
-  const info = statusInfo[o.status] || {
-    label: o.status,
-    color: 'text-slate-300',
-    icon: '•',
+  function handleBroadcastPointerUp(
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    if (
+      broadcastStartX.current === null ||
+      cyberBroadcasts.length <= 1
+    ) {
+      broadcastStartX.current = null
+      return
+    }
+
+    const distance =
+      event.clientX -
+      broadcastStartX.current
+
+    if (Math.abs(distance) >= 50) {
+      if (distance < 0) {
+        setActiveBroadcast(
+          (current) =>
+            (current + 1) %
+            cyberBroadcasts.length
+        )
+      } else {
+        setActiveBroadcast(
+          (current) =>
+            (current - 1 +
+              cyberBroadcasts.length) %
+            cyberBroadcasts.length
+        )
+      }
+    }
+
+    broadcastStartX.current = null
+
+    try {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId
+      )
+    } catch {}
   }
 
-  const compact = o.status === 'SUCCESS' || ['FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED'].includes(o.status)
-  const subtotal = Number(o.subtotal ?? o.total ?? 0)
-  const discount = Number(o.discount ?? 0)
-  const total = Number(o.total ?? Math.max(0, subtotal - discount))
-  const voucherCode = String(o.voucher_code || '').trim()
-  const hasDiscount = discount > 0 || Boolean(voucherCode)
-  const reference = payment?.external_reference || ''
+  /* =========================================================
+     RUNNING TEXT + CUSTOMER REVIEWS
+     Review publik hanya yang sudah disetujui Admin.
+  ========================================================= */
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadHomeExtras() {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) return
+
+      try {
+        const runningParams = new URLSearchParams()
+        runningParams.set('select', 'id,text_content,is_active,speed_ms')
+        runningParams.set('is_active', 'eq.true')
+        runningParams.set('limit', '1')
+
+        const reviewParams = new URLSearchParams()
+        reviewParams.set('select', 'id,reviewer_display,rating,review_text,created_at')
+        reviewParams.set('is_approved', 'eq.true')
+        reviewParams.set('order', 'created_at.desc')
+        reviewParams.set('limit', '50')
+
+        const headers = {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          Pragma: 'no-cache',
+        }
+
+        const [runningResponse, reviewResponse] = await Promise.all([
+          fetch(`${supabaseUrl}/rest/v1/home_running_text?${runningParams.toString()}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+          }),
+          fetch(`${supabaseUrl}/rest/v1/customer_reviews?${reviewParams.toString()}`, {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+          }),
+        ])
+
+        if (!runningResponse.ok || !reviewResponse.ok) return
+
+        const [runningData, reviewData] = await Promise.all([
+          runningResponse.json(),
+          reviewResponse.json(),
+        ])
+
+        if (!mounted) return
+
+        setRunningText(Array.isArray(runningData) && runningData.length ? runningData[0] : null)
+        setReviews(Array.isArray(reviewData) ? reviewData : [])
+        setActiveReview(0)
+      } catch (error) {
+        console.error('Gagal memuat running text/review:', error)
+      }
+    }
+
+    loadHomeExtras()
+    const interval = setInterval(loadHomeExtras, 30000)
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (reviews.length <= 1) return
+
+    const timer = setTimeout(() => {
+      setActiveReview((current) => (current + 1) % reviews.length)
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [activeReview, reviews.length])
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-3 py-5 sm:px-4 sm:py-8">
-      <section className="glass overflow-hidden rounded-2xl p-3.5 sm:p-5">
-        <header className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-              Status Pesanan
-            </p>
-            <h1 className={`mt-1 text-lg font-black sm:text-xl ${info.color}`}>
-              {info.icon} {info.label}
-            </h1>
-          </div>
-          <div className="shrink-0 rounded-lg bg-white/5 px-2.5 py-1.5 text-right">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Order ID</p>
-            <p className="max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap text-[10px] font-black text-slate-200 sm:max-w-[180px] sm:text-[11px]">
-              {o.order_code}
-            </p>
-          </div>
-        </header>
+    <div>
+      {/* =====================================================
+          PROMO
+      ===================================================== */}
 
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Produk</p>
-              <p className="mt-0.5 truncate text-sm font-black text-slate-100">
-                {o.games?.name || 'Produk'}
-              </p>
-            </div>
-            <span className="shrink-0 rounded-md bg-white/5 px-2 py-1 text-[9px] font-bold text-slate-400">
-              {info.label}
-            </span>
-          </div>
+      {!loadingPromo && promo && (
+        <section
+          id="promo"
+          className="mx-auto max-w-7xl px-4 py-10"
+        >
+          <div className="glass overflow-hidden rounded-3xl border border-pink-400/10">
+            {promo.content_type !== 'text' && promo.banner_url && (
+              <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
+                {/\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(promo.banner_url) ? (
+                <video
+                  src={promo.banner_url}
+                  aria-label={promo.name || 'Banner Promo'}
+                  className="h-full w-full object-cover"
+                  autoPlay muted loop playsInline
+                />
+              ) : (
+                <img
+                  src={promo.banner_url}
+                  alt={promo.name || 'Banner Promo'}
+                  className="h-full w-full object-cover"
+                />
+                )}
+              </div>
+            )}
 
-          {o.order_items?.length > 0 && (
-            <div className="mt-2 border-t border-white/5 pt-2">
-              {o.order_items.map((item: any) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 py-0.5 text-xs">
-                  <span className="truncate text-slate-500">{item.product_name}</span>
-                  {item.quantity && Number(item.quantity) > 1 && (
-                    <span className="shrink-0 text-slate-600">×{item.quantity}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {customerEntries.length > 0 && (
-          <div className="mt-2.5 rounded-xl border border-white/10 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Data Game
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {customerEntries.map((entry) => (
-                <div key={entry.key} className="min-w-0 rounded-lg bg-white/[0.025] px-2.5 py-2">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
-                    {entry.label}
+            {promo.content_type !== 'image' && (
+              <div className="p-6 md:p-8">
+                {promo.custom_text && (
+                  <p className="text-sm font-bold uppercase tracking-[0.18em] text-pink-300">
+                    {promo.custom_text}
                   </p>
-                  <p className="mt-0.5 break-all text-xs font-bold text-slate-200">
-                    {entry.value}
+                )}
+
+                {promo.name && (
+                  <h2 className="mt-2 text-3xl font-black">
+                    {promo.name}
+                  </h2>
+                )}
+
+                {promo.description && (
+                  <p className="mt-3 max-w-3xl text-slate-400">
+                    {promo.description}
                   </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                )}
 
-        <div className="mt-2.5 rounded-xl border border-white/10 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Rincian Pembayaran
-            </p>
-            <p className="text-[10px] font-semibold text-slate-600">
-              {paymentMethod?.name || 'Pembayaran'}
-            </p>
-          </div>
-
-          <div className="mt-2 space-y-1.5 text-xs">
-            <div className="flex justify-between gap-4">
-              <span className="text-slate-500">Subtotal</span>
-              <span className="font-semibold text-slate-300">
-                Rp {subtotal.toLocaleString('id-ID')}
-              </span>
-            </div>
-
-            {hasDiscount && (
-              <>
-                {voucherCode && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-slate-500">Voucher</span>
-                    <span className="font-bold text-cyan-300">{voucherCode}</span>
+                {promo.code && (
+                  <div className="mt-4 inline-flex rounded-xl border border-pink-400/20 bg-pink-400/10 px-4 py-2 text-sm font-black text-pink-200">
+                    Kode: {promo.code}
                   </div>
                 )}
-                {discount > 0 && (
-                  <div className="flex justify-between gap-4">
-                    <span className="text-slate-500">Diskon</span>
-                    <span className="font-bold text-emerald-300">
-                      -Rp {discount.toLocaleString('id-ID')}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {!loadingPromo && !promo && promoError && (
+        <section className="mx-auto max-w-7xl px-4 py-4">
+          <p className="text-xs text-slate-500">Banner Promo belum dapat dimuat.</p>
+        </section>
+      )}
+
+      {/* =====================================================
+          RUNNING TEXT
+      ===================================================== */}
+
+      {runningText?.text_content && (
+        <section className="mx-auto max-w-7xl px-4 pt-4">
+          <div className="relative overflow-hidden rounded-xl border border-cyan-400/20 bg-[#070b12] shadow-[0_0_24px_rgba(34,211,238,.05)]">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#070b12] to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#070b12] to-transparent" />
+            <div className="flex min-h-10 items-center overflow-hidden">
+              <div className="shrink-0 px-3 text-cyan-300">⚡</div>
+              <div
+                className="whitespace-nowrap text-xs font-black uppercase tracking-[0.12em] text-slate-200"
+                style={{
+                  animation: `ndraaaid-marquee ${Math.max(8, Math.min(60, Number(runningText.speed_ms || 18000) / 1000))}s linear infinite`,
+                }}
+              >
+                <span className="mr-16">{runningText.text_content}</span>
+                <span>{runningText.text_content}</span>
+              </div>
+            </div>
+          </div>
+          <style jsx>{`
+            @keyframes ndraaaid-marquee {
+              from { transform: translateX(0); }
+              to { transform: translateX(-50%); }
+            }
+          `}</style>
+        </section>
+      )}
+
+
+      {/* =====================================================
+          BROADCAST WIDGETS — COMPACT / SIDE BY SIDE
+      ===================================================== */}
+
+      {!loadingBroadcast && (currentBroadcast || linkedBroadcast) && (
+        <section className="mx-auto max-w-7xl px-4 pt-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {currentBroadcast && (
+              <div
+                className="relative min-w-0 overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-[#07131c] via-[#050a11] to-[#07050f] shadow-[0_0_28px_rgba(34,211,238,.06)] select-none"
+                onPointerDown={handleBroadcastPointerDown}
+                onPointerUp={handleBroadcastPointerUp}
+                onPointerCancel={handleBroadcastPointerUp}
+                style={{ touchAction: 'pan-y' }}
+              >
+                <div className="pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full bg-cyan-400/10 blur-2xl" />
+                <div className="relative flex min-h-[118px] flex-col justify-between p-3 sm:min-h-[126px] sm:p-4">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <Radio size={13} className="text-cyan-300" />
+                      <span className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-cyan-300">
+                        {currentBroadcast.type}
+                      </span>
+                    </div>
+                    <h2 className="mt-2 line-clamp-1 text-sm font-black text-white sm:text-base">
+                      {currentBroadcast.title}
+                    </h2>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400 sm:text-xs">
+                      {currentBroadcast.message}
+                    </p>
+                  </div>
+                  <div className="mt-2 flex gap-1">
+                    {cyberBroadcasts.map((item, index) => (
+                      <span
+                        key={item.id}
+                        className={`h-1 rounded-full transition-all ${index === activeBroadcast ? 'w-6 bg-cyan-300' : 'w-1 bg-slate-700'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {linkedBroadcast && (
+              <div className="relative min-w-0 overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-gradient-to-br from-[#190719] via-[#100512] to-[#09030b] shadow-[0_0_32px_rgba(217,70,239,.10)]">
+                <div className="pointer-events-none absolute -left-8 -bottom-8 h-24 w-24 rounded-full bg-fuchsia-500/10 blur-2xl" />
+                <div className="relative flex min-h-[118px] flex-col justify-between p-3 sm:min-h-[126px] sm:p-4">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <ExternalLink size={13} className="text-fuchsia-300" />
+                      <span className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-fuchsia-300">
+                        {linkedBroadcast.type}
+                      </span>
+                    </div>
+                    <h2 className="mt-2 line-clamp-1 text-sm font-black text-white sm:text-base">
+                      {linkedBroadcast.title}
+                    </h2>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400 sm:text-xs">
+                      {linkedBroadcast.message}
+                    </p>
+                  </div>
+                  <div className="mt-2">
+                    {String(linkedBroadcast.link_url).startsWith('/') ? (
+                      <Link
+                        href={linkedBroadcast.link_url}
+                        className="inline-flex max-w-full items-center rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-1.5 text-[10px] font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-xs"
+                      >
+                        <span className="truncate">{linkedBroadcast.link_label || 'Lihat'}</span>
+                        <ArrowRight size={12} className="ml-1 shrink-0" />
+                      </Link>
+                    ) : (
+                      <a
+                        href={linkedBroadcast.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex max-w-full items-center rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-1.5 text-[10px] font-black text-fuchsia-100 transition hover:bg-fuchsia-500/25 sm:text-xs"
+                      >
+                        <span className="truncate">{linkedBroadcast.link_label || 'Lihat'}</span>
+                        <ExternalLink size={12} className="ml-1 shrink-0" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* =====================================================
+          ULASAN PELANGGAN — COMPACT, AUTO 5 DETIK
+      ===================================================== */}
+
+      {reviews.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 pt-5">
+          <div className="relative overflow-hidden rounded-xl border border-cyan-400/20 bg-[#070b12] shadow-[0_0_24px_rgba(34,211,238,.06)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent" />
+            <div className="pointer-events-none absolute right-0 top-0 h-16 w-24 bg-cyan-400/5 blur-2xl" />
+
+            <div className="relative px-4 py-3">
+              {reviews.map((review, index) => (
+                <div
+                  key={review.id}
+                  className={`transition-opacity duration-500 ${index === activeReview ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'}`}
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-cyan-400/10 pb-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-cyan-300">◈</span>
+                      <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">
+                        Customer Feedback
+                      </span>
+                    </div>
+                    <span className="shrink-0 rounded-md border border-emerald-400/20 bg-emerald-400/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-emerald-400">
+                      [ Online ]
                     </span>
                   </div>
-                )}
-              </>
-            )}
 
-            <div className="mt-2 flex items-center justify-between gap-4 border-t border-white/10 pt-2">
-              <span className="font-bold text-slate-300">Total</span>
-              <span className="text-base font-black text-cyan-300">
-                Rp {total.toLocaleString('id-ID')}
-              </span>
-            </div>
-          </div>
-        </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-start">
+                    <div>
+                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">USER</p>
+                      <p className="mt-1 truncate text-xs font-black text-slate-200">{review.reviewer_display}</p>
 
-        {o.status === 'PENDING_PAYMENT' && (
-          <div className="mt-2.5 rounded-xl border border-amber-400/10 bg-amber-400/[0.03] p-3">
-            <p className="text-xs font-black text-slate-200">
-              {paymentMethod?.name || 'Metode pembayaran'}
-            </p>
+                      <p className="mt-3 text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">RATING</p>
+                      <p className="mt-1 text-[13px] tracking-tight text-amber-300">
+                        {'★'.repeat(Math.max(1, Math.min(5, Number(review.rating || 5))))}
+                      </p>
+                    </div>
 
-            {paymentMethodIsQris && (
-              <div className="mt-2.5 rounded-xl bg-white p-2">
-                <p className="mb-2 text-center text-[10px] font-bold text-slate-900">
-                  Scan QRIS untuk pembayaran
-                </p>
-                <img
-                  src="/qris.png"
-                  alt="QRIS Pembayaran"
-                  className="mx-auto block w-full max-w-[210px] rounded-lg"
-                />
-              </div>
-            )}
+                    <div className="min-w-0 rounded-lg border border-cyan-400/15 bg-[#081018] px-3 py-2.5">
+                      <p className="line-clamp-2 text-xs font-semibold leading-5 text-slate-200 sm:text-[13px]">
+                        “{review.review_text}”
+                      </p>
+                    </div>
+                  </div>
 
-            <p className="mt-2 text-[11px] leading-5 text-slate-500">
-              {paymentMethod?.instruction || 'Bayar sesuai total lalu upload bukti.'}
-            </p>
-          </div>
-        )}
-
-        {o.status === 'PENDING_PAYMENT' && (
-          <div className="mt-2.5">
-            <PaymentProof orderId={o.id} />
-          </div>
-        )}
-
-        {o.status === 'SUCCESS' && (
-          <div className="mt-2.5 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.035] p-3">
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2.5">
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                  Struk Transaksi
-                </p>
-                <p className="mt-0.5 text-sm font-black text-emerald-300">
-                  Pembayaran Berhasil
-                </p>
-              </div>
-              <span className="text-lg">✓</span>
-            </div>
-
-            <div className="mt-2.5 grid grid-cols-2 gap-2">
-              <div className="rounded-lg bg-white/[0.025] p-2">
-                <p className="text-[9px] uppercase tracking-wider text-slate-600">REFF ID</p>
-                <p className="mt-0.5 break-all text-[11px] font-bold text-slate-200">
-                  {reference || 'Belum tersedia'}
-                </p>
-              </div>
-              <div className="rounded-lg bg-white/[0.025] p-2">
-                <p className="text-[9px] uppercase tracking-wider text-slate-600">Tanggal</p>
-                <p className="mt-0.5 text-[11px] font-semibold text-slate-300">
-                  {new Date(o.updated_at || o.created_at).toLocaleString('id-ID')}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-2.5 rounded-xl border border-white/10 p-3">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Perjalanan Pesanan
-          </p>
-
-          <div className="mt-2 space-y-2">
-            {history.map((item: any) => (
-              <div key={item.id} className="flex gap-2.5 border-l-2 border-purple-500/40 pl-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-300">
-                    {labels[item.new_status] || item.new_status}
-                  </p>
-                  <p className="text-[9px] text-slate-600">
-                    {new Date(item.created_at).toLocaleString('id-ID')}
-                  </p>
-                  {item.note &&
-                    !String(item.note).toLowerCase().includes('diproses manual oleh owner') && (
-                      <p className="mt-0.5 text-[10px] leading-4 text-slate-500">{item.note}</p>
-                    )}
+                  <div className="mt-3 flex min-w-0 items-center gap-2 border-t border-cyan-400/10 pt-2">
+                    <span className="shrink-0 text-[10px] text-cyan-400/70">ⓘ</span>
+                    <p className="min-w-0 truncate whitespace-nowrap text-[9px] font-medium text-slate-500">
+                      Review ini berdasarkan pengalaman terakhir.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+        </section>
+      )}
+
+      {/* =====================================================
+          GAME POPULER + KATEGORI HOME
+      ===================================================== */}
+
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:py-14">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.2em] text-rose-400">
+              PRODUK
+            </p>
+            <h2 className="mt-1 text-2xl font-black uppercase tracking-tight text-white sm:text-3xl">
+              GAME POPULER
+            </h2>
+          </div>
+          <Link
+            href="/games/"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.03] px-2.5 py-1.5 text-[10px] font-bold text-slate-300 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-white sm:px-3 sm:py-2 sm:text-[11px]"
+          >
+            Lihat semua
+            <ArrowRight className="h-3 w-3" />
+          </Link>
         </div>
 
-        {proof && proofUrl && !compact && (
-          <a
-            href={proofUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2.5 block rounded-lg border border-cyan-400/20 bg-cyan-400/[0.04] px-3 py-2 text-center text-[11px] font-bold text-cyan-300"
-          >
-            Lihat bukti pembayaran →
-          </a>
-        )}
-
-        {o.status === 'SUCCESS' && (
+        <div className="relative mt-4">
           <button
             type="button"
-            onClick={() => router.push('/review')}
-            className="mt-2.5 w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2.5 text-xs font-black text-cyan-300 transition hover:bg-cyan-400/15"
+            aria-label="Geser kategori ke kiri"
+            onClick={() => categoryScrollRef.current?.scrollBy({ left: -260, behavior: 'smooth' })}
+            className="absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-slate-950/90 p-2 text-slate-300 shadow-lg backdrop-blur transition hover:border-rose-400/40 hover:text-white md:flex"
           >
-            ⭐ Beri Penilaian
+            <ChevronLeft className="h-4 w-4" />
           </button>
-        )}
-      </section>
-    </main>
-  )
-}
 
-export default function OrderStatusPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="mx-auto max-w-2xl px-4 py-12 text-center text-slate-400">
-          Memuat transaksi...
-        </main>
-      }
-    >
-      <OrderStatusContent />
-    </Suspense>
+          <div
+            ref={categoryScrollRef}
+            className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-0.5 pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:px-9"
+            style={{ touchAction: 'pan-x' }}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedHomeCategory('popular')}
+              className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition ${selectedHomeCategory === 'popular' ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`}
+            >
+              <Star className="h-3.5 w-3.5" />
+              Game Populer
+            </button>
+
+            {homeCategories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => setSelectedHomeCategory(category.id)}
+                className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition ${selectedHomeCategory === category.id ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-white/10 bg-white/[.025] text-slate-400'}`}
+              >
+                {category.slug === 'pc-games' ? <Monitor className="h-3.5 w-3.5" /> : category.slug === 'voucher-digital' ? <Ticket className="h-3.5 w-3.5" /> : category.slug === 'console' ? <Tv className="h-3.5 w-3.5" /> : <Gamepad2 className="h-3.5 w-3.5" />}
+                {homeCategoryLabel(category)}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            aria-label="Geser kategori ke kanan"
+            onClick={() => categoryScrollRef.current?.scrollBy({ left: 260, behavior: 'smooth' })}
+            className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-slate-950/90 p-2 text-slate-300 shadow-lg backdrop-blur transition hover:border-rose-400/40 hover:text-white md:flex"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        {loadingGames && (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center">
+            <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-rose-400" />
+            <p className="mt-3 text-sm text-slate-400">Memuat game...</p>
+          </div>
+        )}
+
+        {!loadingGames && gameError && (
+          <div className="mt-5 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-xs font-bold text-red-300">Game gagal dimuat</p>
+            <p className="mt-1 break-words text-[11px] text-red-200/70">{gameError}</p>
+          </div>
+        )}
+
+        {!loadingGames && !gameError && (() => {
+          const visibleGames = selectedHomeCategory === 'popular'
+            ? games.filter((g) => g.popular === true).slice(0, 9)
+            : games.filter((g) => g.category_id === selectedHomeCategory)
+
+          return visibleGames.length ? (
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {visibleGames.map((g) => (
+                <Link
+                  key={g.id}
+                  href={`/game/?slug=${encodeURIComponent(g.slug)}`}
+                  className="glass group overflow-hidden rounded-2xl p-3 transition hover:-translate-y-1 hover:border-rose-400/30"
+                >
+                  <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-slate-900 text-3xl">
+                    {g.logo_url ? <img src={g.logo_url} alt={g.name} className="h-full w-full object-cover" /> : <Gamepad2 className="h-8 w-8 text-slate-600" />}
+                    {selectedHomeCategory === 'popular' && <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-amber-300/20 bg-black/65 px-1.5 py-1 text-[8px] font-black text-amber-200"><Star className="h-2.5 w-2.5 fill-amber-300" /> Populer</span>}
+                  </div>
+                  <h3 className="mt-2.5 truncate text-sm font-bold text-white">{g.name}</h3>
+                  <p className="mt-1 truncate text-[10px] text-slate-500">{selectedHomeCategory === 'popular' ? 'Game Populer' : homeCategoryLabel(homeCategories.find((c) => c.id === selectedHomeCategory))} · Top Up →</p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-sm text-slate-500">
+              {selectedHomeCategory === 'popular' ? 'Belum ada Game Populer yang dipilih Admin.' : 'Belum ada game di kategori ini.'}
+            </div>
+          )
+        })()}
+      </section>
+
+
+    </div>
   )
 }
