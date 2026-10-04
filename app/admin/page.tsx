@@ -771,10 +771,31 @@ s
 
   async function providerAction(action: string, payload: Record<string, any> = {}) {
     setMsg('')
-    const { data, error } = await s.functions.invoke('digiflazz-mapping', {
-      body: { action, ...payload },
+
+    const { data: { session } } = await s.auth.getSession()
+    if (!session?.access_token) throw new Error('Sesi login tidak ditemukan. Silakan login ulang.')
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey) throw new Error('Konfigurasi Supabase tidak ditemukan.')
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/digiflazz-mapping`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ action, ...payload }),
     })
-    if (error) throw error
+
+    const text = await response.text()
+    let data: any = null
+    try { data = text ? JSON.parse(text) : null } catch {}
+
+    if (!response.ok) {
+      throw new Error(data?.error || data?.message || text || `Request gagal (${response.status})`)
+    }
     if (data?.error) throw new Error(data.error)
     return data
   }
