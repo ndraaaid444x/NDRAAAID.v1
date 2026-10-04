@@ -789,7 +789,12 @@ s
       await reloadProviderCatalog()
       setMsg(`Sinkron Digiflazz selesai: ${data?.synced ?? 0} produk.`)
     } catch (e: any) {
-      setMsg(`Sinkron gagal: ${e?.message || String(e)}`)
+      let detail = e?.message || String(e)
+      try {
+        const body = e?.context && typeof e.context.json === 'function' ? await e.context.json() : null
+        if (body?.error) detail = body.stage ? `${body.error} [${body.stage}]` : body.error
+      } catch {}
+      setMsg(`Sinkron gagal: ${detail}`)
     } finally {
       setProviderSyncing(false)
     }
