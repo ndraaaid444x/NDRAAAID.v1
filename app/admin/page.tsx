@@ -21,6 +21,12 @@ import {
   Package,
   Radio,
   Settings,
+  RefreshCw,
+  Lock,
+  Unlock,
+  Link2,
+  Unlink,
+  Zap,
   ShoppingCart,
   Ticket,
   Users,
@@ -59,6 +65,7 @@ const tabs = [
   'categories',
   'games',
   'products',
+  'provider-codes',
   'home-popular',
   'home-categories',
   'payments',
@@ -98,6 +105,7 @@ const adminIcons: Record<string, LucideIcon> = {
   reviews: MessageSquare,
   chat: MessageSquare,
   settings: Settings,
+  'provider-codes': Link2,
 }
 
 type AdminMenuItem = readonly [string, string]
@@ -142,6 +150,7 @@ const adminMenuGroups: readonly AdminMenuGroup[] = [
       ['categories', 'Kategori'],
       ['games', 'Games'],
       ['products', 'Produk'],
+      ['provider-codes', 'Kode Provider'],
     ],
   },
   {
@@ -268,6 +277,19 @@ export default function Admin() {
   const [reviewSearch, setReviewSearch] = useState('')
   const [reviewRatingFilter, setReviewRatingFilter] = useState('')
   const [reviewModerationFilter, setReviewModerationFilter] = useState('')
+  const [providerCatalog, setProviderCatalog] = useState<any[]>([])
+  const [providerSearch, setProviderSearch] = useState('')
+  const [providerCategoryFilter, setProviderCategoryFilter] = useState('')
+  const [providerBrandFilter, setProviderBrandFilter] = useState('')
+  const [providerMappingFilter, setProviderMappingFilter] = useState('')
+  const [providerAvailabilityFilter, setProviderAvailabilityFilter] = useState('')
+  const [providerPage, setProviderPage] = useState(1)
+  const [providerPageSize, setProviderPageSize] = useState(25)
+  const [providerSyncing, setProviderSyncing] = useState(false)
+  const [providerBusySku, setProviderBusySku] = useState('')
+  const [mappingTarget, setMappingTarget] = useState<any>(null)
+  const [mappingProductId, setMappingProductId] = useState('')
+  const [mappingProductSearch, setMappingProductSearch] = useState('')
   const [games, setGames] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
@@ -500,6 +522,30 @@ export default function Admin() {
   })
 
   const reviewFilterActive = Boolean(reviewSearch || reviewRatingFilter || reviewModerationFilter)
+  const providerCategories = Array.from(new Set(providerCatalog.map((x) => x.provider_category).filter(Boolean))).sort()
+  const providerBrands = Array.from(new Set(providerCatalog.map((x) => x.provider_brand).filter(Boolean))).sort()
+  const providerIsAvailable = (x: any) => x.buyer_product_status !== false && x.seller_product_status !== false
+  const providerFiltered = providerCatalog.filter((x) => {
+    const q = providerSearch.trim().toLowerCase()
+    const mapped = Boolean(x.mapped_product_id)
+    const unavailable = mapped && !providerIsAvailable(x)
+    return (!q || [x.provider_name, x.provider_sku, x.provider_brand, x.provider_category].some((v) => String(v || '').toLowerCase().includes(q))) &&
+      (!providerCategoryFilter || x.provider_category === providerCategoryFilter) &&
+      (!providerBrandFilter || x.provider_brand === providerBrandFilter) &&
+      (!providerMappingFilter ||
+        (providerMappingFilter === 'mapped' && mapped && !unavailable) ||
+        (providerMappingFilter === 'unmapped' && !mapped) ||
+        (providerMappingFilter === 'unavailable' && unavailable)) &&
+      (!providerAvailabilityFilter ||
+        (providerAvailabilityFilter === 'active' && providerIsAvailable(x)) ||
+        (providerAvailabilityFilter === 'inactive' && !providerIsAvailable(x)))
+  })
+  const providerPageCount = Math.max(1, Math.ceil(providerFiltered.length / providerPageSize))
+  const providerPageRows = providerFiltered.slice((providerPage - 1) * providerPageSize, providerPage * providerPageSize)
+  const providerMappingProducts = products.filter((p) => {
+    const q = mappingProductSearch.trim().toLowerCase()
+    return !q || [p.name, p.nominal, p.sku, p.games?.name].some((v) => String(v || '').toLowerCase().includes(q))
+  })
   const filteredCustomerReviews = customerReviews.filter((review) => {
     const q = reviewSearch.trim().toLowerCase()
     return (!q || [review.reviewer_display, review.review_text, review.order_id].some((v) => String(v || '').toLowerCase().includes(q))) &&
@@ -549,6 +595,7 @@ export default function Admin() {
       { data: st },
       { data: rt },
       { data: rv },
+      { data: pc },
     ] = await Promise.all([
       s
         .from('orders')
@@ -660,6 +707,14 @@ s
         .select('id,order_id,user_id,reviewer_display,rating,review_text,is_approved,created_at,updated_at')
         .order('created_at', { ascending: false })
         .limit(200),
+
+      s
+        .from('provider_catalog')
+        .select('*,game_products:mapped_product_id(id,name,nominal,sku,price,games:game_id(name))')
+        .eq('provider', 'digiflazz')
+        .order('provider_category')
+        .order('provider_brand')
+        .order('provider_price'),
     ])
 
     setOrders(o || [])
@@ -679,6 +734,8 @@ s
     setRooms(cr || [])
     setHomeRunningText(rt || { text_content: '', is_active: false, speed_ms: 18000 })
     setCustomerReviews(rv || [])
+    setProviderCatalog(pc || [])
+    setProviderPage(1)
 
     if (st?.value) {
       setSite(st.value)
@@ -696,6 +753,102 @@ s
         ...x,
         category_id: cat[0].id,
       }))
+    }
+  }
+
+  async function reloadProviderCatalog() {
+    const { data, error } = await s
+      .from('provider_catalog')
+      .select('*,game_products:mapped_product_id(id,name,nominal,sku,price,games:game_id(name))')
+      .eq('provider', 'digiflazz')
+      .order('provider_category')
+      .order('provider_brand')
+      .order('provider_price')
+    if (error) throw error
+    setProviderCatalog(data || [])
+    setProviderPage(1)
+  }
+
+  async function providerAction(action: string, payload: Record<string, any> = {}) {
+    setMsg('')
+    const { data, error } = await s.functions.invoke('digiflazz-mapping', {
+      body: { action, ...payload },
+    })
+    if (error) throw error
+    if (data?.error) throw new Error(data.error)
+    return data
+  }
+
+  async function syncDigiflazz() {
+    setProviderSyncing(true)
+    setMsg('')
+    try {
+      const { data, error } = await s.functions.invoke('digiflazz-sync', { body: { action: 'sync' } })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      await reloadProviderCatalog()
+      setMsg(`Sinkron Digiflazz selesai: ${data?.synced ?? 0} produk.`)
+    } catch (e: any) {
+      setMsg(`Sinkron gagal: ${e?.message || String(e)}`)
+    } finally {
+      setProviderSyncing(false)
+    }
+  }
+
+  async function autoMapDigiflazz() {
+    setProviderBusySku('__AUTO__')
+    try {
+      const data = await providerAction('auto_map')
+      await reloadProviderCatalog()
+      setMsg(`Auto mapping selesai: ${data?.mapped ?? 0} produk terhubung.`)
+    } catch (e: any) {
+      setMsg(`Auto mapping gagal: ${e?.message || String(e)}`)
+    } finally {
+      setProviderBusySku('')
+    }
+  }
+
+  async function saveProviderMapping() {
+    if (!mappingTarget || !mappingProductId) return
+    setProviderBusySku(mappingTarget.provider_sku)
+    try {
+      await providerAction('map', { provider_sku: mappingTarget.provider_sku, product_id: mappingProductId })
+      await reloadProviderCatalog()
+      setMappingTarget(null)
+      setMappingProductId('')
+      setMappingProductSearch('')
+      setMsg('Mapping provider berhasil disimpan.')
+    } catch (e: any) {
+      setMsg(`Mapping gagal: ${e?.message || String(e)}`)
+    } finally {
+      setProviderBusySku('')
+    }
+  }
+
+  async function unmapProvider(row: any) {
+    if (!window.confirm(`Lepas mapping ${row.provider_sku}?`)) return
+    setProviderBusySku(row.provider_sku)
+    try {
+      await providerAction('unmap', { provider_sku: row.provider_sku })
+      await reloadProviderCatalog()
+      setMsg('Mapping dilepas.')
+    } catch (e: any) {
+      setMsg(`Unmap gagal: ${e?.message || String(e)}`)
+    } finally {
+      setProviderBusySku('')
+    }
+  }
+
+  async function toggleProviderLock(row: any) {
+    setProviderBusySku(row.provider_sku)
+    try {
+      await providerAction(row.mapping_locked ? 'unlock' : 'lock', { provider_sku: row.provider_sku })
+      await reloadProviderCatalog()
+      setMsg(row.mapping_locked ? 'Mapping dibuka.' : 'Mapping dikunci.')
+    } catch (e: any) {
+      setMsg(`Lock/unlock gagal: ${e?.message || String(e)}`)
+    } finally {
+      setProviderBusySku('')
     }
   }
 
@@ -2739,7 +2892,7 @@ async function deleteVoucher(v: any) {
                   <p className="px-2 pb-1.5 text-[8px] font-black tracking-[.22em] text-slate-600">{group.title}</p>
                   <div className="space-y-0.5">
                     {group.items
-                      .filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role)))
+                      .filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role)) && (item[0] !== 'provider-codes' || ['owner', 'admin'].includes(role)))
                       .map((item) => menuButton(item))}
                   </div>
                 </div>
@@ -2770,7 +2923,7 @@ async function deleteVoucher(v: any) {
               <div
                 className="flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 touch-pan-x [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
               >
-                {adminMenuGroups.flatMap((group) => group.items).filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role))).map((item) => menuButton(item, true))}
+                {adminMenuGroups.flatMap((group) => group.items).filter((item) => (item[0] !== 'broadcasts' || ['owner', 'admin'].includes(role)) && (item[0] !== 'reviews' || ['owner', 'admin'].includes(role)) && (item[0] !== 'provider-codes' || ['owner', 'admin'].includes(role))).map((item) => menuButton(item, true))}
               </div>
             </div>
           </header>
@@ -3952,6 +4105,151 @@ async function deleteVoucher(v: any) {
         </section>
       )}
 
+
+      {tab === 'provider-codes' && (
+        <section className="mt-7 space-y-4">
+          <div className="glass rounded-xl p-4">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <h2 className="text-lg font-black">Kode Provider</h2>
+                <p className="text-xs text-slate-400">Hubungkan produk website dengan SKU Digiflazz. Transaksi otomatis tetap tidak diaktifkan.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={syncDigiflazz} disabled={providerSyncing} className="btn btn-primary inline-flex items-center gap-2">
+                  <RefreshCw className={`h-4 w-4 ${providerSyncing ? 'animate-spin' : ''}`} />
+                  {providerSyncing ? 'Sinkronisasi...' : 'Sinkron Digiflazz'}
+                </button>
+                <button type="button" onClick={autoMapDigiflazz} disabled={providerBusySku === '__AUTO__'} className="btn btn-muted inline-flex items-center gap-2">
+                  <Zap className="h-4 w-4" /> Auto Mapping
+                </button>
+              </div>
+            </div>
+
+            <AdminFilterShell
+              active={Boolean(providerSearch || providerCategoryFilter || providerBrandFilter || providerMappingFilter || providerAvailabilityFilter)}
+              onReset={() => {
+                setProviderSearch('')
+                setProviderCategoryFilter('')
+                setProviderBrandFilter('')
+                setProviderMappingFilter('')
+                setProviderAvailabilityFilter('')
+                setProviderPage(1)
+              }}
+            >
+              <input className="input" placeholder="Cari produk / SKU / brand..." value={providerSearch} onChange={(e) => { setProviderSearch(e.target.value); setProviderPage(1) }} />
+              <select className="input" value={providerCategoryFilter} onChange={(e) => { setProviderCategoryFilter(e.target.value); setProviderPage(1) }}>
+                <option value="">Semua kategori provider</option>
+                {providerCategories.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
+              <select className="input" value={providerBrandFilter} onChange={(e) => { setProviderBrandFilter(e.target.value); setProviderPage(1) }}>
+                <option value="">Semua brand</option>
+                {providerBrands.map((x) => <option key={x} value={x}>{x}</option>)}
+              </select>
+              <select className="input" value={providerMappingFilter} onChange={(e) => { setProviderMappingFilter(e.target.value); setProviderPage(1) }}>
+                <option value="">Semua status mapping</option>
+                <option value="mapped">Terhubung</option>
+                <option value="unmapped">Belum dipetakan</option>
+                <option value="unavailable">Tidak tersedia</option>
+              </select>
+              <select className="input" value={providerAvailabilityFilter} onChange={(e) => { setProviderAvailabilityFilter(e.target.value); setProviderPage(1) }}>
+                <option value="">Provider aktif/nonaktif</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+              </select>
+            </AdminFilterShell>
+          </div>
+
+          {mappingTarget && (
+            <div className="glass rounded-xl border border-emerald-400/20 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Mapping manual</p>
+                  <p className="mt-1 truncate font-semibold">{mappingTarget.provider_name} · {mappingTarget.provider_sku}</p>
+                </div>
+                <input className="input md:w-72" placeholder="Cari produk website..." value={mappingProductSearch} onChange={(e) => setMappingProductSearch(e.target.value)} />
+                <select className="input md:w-[28rem]" value={mappingProductId} onChange={(e) => setMappingProductId(e.target.value)}>
+                  <option value="">Pilih produk website</option>
+                  {providerMappingProducts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} · {p.nominal || '-'} · {p.sku}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={saveProviderMapping} disabled={!mappingProductId || providerBusySku === mappingTarget.provider_sku} className="btn btn-primary">Simpan</button>
+                <button type="button" onClick={() => setMappingTarget(null)} className="btn btn-muted">Batal</button>
+              </div>
+            </div>
+          )}
+
+          <div className="glass overflow-hidden rounded-xl">
+            <div className="flex flex-col gap-2 border-b border-white/[.06] p-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-slate-400">{providerFiltered.length} produk provider</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500">Tampilkan</span>
+                <select className="input !h-8 !w-20 !py-1 text-xs" value={providerPageSize} onChange={(e) => { setProviderPageSize(Number(e.target.value)); setProviderPage(1) }}>
+                  {[10,25,50,100].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <button type="button" className="btn btn-muted !h-8 !px-2" disabled={providerPage <= 1} onClick={() => setProviderPage((p) => p - 1)}>‹</button>
+                <span className="min-w-16 text-center">{providerPage} / {providerPageCount}</span>
+                <button type="button" className="btn btn-muted !h-8 !px-2" disabled={providerPage >= providerPageCount} onClick={() => setProviderPage((p) => p + 1)}>›</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1050px] text-left text-xs">
+                <thead className="bg-white/[.03] text-[10px] uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-3 py-3">Produk Provider</th>
+                    <th className="px-3 py-3">Kode Provider</th>
+                    <th className="px-3 py-3">Produk Website</th>
+                    <th className="px-3 py-3">Kode Website</th>
+                    <th className="px-3 py-3">Harga</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[.05]">
+                  {providerPageRows.map((row) => {
+                    const mapped = Boolean(row.mapped_product_id)
+                    const available = providerIsAvailable(row)
+                    const status = !mapped ? 'Belum dipetakan' : !available ? 'Tidak tersedia' : 'Terhubung'
+                    const website = row.game_products
+                    const busy = providerBusySku === row.provider_sku
+                    return (
+                      <tr key={row.id} className="hover:bg-white/[.02]">
+                        <td className="px-3 py-3">
+                          <div className="font-semibold">{row.provider_name || '-'}</div>
+                          <div className="text-[10px] text-slate-500">{row.provider_brand || '-'} · {row.provider_category || '-'}</div>
+                        </td>
+                        <td className="px-3 py-3 font-mono text-emerald-300">{row.provider_sku}</td>
+                        <td className="px-3 py-3">
+                          <div>{website?.name || <span className="text-slate-600">—</span>}</div>
+                          {website?.games?.name && <div className="text-[10px] text-slate-500">{website.games.name}</div>}
+                        </td>
+                        <td className="px-3 py-3 font-mono text-slate-300">{website?.sku || '—'}</td>
+                        <td className="px-3 py-3">Rp {Number(row.provider_price || 0).toLocaleString('id-ID')}</td>
+                        <td className="px-3 py-3">
+                          <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${status === 'Terhubung' ? 'bg-emerald-500/10 text-emerald-300' : status === 'Tidak tersedia' ? 'bg-amber-500/10 text-amber-300' : 'bg-slate-500/10 text-slate-300'}`}>{status}</span>
+                          {!available && <div className="mt-1 text-[9px] text-slate-500">Provider nonaktif</div>}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            <button type="button" disabled={busy || row.mapping_locked} onClick={() => { setMappingTarget(row); setMappingProductId(row.mapped_product_id || ''); setMappingProductSearch('') }} className="btn btn-muted !px-2 !py-1.5" title={row.mapping_locked ? 'Mapping terkunci' : 'Mapping manual'}>
+                              <Link2 className="h-3.5 w-3.5" />
+                            </button>
+                            {mapped && <button type="button" disabled={busy || row.mapping_locked} onClick={() => unmapProvider(row)} className="btn btn-muted !px-2 !py-1.5 text-red-300" title="Unmap"><Unlink className="h-3.5 w-3.5" /></button>}
+                            <button type="button" disabled={busy} onClick={() => toggleProviderLock(row)} className="btn btn-muted !px-2 !py-1.5" title={row.mapping_locked ? 'Unlock mapping' : 'Lock mapping'}>
+                              {row.mapping_locked ? <Unlock className="h-3.5 w-3.5 text-amber-300" /> : <Lock className="h-3.5 w-3.5" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {!providerPageRows.length && <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">Belum ada katalog provider. Jalankan Sinkron Digiflazz.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* =====================================================
           HOME - GAME POPULER
