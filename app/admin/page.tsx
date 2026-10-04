@@ -861,76 +861,208 @@ s
 }
 
   async function autoMapDigiflazz() {
-    setProviderBusySku('__AUTO__')
-    try {
-      // Jalankan auto-mapping langsung melalui Supabase DB agar tidak terkena
-      // preflight OPTIONS pada Edge Function digiflazz-mapping.
-      const { data: catalog, error: ce } = await s
-        .from('provider_catalog')
-        .select('id,provider_sku,provider_name,provider_brand,mapped_product_id,mapping_locked')
-        .eq('provider', 'digiflazz')
-      if (ce) throw ce
+  setProviderBusySku('__AUTO__')
 
-      const { data: products, error: pe } = await s
-        .from('game_products')
-        .select('id,name,nominal,sku,game_id,games:game_id(name)')
-      if (pe) throw pe
-
-      const used = new Set<string>(
-        (catalog || []).filter((x: any) => x.mapped_product_id).map((x: any) => String(x.mapped_product_id))
+  try {
+    const { data: catalog, error: ce } = await s
+      .from('provider_catalog')
+      .select(
+        'id,provider_sku,provider_name,provider_brand,provider_type,mapped_product_id,mapping_locked'
       )
-      let mapped = 0
+      .eq('provider', 'digiflazz')
 
-      for (const c of catalog || []) {
-        if (c.mapping_locked || c.mapped_product_id) continue
+    if (ce) throw ce
 
-        const sku = String(c.provider_sku || '').toLowerCase()
-        let candidates = (products || []).filter((p: any) =>
-          String(p.sku || '').toLowerCase() === sku && !used.has(String(p.id))
-        )
+    const { data: products, error: pe } = await s
+      .from('game_products')
+      .select('id,name,nominal,sku,game_id,games:game_id(name)')
 
-        if (candidates.length !== 1) {
-          const brand = String(c.provider_brand || '').toLowerCase().trim()
-          const nominalDigits = String(c.provider_name || '').replace(/\D/g, '')
-          candidates = (products || []).filter((p: any) => {
-            if (used.has(String(p.id)) || !brand || !nominalDigits) return false
-            const gameName = String(p.games?.name || '').toLowerCase()
-            const gameMatch = gameName.includes(brand) || brand.includes(gameName)
-            const productNominal = String(p.nominal || '').replace(/\D/g, '')
-            return gameMatch && productNominal !== '' && productNominal === nominalDigits
-          })
-        }
+    if (pe) throw pe
 
-        if (candidates.length === 1) {
-          const productId = String(candidates[0].id)
-          const now = new Date().toISOString()
+    const allCatalog = catalog || []
+    const allProducts = products || []
 
-          const { error: mapError } = await s
-            .from('provider_catalog')
-            .update({ mapped_product_id: productId, mapped_at: now, updated_at: now })
-            .eq('id', c.id)
-          if (mapError) throw mapError
+    const used = new Set<string>(
+      allCatalog
+        .filter((x: any) => x.mapped_product_id)
+        .map((x: any) => String(x.mapped_product_id))
+    )
 
-          const { error: mirrorError } = await s
-            .from('provider_products')
-            .update({ product_id: productId, is_active: true, updated_at: now })
-            .eq('provider', 'digiflazz')
-            .eq('provider_sku', c.provider_sku)
-          if (mirrorError) throw mirrorError
+    let mapped = 0
 
-          used.add(productId)
-          mapped++
+    const normalize = (value: any) =>
+      String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+
+    const digits = (value: any) =>
+      String(value || '').replace(/\D/g, '')
+
+    for (const c of allCatalog) {
+      if (c.mapping_locked || c.mapped_product_id) continue
+
+      const providerSku = normalize(c.provider_sku)
+      const providerName = normalize(c.provider_name)
+      const providerBrand = normalize(c.provider_brand)
+
+      let match: any = null
+
+      // 1. Exact SKU
+      const skuMatches = allProducts.filter(
+        (p: any) =>
+          !used.has(String(p.id)) &&
+          providerSku !== '' &&
+          normalize(p.sku) === providerSku
+      )
+
+      if (skuMatches.length === 1) {
+        match = skuMatches[0]
+      }
+
+      // 2. SKU contains / contained
+      if (!match && providerSku) {
+        const fuzzySku = allProducts.filter((p: any) => {
+          if (used.has(String(p.id))) return false
+
+          const ps = normalize(p.sku)
+          if (!ps) return false
+
+          return ps === providerSku ||
+            ps.includes(providerSku) ||
+            providerSku.includes(ps)
+        })
+
+        if (fuzzySku.length === 1) {
+          match = fuzzySku[0]
         }
       }
 
-      await reloadProviderCatalog()
-      setMsg(`Auto mapping selesai: ${mapped} produk terhubung.`)
-    } catch (e: any) {
-      setMsg(`Auto mapping gagal: ${e?.message || String(e)}`)
-    } finally {
-      setProviderBusySku('')
+      // 3. Brand/game + nominal
+      if (!match) {
+        const providerNumbers = digits(c.provider_name)
+
+        if (providerNumbers) {
+          const brandMatches = allProducts.filter((p: any) => {
+            if (used.has(String(p.id))) return false
+
+            const gameName = normalize(p.games?.name)
+            const productName = normalize(p.name)
+            const productNumbers = digits(p.nominal)
+
+            if (!productNumbers || productNumbers !== providerNumbers) {
+              return false
+            }
+
+            const brandMatch =
+              (providerBrand &&
+                (gameName.includes(providerBrand) ||
+                  providerBrand.includes(gameName) ||
+                  productName.includes(providerBrand) ||
+                  providerBrand.includes(productName))) ||
+              (providerName &&
+                (gameName.includes(providerName) ||
+                  providerName.includes(gameName) ||
+                  productName.includes(providerName) ||
+                  providerName.includes(productName)))
+
+            return Boolean(brandMatch)
+          })
+
+          if (brandMatches.length === 1) {
+            match = brandMatches[0]
+          }
+        }
+      }
+
+      // 4. Nominal dari nama produk provider + kecocokan nama
+      if (!match) {
+        const providerNumbers = digits(c.provider_name)
+
+        if (providerNumbers) {
+          const nameMatches = allProducts.filter((p: any) => {
+            if (used.has(String(p.id))) return false
+
+            const gameName = normalize(p.games?.name)
+            const productName = normalize(p.name)
+            const productNumbers = digits(p.nominal)
+
+            if (
+              !productNumbers ||
+              productNumbers !== providerNumbers
+            ) {
+              return false
+            }
+
+            if (!providerName && !providerBrand) return false
+
+            return (
+              (providerName &&
+                (providerName.includes(gameName) ||
+                  gameName.includes(providerName) ||
+                  providerName.includes(productName) ||
+                  productName.includes(providerName))) ||
+              (providerBrand &&
+                (providerBrand.includes(gameName) ||
+                  gameName.includes(providerBrand) ||
+                  providerBrand.includes(productName) ||
+                  productName.includes(providerBrand)))
+            )
+          })
+
+          if (nameMatches.length === 1) {
+            match = nameMatches[0]
+          }
+        }
+      }
+
+      if (!match) continue
+
+      const { error: ue } = await s
+        .from('provider_catalog')
+        .update({
+          mapped_product_id: match.id,
+          mapped_at: new Date().toISOString(),
+        })
+        .eq('id', c.id)
+        .is('mapped_product_id', null)
+
+      if (ue) throw ue
+
+      const { error: upe } = await s
+        .from('provider_products')
+        .upsert(
+          {
+            provider: 'digiflazz',
+            product_id: match.id,
+            provider_sku: c.provider_sku,
+            provider_name: c.provider_name,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'provider,provider_sku',
+          }
+        )
+
+      if (upe) throw upe
+
+      used.add(String(match.id))
+      mapped++
     }
+
+    await reloadProviderCatalog()
+
+    setMsg(`Auto mapping selesai: ${mapped} produk terhubung.`)
+  } catch (e: any) {
+    setMsg(
+      `Auto mapping gagal: ${
+        e?.message || 'Gagal melakukan auto mapping'
+      }`
+    )
+  } finally {
+    setProviderBusySku(null)
   }
+}
 
   async function saveProviderMapping() {
     if (!mappingTarget || !mappingProductId) return
