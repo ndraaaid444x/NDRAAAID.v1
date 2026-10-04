@@ -1060,7 +1060,7 @@ s
       }`
     )
   } finally {
-    setProviderBusySku(null)
+    setProviderBusySku('')
   }
 }
 
