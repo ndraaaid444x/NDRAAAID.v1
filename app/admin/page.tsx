@@ -780,25 +780,85 @@ s
   }
 
   async function syncDigiflazz() {
-    setProviderSyncing(true)
-    setMsg('')
-    try {
-      const { data, error } = await s.functions.invoke('digiflazz-sync', { body: { action: 'sync' } })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
-      await reloadProviderCatalog()
-      setMsg(`Sinkron Digiflazz selesai: ${data?.synced ?? 0} produk.`)
-    } catch (e: any) {
-      let detail = e?.message || String(e)
+  setMsg('Sinkronisasi Digiflazz...')
+
+  try {
+    // Tandai waktu mulai supaya jumlah produk yang benar-benar
+    // diperbarui oleh proses sync bisa dihitung langsung dari DB.
+    const syncStartedAt = new Date().toISOString()
+
+    const { data, error } = await s.functions.invoke('digiflazz-sync', {
+      body: { action: 'sync' },
+    })
+
+    if (error) {
+      let detail = error.message || 'Gagal sinkronisasi'
+
       try {
-        const body = e?.context && typeof e.context.json === 'function' ? await e.context.json() : null
-        if (body?.error) detail = body.stage ? `${body.error} [${body.stage}]` : body.error
+        const ctx = (error as any)?.context
+
+        if (ctx?.json) {
+          const body = await ctx.json()
+
+          if (body?.error) {
+            detail = body.error
+          }
+        }
       } catch {}
-      setMsg(`Sinkron gagal: ${detail}`)
-    } finally {
-      setProviderSyncing(false)
+
+      throw new Error(detail)
     }
+
+    if (data?.error) {
+      throw new Error(data.error)
+    }
+
+    // Reload katalog agar tabel langsung mengambil data terbaru.
+    await reloadProviderCatalog()
+
+    // Hitung total katalog Digiflazz.
+    const { count: totalCount, error: totalError } = await s
+      .from('provider_catalog')
+      .select('id', { count: 'exact', head: true })
+      .eq('provider', 'digiflazz')
+
+    // Hitung produk yang benar-benar tersentuh oleh sync ini.
+    const { count: recentCount, error: recentError } = await s
+      .from('provider_catalog')
+      .select('id', { count: 'exact', head: true })
+      .eq('provider', 'digiflazz')
+      .gte('last_synced_at', syncStartedAt)
+
+    const synced =
+      !recentError && recentCount != null
+        ? recentCount
+        : Number(
+            data?.synced ??
+            data?.count ??
+            data?.received ??
+            0
+          )
+
+    const total =
+      !totalError && totalCount != null
+        ? totalCount
+        : Number(
+            data?.count ??
+            data?.received ??
+            0
+          )
+
+    setMsg(
+      `Sinkron Digiflazz selesai: ${synced} produk diperbarui. Total katalog: ${total}.`
+    )
+  } catch (e: any) {
+    setMsg(
+      `Sinkron Digiflazz gagal: ${
+        e?.message || 'Gagal sinkronisasi'
+      }`
+    )
   }
+}
 
   async function autoMapDigiflazz() {
     setProviderBusySku('__AUTO__')
