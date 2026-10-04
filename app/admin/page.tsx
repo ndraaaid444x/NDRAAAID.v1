@@ -771,31 +771,10 @@ s
 
   async function providerAction(action: string, payload: Record<string, any> = {}) {
     setMsg('')
-
-    const { data: { session } } = await s.auth.getSession()
-    if (!session?.access_token) throw new Error('Sesi login tidak ditemukan. Silakan login ulang.')
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    if (!supabaseUrl || !supabaseAnonKey) throw new Error('Konfigurasi Supabase tidak ditemukan.')
-
-    const response = await fetch(`${supabaseUrl}/functions/v1/digiflazz-mapping`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseAnonKey,
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ action, ...payload }),
+    const { data, error } = await s.functions.invoke('digiflazz-mapping', {
+      body: { action, ...payload },
     })
-
-    const text = await response.text()
-    let data: any = null
-    try { data = text ? JSON.parse(text) : null } catch {}
-
-    if (!response.ok) {
-      throw new Error(data?.error || data?.message || text || `Request gagal (${response.status})`)
-    }
+    if (error) throw error
     if (data?.error) throw new Error(data.error)
     return data
   }
@@ -824,9 +803,68 @@ s
   async function autoMapDigiflazz() {
     setProviderBusySku('__AUTO__')
     try {
-      const data = await providerAction('auto_map')
+      // Jalankan auto-mapping langsung melalui Supabase DB agar tidak terkena
+      // preflight OPTIONS pada Edge Function digiflazz-mapping.
+      const { data: catalog, error: ce } = await s
+        .from('provider_catalog')
+        .select('id,provider_sku,provider_name,provider_brand,mapped_product_id,mapping_locked')
+        .eq('provider', 'digiflazz')
+      if (ce) throw ce
+
+      const { data: products, error: pe } = await s
+        .from('game_products')
+        .select('id,name,nominal,sku,game_id,games:game_id(name)')
+      if (pe) throw pe
+
+      const used = new Set<string>(
+        (catalog || []).filter((x: any) => x.mapped_product_id).map((x: any) => String(x.mapped_product_id))
+      )
+      let mapped = 0
+
+      for (const c of catalog || []) {
+        if (c.mapping_locked || c.mapped_product_id) continue
+
+        const sku = String(c.provider_sku || '').toLowerCase()
+        let candidates = (products || []).filter((p: any) =>
+          String(p.sku || '').toLowerCase() === sku && !used.has(String(p.id))
+        )
+
+        if (candidates.length !== 1) {
+          const brand = String(c.provider_brand || '').toLowerCase().trim()
+          const nominalDigits = String(c.provider_name || '').replace(/\D/g, '')
+          candidates = (products || []).filter((p: any) => {
+            if (used.has(String(p.id)) || !brand || !nominalDigits) return false
+            const gameName = String(p.games?.name || '').toLowerCase()
+            const gameMatch = gameName.includes(brand) || brand.includes(gameName)
+            const productNominal = String(p.nominal || '').replace(/\D/g, '')
+            return gameMatch && productNominal !== '' && productNominal === nominalDigits
+          })
+        }
+
+        if (candidates.length === 1) {
+          const productId = String(candidates[0].id)
+          const now = new Date().toISOString()
+
+          const { error: mapError } = await s
+            .from('provider_catalog')
+            .update({ mapped_product_id: productId, mapped_at: now, updated_at: now })
+            .eq('id', c.id)
+          if (mapError) throw mapError
+
+          const { error: mirrorError } = await s
+            .from('provider_products')
+            .update({ product_id: productId, is_active: true, updated_at: now })
+            .eq('provider', 'digiflazz')
+            .eq('provider_sku', c.provider_sku)
+          if (mirrorError) throw mirrorError
+
+          used.add(productId)
+          mapped++
+        }
+      }
+
       await reloadProviderCatalog()
-      setMsg(`Auto mapping selesai: ${data?.mapped ?? 0} produk terhubung.`)
+      setMsg(`Auto mapping selesai: ${mapped} produk terhubung.`)
     } catch (e: any) {
       setMsg(`Auto mapping gagal: ${e?.message || String(e)}`)
     } finally {
