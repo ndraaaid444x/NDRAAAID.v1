@@ -181,6 +181,22 @@ const adminMenuGroups: readonly AdminMenuGroup[] = [
   },
 ] as const
 
+type EditGameField = {
+  id?: string
+  key: string
+  label: string
+  placeholder: string
+  required: boolean
+}
+
+function normalizeFieldKey(value: string) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+}
+
 const GAME_FIELD_OPTIONS = [
   { key: 'user_id', label: 'User ID', placeholder: 'Masukkan User ID' },
   { key: 'server', label: 'Server ID', placeholder: 'Masukkan Server ID' },
@@ -209,6 +225,11 @@ export default function Admin() {
   const [msg, setMsg] = useState('')
 
   const [editType, setEditType] = useState<'category' | 'game' | 'product' | 'payment' | null>(null)
+  const [editFields, setEditFields] = useState<EditGameField[]>([])
+  const [editFieldsLoaded, setEditFieldsLoaded] = useState(false)
+  const [editFieldsLoading, setEditFieldsLoading] = useState(false)
+  const [removedFieldIds, setRemovedFieldIds] = useState<string[]>([])
+  const [newEditField, setNewEditField] = useState({ key: '', label: '', placeholder: '' })
   const [editId, setEditId] = useState('')
   const [editForm, setEditForm] = useState<any>({})
 
@@ -1638,6 +1659,137 @@ s
     load()
   }
 
+  async function loadEditFields(gameId: string) {
+    setEditFieldsLoaded(false)
+    setEditFieldsLoading(true)
+    setEditFields([])
+    setRemovedFieldIds([])
+    setNewEditField({ key: '', label: '', placeholder: '' })
+
+    const { data, error } = await s
+      .from('game_fields')
+      .select('id,key,label,placeholder,required,sort_order')
+      .eq('game_id', gameId)
+      .order('sort_order')
+
+    setEditFieldsLoading(false)
+
+    if (error) {
+      // Sengaja tidak menandai loaded: field tidak akan disinkronkan agar tidak ada field terhapus tanpa sengaja.
+      setMsg(`Field game gagal dimuat: ${error.message}`)
+      return
+    }
+
+    setEditFields(
+      (data || []).map((f: any) => ({
+        id: f.id,
+        key: f.key,
+        label: f.label || '',
+        placeholder: f.placeholder || '',
+        required: f.required !== false,
+      }))
+    )
+    setEditFieldsLoaded(true)
+  }
+
+  function updateEditField(index: number, patch: Partial<EditGameField>) {
+    setEditFields((list) => list.map((f, i) => (i === index ? { ...f, ...patch } : f)))
+  }
+
+  function moveEditField(index: number, dir: -1 | 1) {
+    setEditFields((list) => {
+      const target = index + dir
+      if (target < 0 || target >= list.length) return list
+      const next = [...list]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
+  function removeEditField(index: number) {
+    const f = editFields[index]
+    if (!f) return
+    if (f.id) setRemovedFieldIds((ids) => [...ids, f.id as string])
+    setEditFields((list) => list.filter((_, i) => i !== index))
+  }
+
+  function addEditField(field: { key: string; label: string; placeholder?: string }) {
+    const key = normalizeFieldKey(field.key)
+    const label = field.label.trim()
+    if (!key || !label) {
+      setMsg('Key dan label field wajib diisi.')
+      return false
+    }
+    if (editFields.some((f) => f.key === key)) {
+      setMsg(`Field dengan key "${key}" sudah ada di game ini.`)
+      return false
+    }
+    // Jika key sebelumnya dihapus pada sesi edit ini, pakai ulang barisnya agar tidak bentrok unique(game_id,key).
+    setEditFields((list) => [
+      ...list,
+      { key, label, placeholder: (field.placeholder || '').trim(), required: true },
+    ])
+    return true
+  }
+
+  function validateEditFields(): string | null {
+    const seen = new Set<string>()
+    for (const f of editFields) {
+      const key = normalizeFieldKey(f.key)
+      if (!key) return 'Ada field dengan key kosong atau tidak valid.'
+      if (!f.label.trim()) return `Label untuk field "${key}" wajib diisi.`
+      if (seen.has(key)) return `Key field "${key}" duplikat.`
+      seen.add(key)
+    }
+    return null
+  }
+
+  async function syncEditGameFields(gameId: string): Promise<string | null> {
+    if (removedFieldIds.length) {
+      const { error } = await s
+        .from('game_fields')
+        .delete()
+        .eq('game_id', gameId)
+        .in('id', removedFieldIds)
+      if (error) return error.message
+    }
+
+    for (let i = 0; i < editFields.length; i++) {
+      const f = editFields[i]
+      if (!f.id) continue
+      const { error } = await s
+        .from('game_fields')
+        .update({
+          label: f.label.trim(),
+          placeholder: f.placeholder.trim() || null,
+          required: f.required,
+          sort_order: i + 1,
+        })
+        .eq('id', f.id)
+        .eq('game_id', gameId)
+      if (error) return error.message
+    }
+
+    const inserts = editFields
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => !f.id)
+      .map(({ f, i }) => ({
+        game_id: gameId,
+        key: normalizeFieldKey(f.key),
+        label: f.label.trim(),
+        placeholder: f.placeholder.trim() || null,
+        required: f.required,
+        sort_order: i + 1,
+      }))
+
+    if (inserts.length) {
+      const { error } = await s.from('game_fields').insert(inserts)
+      if (error) return error.message
+    }
+
+    return null
+  }
+
   function openEdit(type: 'category' | 'game' | 'product' | 'payment', row: any) {
     if (!['owner', 'admin'].includes(role)) {
       setMsg('Hanya Owner/Admin yang dapat mengedit katalog.')
@@ -1665,6 +1817,7 @@ s
         logo_url: row.logo_url || '',
         banner_url: row.banner_url || '',
       })
+      loadEditFields(row.id)
       return
     }
 
@@ -1694,6 +1847,11 @@ s
     setEditType(null)
     setEditId('')
     setEditForm({})
+    setEditFields([])
+    setEditFieldsLoaded(false)
+    setEditFieldsLoading(false)
+    setRemovedFieldIds([])
+    setNewEditField({ key: '', label: '', placeholder: '' })
   }
 
   async function saveEdit() {
@@ -1742,6 +1900,14 @@ s
       if (!payload.name || !payload.slug) {
         setMsg('Nama dan slug game wajib diisi.')
         return
+      }
+
+      if (editFieldsLoaded) {
+        const fieldValidation = validateEditFields()
+        if (fieldValidation) {
+          setMsg(fieldValidation)
+          return
+        }
       }
     }
 
@@ -1795,6 +1961,15 @@ s
       .from(table)
       .update(payload)
       .eq('id', editId)
+
+    if (!error && editType === 'game' && editFieldsLoaded) {
+      const fieldError = await syncEditGameFields(editId)
+      if (fieldError) {
+        setMsg(`Data game tersimpan, tetapi field gagal disimpan: ${fieldError}`)
+        load()
+        return
+      }
+    }
 
     setMsg(
       error?.message ||
@@ -6635,6 +6810,150 @@ async function deleteVoucher(v: any) {
                   <p className="text-xs text-slate-500">
                     Pilih file foto untuk mengganti logo atau banner. URL akan dibuat otomatis oleh Supabase Storage.
                   </p>
+
+                  <div className="rounded-2xl border border-cyan-400/20 bg-slate-900/40 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">
+                      FIELD DATA AKUN
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Field ini tampil di form order customer untuk game ini. Perubahan baru tersimpan setelah klik Simpan Perubahan.
+                    </p>
+
+                    {editFieldsLoading && (
+                      <p className="mt-3 text-sm text-slate-400">Memuat field...</p>
+                    )}
+
+                    {!editFieldsLoading && !editFieldsLoaded && (
+                      <p className="mt-3 text-sm text-amber-300">
+                        Field gagal dimuat, jadi tidak akan diubah saat menyimpan.{' '}
+                        <button type="button" className="underline" onClick={() => loadEditFields(editId)}>
+                          Coba lagi
+                        </button>
+                      </p>
+                    )}
+
+                    {editFieldsLoaded && editFields.length === 0 && (
+                      <p className="mt-3 text-sm text-slate-400">
+                        Game ini belum punya field. Tambahkan di bawah.
+                      </p>
+                    )}
+
+                    <div className="mt-3 space-y-3">
+                      {editFields.map((f, index) => (
+                        <div key={f.id || `new-${f.key}`} className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <label className="text-xs font-semibold text-slate-400">
+                              Label
+                              <input
+                                className="input mt-1"
+                                value={f.label}
+                                onChange={(e) => updateEditField(index, { label: e.target.value })}
+                              />
+                            </label>
+                            <label className="text-xs font-semibold text-slate-400">
+                              Key {f.id ? '(terkunci)' : ''}
+                              <input
+                                className="input mt-1"
+                                value={f.key}
+                                readOnly={Boolean(f.id)}
+                                onChange={(e) => updateEditField(index, { key: normalizeFieldKey(e.target.value) })}
+                              />
+                            </label>
+                          </div>
+                          <label className="mt-2 block text-xs font-semibold text-slate-400">
+                            Placeholder
+                            <input
+                              className="input mt-1"
+                              value={f.placeholder}
+                              onChange={(e) => updateEditField(index, { placeholder: e.target.value })}
+                            />
+                          </label>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                            <label className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                              <input
+                                type="checkbox"
+                                checked={f.required}
+                                onChange={(e) => updateEditField(index, { required: e.target.checked })}
+                              />
+                              Wajib diisi
+                            </label>
+                            <div className="flex gap-2">
+                              <button type="button" className="btn btn-muted" disabled={index === 0} onClick={() => moveEditField(index, -1)}>
+                                ↑
+                              </button>
+                              <button type="button" className="btn btn-muted" disabled={index === editFields.length - 1} onClick={() => moveEditField(index, 1)}>
+                                ↓
+                              </button>
+                              <button type="button" className="btn btn-muted" onClick={() => removeEditField(index)}>
+                                Hapus
+                              </button>
+                            </div>
+                          </div>
+                          {f.id && (
+                            <p className="mt-2 text-[11px] text-slate-500">
+                              Key tidak bisa diubah agar data order lama tetap konsisten. Untuk mengganti key, hapus field lalu tambah baru.
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {editFieldsLoaded && (
+                      <div className="mt-4 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-400">Tambah cepat</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {GAME_FIELD_OPTIONS.filter((o) => !editFields.some((f) => f.key === o.key)).map((o) => (
+                              <button
+                                key={o.key}
+                                type="button"
+                                className="btn btn-muted"
+                                onClick={() => addEditField(o)}
+                              >
+                                + {o.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-dashed border-white/10 p-3">
+                          <p className="text-xs font-semibold text-slate-400">Field kustom</p>
+                          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                            <input
+                              className="input"
+                              placeholder="Label (mis. Region)"
+                              value={newEditField.label}
+                              onChange={(e) => setNewEditField((v) => ({ ...v, label: e.target.value }))}
+                            />
+                            <input
+                              className="input"
+                              placeholder="Key (mis. region)"
+                              value={newEditField.key}
+                              onChange={(e) => setNewEditField((v) => ({ ...v, key: normalizeFieldKey(e.target.value) }))}
+                            />
+                            <input
+                              className="input"
+                              placeholder="Placeholder"
+                              value={newEditField.placeholder}
+                              onChange={(e) => setNewEditField((v) => ({ ...v, placeholder: e.target.value }))}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary mt-3"
+                            onClick={() => {
+                              const key = newEditField.key || newEditField.label
+                              if (addEditField({ ...newEditField, key })) {
+                                setNewEditField({ key: '', label: '', placeholder: '' })
+                              }
+                            }}
+                          >
+                            Tambah Field
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 
