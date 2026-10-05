@@ -155,47 +155,59 @@ export default function Home() {
 
       const timeout = setTimeout(() => {
         controller.abort()
-      }, 8000)
+      }, 20000)
 
       try {
-        const url =
-          `${supabaseUrl}/rest/v1/games` +
-          `?select=*` +
-          `&is_active=eq.true` +
-          `&order=name.asc` +
-          `&limit=50`
+        // Tanpa batas jumlah game: ambil per halaman sampai habis.
+        // (Server Supabase membatasi satu respons, jadi satu query tidak cukup.)
+        const PAGE_SIZE = 500
+        const data: any[] = []
 
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            apikey: supabaseKey,
-            Authorization: `Bearer ${supabaseKey}`,
-            Accept: 'application/json',
-            'Cache-Control':
-              'no-cache, no-store, max-age=0',
-            Pragma: 'no-cache',
-          },
-          cache: 'no-store',
-          signal: controller.signal,
-        })
+        for (let offset = 0; ; offset += PAGE_SIZE) {
+          const url =
+            `${supabaseUrl}/rest/v1/games` +
+            `?select=*` +
+            `&is_active=eq.true` +
+            `&order=name.asc,id.asc` +
+            `&limit=${PAGE_SIZE}` +
+            `&offset=${offset}`
 
-        if (!response.ok) {
-          const message = await response.text()
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              apikey: supabaseKey,
+              Authorization: `Bearer ${supabaseKey}`,
+              Accept: 'application/json',
+              'Cache-Control':
+                'no-cache, no-store, max-age=0',
+              Pragma: 'no-cache',
+            },
+            cache: 'no-store',
+            signal: controller.signal,
+          })
 
-          throw new Error(
-            `Supabase HTTP ${response.status}: ${message}`
-          )
+          if (!response.ok) {
+            const message = await response.text()
+
+            throw new Error(
+              `Supabase HTTP ${response.status}: ${message}`
+            )
+          }
+
+          const page = await response.json()
+
+          if (!Array.isArray(page)) {
+            throw new Error(
+              'Format data game tidak valid.'
+            )
+          }
+
+          data.push(...page)
+
+          if (page.length < PAGE_SIZE) break
         }
-
-        const data = await response.json()
 
         if (!mounted) return
-
-        if (!Array.isArray(data)) {
-          throw new Error(
-            'Format data game tidak valid.'
-          )
-        }
 
         const uniqueGames = Array.from(
           new Map(
