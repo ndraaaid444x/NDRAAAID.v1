@@ -9,6 +9,7 @@ create table if not exists public.game_categories (
   icon_url text,
   sort_order int not null default 0,
   is_active boolean not null default true,
+  show_on_home boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

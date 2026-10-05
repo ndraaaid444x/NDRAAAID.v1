@@ -1,298 +1,451 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase-browser'
-import { User, Mail, Phone, AtSign, Save } from 'lucide-react'
+import PaymentProof from '@/components/payment-proof'
 
-type Profile = {
-  id?: string
-  name?: string | null
-  username?: string | null
-  email?: string | null
-  phone?: string | null
+const statusInfo: Record<string, { label: string; color: string; icon: string }> = {
+  PENDING_PAYMENT: { label: 'Menunggu Pembayaran', color: 'text-amber-300', icon: '⏳' },
+  PAYMENT_RECEIVED: { label: 'Pembayaran Diterima', color: 'text-cyan-300', icon: '✓' },
+  PROCESSING: { label: 'Sedang Diproses', color: 'text-purple-300', icon: '⚙️' },
+  SUCCESS: { label: 'Berhasil', color: 'text-emerald-300', icon: '✓' },
+  FAILED: { label: 'Gagal', color: 'text-rose-300', icon: '✕' },
+  CANCELLED: { label: 'Dibatalkan', color: 'text-slate-300', icon: '✕' },
+  EXPIRED: { label: 'Kedaluwarsa', color: 'text-orange-300', icon: '⌛' },
+  REFUNDED: { label: 'Dana Dikembalikan', color: 'text-blue-300', icon: '↩' },
 }
 
-export default function Account() {
+const slugStatus: Record<string, string> = {
+  'menunggu-pembayaran': 'PENDING_PAYMENT',
+  'pembayaran-diterima': 'PAYMENT_RECEIVED',
+  'sedang-diproses': 'PROCESSING',
+  berhasil: 'SUCCESS',
+  gagal: 'FAILED',
+  dibatalkan: 'CANCELLED',
+  kedaluwarsa: 'EXPIRED',
+  dikembalikan: 'REFUNDED',
+}
+
+const statusSlug: Record<string, string> = Object.fromEntries(
+  Object.entries(slugStatus).map(([slug, status]) => [status, slug])
+)
+
+const labels: Record<string, string> = Object.fromEntries(
+  Object.entries(statusInfo).map(([key, value]) => [key, value.label])
+)
+
+function OrderStatusContent() {
   const router = useRouter()
+  const params = useParams<{ status: string }>()
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id') || ''
+  const routeStatus = slugStatus[params.status || ''] || ''
 
-  const [profile, setProfile] = useState<Profile>({})
+  const [o, setO] = useState<any>(null)
+  const [payment, setPayment] = useState<any>(null)
+  const [paymentMethod, setPaymentMethod] = useState<any>(null)
+  const [history, setHistory] = useState<any[]>([])
+  const [proof, setProof] = useState<any>(null)
+  const [proofUrl, setProofUrl] = useState('')
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
 
-  useEffect(() => {
-    let mounted = true
+  const load = useCallback(async (first = false) => {
+    if (!id) {
+      router.replace('/orders')
+      return
+    }
 
-    async function loadProfile() {
-      const supabase = supabaseBrowser()
+    const s = supabaseBrowser()
+    const {
+      data: { user },
+    } = await s.auth.getUser()
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    if (!user) {
+      router.replace(`/login?next=/order/${encodeURIComponent(params.status || '')}?id=${encodeURIComponent(id)}`)
+      return
+    }
 
-      if (!user) {
-        router.push('/login')
-        return
-      }
+    const { data: order } = await s
+      .from('orders')
+      .select('*,games(name),order_items(*)')
+      .eq('id', id)
+      .single()
 
-      const { data, error } = await supabase
+    if (!order) {
+      router.replace('/orders')
+      return
+    }
+
+    if (order.user_id !== user.id) {
+      const { data: profile } = await s
         .from('profiles')
-        .select('*')
+        .select('role')
         .eq('id', user.id)
         .single()
 
-      if (!mounted) return
-
-      if (error) {
-        setError(error.message)
-        setLoading(false)
+      if (!['owner', 'admin'].includes(profile?.role)) {
+        router.replace('/orders')
         return
       }
-
-      setProfile({
-        ...data,
-        email: data?.email || user.email || '',
-      })
-
-      setLoading(false)
     }
 
-    loadProfile()
-
-    return () => {
-      mounted = false
-    }
-  }, [router])
-
-  async function saveProfile(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault()
-
-    setSaving(true)
-    setMessage('')
-    setError('')
-
-    const supabase = supabaseBrowser()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      router.push('/login')
+    if (order.status !== routeStatus) {
+      router.replace(`/order/${statusSlug[order.status] || 'menunggu-pembayaran'}?id=${encodeURIComponent(id)}`)
       return
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        name: profile.name || '',
-        phone: profile.phone || '',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
+    const [{ data: paymentRow }, { data: hist }, { data: proofs }] = await Promise.all([
+      s.from('payments').select('*').eq('order_id', id).maybeSingle(),
+      s.from('order_status_history').select('*').eq('order_id', id).order('created_at'),
+      s.from('payment_proofs').select('*').eq('order_id', id).order('created_at', { ascending: false }).limit(1),
+    ])
 
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
+    let method = null
+    if (paymentRow?.payment_method_id) {
+      const { data } = await s
+        .from('payment_methods')
+        .select('*')
+        .eq('id', paymentRow.payment_method_id)
+        .maybeSingle()
+      method = data
     }
 
-    setMessage('Profil berhasil disimpan.')
-    setSaving(false)
-  }
+    const latestProof = proofs?.[0] || null
+    let signedUrl = ''
+    if (latestProof?.storage_path) {
+      const { data } = await s.storage.from('payment-proofs').createSignedUrl(latestProof.storage_path, 900)
+      signedUrl = data?.signedUrl || ''
+    }
 
-  if (loading) {
+    setO(order)
+    setPayment(paymentRow)
+    setPaymentMethod(method)
+    setHistory(hist || [])
+    setProof(latestProof)
+    setProofUrl(signedUrl)
+    if (first) setLoading(false)
+  }, [id, params.status, routeStatus, router])
+
+  useEffect(() => {
+    load(true)
+    const timer = window.setInterval(() => load(false), 3000)
+    return () => window.clearInterval(timer)
+  }, [load])
+
+  const paymentMethodIsQris = useMemo(
+    () =>
+      String(paymentMethod?.kind || '').trim().toUpperCase() === 'QRIS' ||
+      String(paymentMethod?.name || '').trim().toLowerCase().includes('qris'),
+    [paymentMethod]
+  )
+
+  const customerEntries = useMemo(() => {
+    const data = o?.customer_data
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return []
+
+    const privateKeys = new Set([
+      'email',
+      'phone',
+      'whatsapp',
+      'wa',
+      'telephone',
+      'phone_number',
+      'whatsapp_number',
+    ])
+
+    const labelMap: Record<string, string> = {
+      id: 'ID',
+      user_id: 'User ID',
+      server: 'Server',
+      zone: 'Zone',
+      zone_id: 'Zone ID',
+      riot_id: 'Riot ID',
+      riotid: 'Riot ID',
+      tag: 'Tag',
+      name: 'Nama',
+      username: 'Username',
+      player_id: 'Player ID',
+      playerid: 'Player ID',
+      uid: 'UID',
+    }
+
+    return Object.entries(data)
+      .filter(([key, value]) => {
+        const normalized = key.toLowerCase().replace(/[\s-]/g, '_')
+        return !privateKeys.has(normalized) && value !== null && value !== undefined && String(value).trim() !== ''
+      })
+      .map(([key, value]) => ({
+        key,
+        label:
+          labelMap[key.toLowerCase()] ||
+          key
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        value:
+          typeof value === 'object'
+            ? JSON.stringify(value)
+            : String(value),
+      }))
+  }, [o])
+
+  if (loading || !o) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-12">
-        <div className="glass rounded-3xl p-8 text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-cyan-400" />
-
-          <p className="mt-4 text-sm text-slate-400">
-            Memuat profil...
-          </p>
-        </div>
+      <main className="mx-auto max-w-2xl px-4 py-12 text-center text-slate-400">
+        Memuat transaksi...
       </main>
     )
   }
 
+  const info = statusInfo[o.status] || {
+    label: o.status,
+    color: 'text-slate-300',
+    icon: '•',
+  }
+
+  const compact = o.status === 'SUCCESS' || ['FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED'].includes(o.status)
+  const subtotal = Number(o.subtotal ?? o.total ?? 0)
+  const discount = Number(o.discount ?? 0)
+  const total = Number(o.total ?? Math.max(0, subtotal - discount))
+  const voucherCode = String(o.voucher_code || '').trim()
+  const hasDiscount = discount > 0 || Boolean(voucherCode)
+  const reference = payment?.external_reference || ''
+
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-8 md:py-10">
-      <div className="mb-5">
-        <p className="text-sm font-bold uppercase tracking-wider text-cyan-300">
-          Account
-        </p>
+    <main className="mx-auto w-full max-w-2xl px-3 py-5 sm:px-4 sm:py-8">
+      <section className="glass overflow-hidden rounded-2xl p-3.5 sm:p-5">
+        <header className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Status Pesanan
+            </p>
+            <h1 className={`mt-1 text-lg font-black sm:text-xl ${info.color}`}>
+              {info.icon} {info.label}
+            </h1>
+          </div>
+          <div className="shrink-0 rounded-lg bg-white/5 px-2.5 py-1.5 text-right">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Order ID</p>
+            <p className="max-w-[150px] break-all text-[11px] font-black text-slate-200">
+              {o.order_code}
+            </p>
+          </div>
+        </header>
 
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-white md:text-4xl">
-          Profile
-        </h1>
-
-        <p className="mt-1 text-sm leading-5 text-slate-500">
-          Kelola informasi akun kamu di sini.
-        </p>
-      </div>
-
-      <form
-        onSubmit={saveProfile}
-        className="glass rounded-2xl border border-white/10 p-4 shadow-2xl sm:p-5"
-      >
-        <div className="grid gap-3.5">
-          {/* NAMA */}
-          <div>
-            <label
-              htmlFor="name"
-              className="mb-2 block text-sm font-semibold text-slate-200"
-            >
-              Nama
-            </label>
-
-            <div className="relative">
-              <User
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
-              />
-
-              <input
-                id="name"
-                type="text"
-                value={profile.name || ''}
-                onChange={(event) =>
-                  setProfile({
-                    ...profile,
-                    name: event.target.value,
-                  })
-                }
-                placeholder="Masukkan nama"
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/60 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
-              />
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Produk</p>
+              <p className="mt-0.5 truncate text-sm font-black text-slate-100">
+                {o.games?.name || 'Produk'}
+              </p>
             </div>
+            <span className="shrink-0 rounded-md bg-white/5 px-2 py-1 text-[9px] font-bold text-slate-400">
+              {info.label}
+            </span>
           </div>
 
-          {/* USERNAME */}
-          <div>
-            <label
-              htmlFor="username"
-              className="mb-2 block text-sm font-semibold text-slate-200"
-            >
-              Username
-            </label>
-
-            <div className="relative">
-              <AtSign
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
-              />
-
-              <input
-                id="username"
-                type="text"
-                value={profile.username || ''}
-                disabled
-                className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.03] py-3 pl-11 pr-4 text-sm text-slate-500 outline-none"
-              />
+          {o.order_items?.length > 0 && (
+            <div className="mt-2 border-t border-white/5 pt-2">
+              {o.order_items.map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 py-0.5 text-xs">
+                  <span className="truncate text-slate-500">{item.product_name}</span>
+                  {item.quantity && Number(item.quantity) > 1 && (
+                    <span className="shrink-0 text-slate-600">×{item.quantity}</span>
+                  )}
+                </div>
+              ))}
             </div>
+          )}
+        </div>
 
-            <p className="mt-2 text-xs text-slate-600">
-              Username tidak dapat diubah.
+        {customerEntries.length > 0 && (
+          <div className="mt-2.5 rounded-xl border border-white/10 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Data Game
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {customerEntries.map((entry) => (
+                <div key={entry.key} className="min-w-0 rounded-lg bg-white/[0.025] px-2.5 py-2">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600">
+                    {entry.label}
+                  </p>
+                  <p className="mt-0.5 break-all text-xs font-bold text-slate-200">
+                    {entry.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2.5 rounded-xl border border-white/10 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Rincian Pembayaran
+            </p>
+            <p className="text-[10px] font-semibold text-slate-600">
+              {paymentMethod?.name || 'Pembayaran'}
             </p>
           </div>
 
-          {/* EMAIL */}
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-semibold text-slate-200"
-            >
-              Email
-            </label>
-
-            <div className="relative">
-              <Mail
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
-              />
-
-              <input
-                id="email"
-                type="email"
-                value={profile.email || ''}
-                disabled
-                className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.03] py-3 pl-11 pr-4 text-sm text-slate-500 outline-none"
-              />
+          <div className="mt-2 space-y-1.5 text-xs">
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-500">Subtotal</span>
+              <span className="font-semibold text-slate-300">
+                Rp {subtotal.toLocaleString('id-ID')}
+              </span>
             </div>
 
-            <p className="mt-2 text-xs text-slate-600">
-              Email akun tidak dapat diubah dari halaman ini.
-            </p>
-          </div>
+            {hasDiscount && (
+              <>
+                {voucherCode && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Voucher</span>
+                    <span className="font-bold text-cyan-300">{voucherCode}</span>
+                  </div>
+                )}
+                {discount > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-500">Diskon</span>
+                    <span className="font-bold text-emerald-300">
+                      -Rp {discount.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
 
-          {/* WHATSAPP */}
-          <div>
-            <label
-              htmlFor="phone"
-              className="mb-2 block text-sm font-semibold text-slate-200"
-            >
-              WhatsApp
-            </label>
-
-            <div className="relative">
-              <Phone
-                size={18}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
-              />
-
-              <input
-                id="phone"
-                type="tel"
-                inputMode="tel"
-                value={profile.phone || ''}
-                onChange={(event) =>
-                  setProfile({
-                    ...profile,
-                    phone: event.target.value,
-                  })
-                }
-                placeholder="Contoh: 081234567890"
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/60 py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/10"
-              />
+            <div className="mt-2 flex items-center justify-between gap-4 border-t border-white/10 pt-2">
+              <span className="font-bold text-slate-300">Total</span>
+              <span className="text-base font-black text-cyan-300">
+                Rp {total.toLocaleString('id-ID')}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* ERROR */}
-        {error && (
-          <div className="mt-5 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3">
-            <p className="text-sm leading-6 text-red-300">
-              {error}
+        {o.status === 'PENDING_PAYMENT' && (
+          <div className="mt-2.5 rounded-xl border border-amber-400/10 bg-amber-400/[0.03] p-3">
+            <p className="text-xs font-black text-slate-200">
+              {paymentMethod?.name || 'Metode pembayaran'}
+            </p>
+
+            {paymentMethodIsQris && (
+              <div className="mt-2.5 rounded-xl bg-white p-2">
+                <p className="mb-2 text-center text-[10px] font-bold text-slate-900">
+                  Scan QRIS untuk pembayaran
+                </p>
+                <img
+                  src="/qris.png"
+                  alt="QRIS Pembayaran"
+                  className="mx-auto block w-full max-w-[210px] rounded-lg"
+                />
+              </div>
+            )}
+
+            <p className="mt-2 text-[11px] leading-5 text-slate-500">
+              {paymentMethod?.instruction || 'Bayar sesuai total lalu upload bukti.'}
             </p>
           </div>
         )}
 
-        {/* SUCCESS */}
-        {message && (
-          <div className="mt-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3">
-            <p className="text-sm leading-6 text-cyan-300">
-              {message}
-            </p>
+        {o.status === 'PENDING_PAYMENT' && (
+          <div className="mt-2.5">
+            <PaymentProof orderId={o.id} />
           </div>
         )}
 
-        {/* BUTTON */}
-        <div className="mt-5 flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn btn-primary inline-flex min-w-[140px] items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+        {o.status === 'SUCCESS' && (
+          <div className="mt-2.5 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.035] p-3">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2.5">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                  Struk Transaksi
+                </p>
+                <p className="mt-0.5 text-sm font-black text-emerald-300">
+                  Pembayaran Berhasil
+                </p>
+              </div>
+              <span className="text-lg">✓</span>
+            </div>
+
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-white/[0.025] p-2">
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">REFF ID</p>
+                <p className="mt-0.5 break-all text-[11px] font-bold text-slate-200">
+                  {reference || 'Belum tersedia'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-white/[0.025] p-2">
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">Tanggal</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-300">
+                  {new Date(o.updated_at || o.created_at).toLocaleString('id-ID')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2.5 rounded-xl border border-white/10 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Perjalanan Pesanan
+          </p>
+
+          <div className="mt-2 space-y-2">
+            {history.map((item: any) => (
+              <div key={item.id} className="flex gap-2.5 border-l-2 border-purple-500/40 pl-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-300">
+                    {labels[item.new_status] || item.new_status}
+                  </p>
+                  <p className="text-[9px] text-slate-600">
+                    {new Date(item.created_at).toLocaleString('id-ID')}
+                  </p>
+                  {item.note &&
+                    !String(item.note).toLowerCase().includes('diproses manual oleh owner') && (
+                      <p className="mt-0.5 text-[10px] leading-4 text-slate-500">{item.note}</p>
+                    )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {proof && proofUrl && !compact && (
+          <a
+            href={proofUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2.5 block rounded-lg border border-cyan-400/20 bg-cyan-400/[0.04] px-3 py-2 text-center text-[11px] font-bold text-cyan-300"
           >
-            <Save size={17} />
+            Lihat bukti pembayaran →
+          </a>
+        )}
 
-            {saving ? 'Menyimpan...' : 'Simpan'}
+        {o.status === 'SUCCESS' && (
+          <button
+            type="button"
+            onClick={() => router.push('/review')}
+            className="mt-2.5 w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2.5 text-xs font-black text-cyan-300 transition hover:bg-cyan-400/15"
+          >
+            ⭐ Beri Penilaian
           </button>
-        </div>
-      </form>
+        )}
+      </section>
     </main>
+  )
+}
+
+export default function OrderStatusPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-2xl px-4 py-12 text-center text-slate-400">
+          Memuat transaksi...
+        </main>
+      }
+    >
+      <OrderStatusContent />
+    </Suspense>
   )
 }

@@ -194,7 +194,7 @@ alter table public.game_products add column if not exists image_url text;
 -- =========================
 create table if not exists public.game_categories (
   id uuid primary key default gen_random_uuid(), name text not null unique, slug text not null unique,
-  description text, icon_url text, sort_order int not null default 0, is_active boolean not null default true,
+  description text, icon_url text, sort_order int not null default 0, is_active boolean not null default true, show_on_home boolean not null default true,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 alter table public.games add column if not exists category_id uuid references public.game_categories(id) on delete set null;
