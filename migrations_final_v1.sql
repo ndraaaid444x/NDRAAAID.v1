@@ -1,6 +1,3 @@
--- Category Home visibility compatibility.
-alter table public.game_categories add column if not exists show_on_home boolean not null default true;
-
 -- NDRAAAID.v1 Final hardening / feature migration
 -- Run AFTER the existing schema + hardening/deposit migrations.
 
