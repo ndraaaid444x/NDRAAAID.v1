@@ -49,6 +49,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
+import { fetchAll } from '@/lib/fetch-all'
 
 const transitions: Record<string, string[]> = {
   PENDING_PAYMENT: ['PAYMENT_RECEIVED', 'CANCELLED', 'EXPIRED'],
@@ -626,10 +627,14 @@ export default function Admin() {
         .order('created_at', { ascending: false })
         .limit(200),
 
-      s
-        .from('games')
-        .select('*,game_categories(name)')
-        .order('created_at', { ascending: false }),
+      fetchAll((from, to) =>
+        s
+          .from('games')
+          .select('*,game_categories(name)')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      ),
 
       s
         .from('game_categories')
@@ -637,10 +642,14 @@ export default function Admin() {
         .order('sort_order')
         .order('name'),
 
-      s
-        .from('game_products')
-        .select('*,games(id,name,category_id,popular)')
-        .order('created_at', { ascending: false }),
+      fetchAll((from, to) =>
+        s
+          .from('game_products')
+          .select('*,games(id,name,category_id,popular)')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      ),
 
       s
         .from('payment_methods')
