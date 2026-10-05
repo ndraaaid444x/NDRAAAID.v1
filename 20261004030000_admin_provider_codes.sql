@@ -1,6 +1,0 @@
--- Admin -> Kode Provider is backed by the existing provider_catalog/provider_products
--- schema and Edge Functions. No transaction switch is changed here.
--- Edge Functions:
---   digiflazz-sync: authenticated admin sync
---   digiflazz-mapping: manual map/unmap, lock/unlock, auto-map
--- Transaction processing remains disabled by provider_settings.is_active = false.
