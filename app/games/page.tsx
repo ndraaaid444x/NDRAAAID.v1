@@ -3,18 +3,24 @@
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-browser'
 import GameCard from '@/components/game-card'
+import { fetchAll } from '@/lib/fetch-all'
 
 export default function Games() {
   const [games, setGames] = useState<any[]>([])
   const [q, setQ] = useState('')
 
   useEffect(() => {
-    supabaseBrowser()
-      .from('games')
-      .select('*')
-      .eq('is_active', true)
-      .order('popular', { ascending: false })
-      .then(({ data }) => setGames(data || []))
+    const s = supabaseBrowser()
+    fetchAll((from, to) =>
+      s
+        .from('games')
+        .select('*')
+        .eq('is_active', true)
+        .order('popular', { ascending: false })
+        .order('name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    ).then(({ data }) => setGames(data || []))
   }, [])
 
   const filtered = games.filter((g) =>
